@@ -11,6 +11,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
@@ -69,9 +70,23 @@ func (fake fakeRegions) Lookup(_ context.Context, lon, lat float64) (regions.Loo
 	}, nil
 }
 
+type fakeOfficial struct {
+	err                error
+	district, division *string
+}
+
+func (fake fakeOfficial) Official(_ context.Context, districtID, dsID string) (*warnings.OfficialAt, error) {
+	if fake.err != nil {
+		return nil, fake.err
+	}
+	*fake.district, *fake.division = districtID, dsID
+	return &warnings.OfficialAt{Status: "available", Warnings: []warnings.Bulletin{{ID: "bulletin"}}, General: []warnings.Bulletin{}}, nil
+}
+
 func TestSummaryForColombo(t *testing.T) {
+	var district, division string
 	service := &Service{Weather: fakeWeather{}, Rivers: fakeRivers{}, Floods: fakeFloods{}, Regions: fakeRegions{},
-		Now: func() time.Time { return start }}
+		Official: fakeOfficial{district: &district, division: &division}, Now: func() time.Time { return start }}
 	summary, err := service.Summary(context.Background(), 79.8612, 6.9271)
 	if err != nil {
 		t.Fatal(err)
@@ -91,8 +106,20 @@ func TestSummaryForColombo(t *testing.T) {
 	if find(summary.Alerts, "heavy_rain") == nil || find(summary.Alerts, "river_level") == nil {
 		t.Fatalf("alerts = %+v", summary.Alerts)
 	}
-	if summary.Official.Status != "not_available" || summary.Official.Warnings == nil {
-		t.Fatalf("official = %+v", summary.Official)
+	if summary.Official.Status != "available" || len(summary.Official.Warnings) != 1 || district != "LK-11" || division != "LK-1103" {
+		t.Fatalf("official = %+v for %q %q", summary.Official, district, division)
+	}
+}
+
+func TestSummarySaysWhenOfficialWarningsCannotBeRead(t *testing.T) {
+	service := &Service{Official: fakeOfficial{err: errors.New("down")}}
+	summary, err := service.Summary(context.Background(), 79.8612, 6.9271)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Official.Status != "not_available" || !summary.Official.Stale || summary.Official.Warnings == nil ||
+		!slices.Contains(summary.Unavailable, "official") {
+		t.Fatalf("summary = %+v", summary)
 	}
 }
 
@@ -102,7 +129,7 @@ func TestSummaryListsUnavailableParts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.Weather != nil || len(summary.Unavailable) != 4 || summary.Rivers == nil || summary.Alerts == nil {
+	if summary.Weather != nil || len(summary.Unavailable) != 5 || summary.Rivers == nil || summary.Alerts == nil {
 		t.Fatalf("summary = %+v", summary)
 	}
 

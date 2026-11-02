@@ -105,6 +105,12 @@ export interface WeatherAlert {
   /** When it lapses, if stated. */
   validUntil?: string
   summary?: string
+  /** An issuer's own words for the level, shown in place of the severity's. */
+  badgeLabel?: string
+  /** `summary` is an excerpt of a longer official document. */
+  excerpt?: boolean
+  /** The official document. */
+  link?: { href: string; label: string }
 }
 
 export type AdminLevel = "province" | "district" | "ds" | "gn"

@@ -18,10 +18,14 @@ export const sriLankaBounds: LngLatBoundsLike = [
 ]
 
 /**
- * Panning limit: wide enough to follow a cyclone approaching from the Bay of
- * Bengal or the Arabian Sea, narrow enough to keep the map about Sri Lanka.
+ * Panning limit: wide enough for the earthquakes and cyclones drawn, the
+ * Indian Ocean from 60° to 105° E, and narrow enough to keep the map about
+ * Sri Lanka.
  */
 export const panLimit: LngLatBoundsLike = [
-  [70, -2],
-  [92, 18],
+  [55, -20],
+  [110, 30],
 ]
+
+/** Far enough out to see that region at once on a laptop. */
+export const minimumZoom = 3

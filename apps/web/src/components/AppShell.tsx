@@ -28,6 +28,8 @@ interface AppShellProps {
   onDetailClose?: () => void
   /** Accessible name of the detail sheet on phones. */
   detailLabel?: string
+  /** On phones, opens the detail sheet at full height, for a list to read. */
+  detailFull?: boolean
   /** Map legends, bottom left over the map (md and up). */
   legends?: React.ReactNode
   /** A short notice centred under the toolbar or the phone bar, e.g. "Zoom in to see GN divisions". */
@@ -50,6 +52,7 @@ export function AppShell({
   detail,
   onDetailClose,
   detailLabel = "Details",
+  detailFull = false,
   legends,
   notice,
   timeline,
@@ -111,7 +114,12 @@ export function AppShell({
       )}
 
       {!desktop && (
-        <DetailSheet open={Boolean(detail)} onClose={() => onDetailClose?.()} label={detailLabel}>
+        <DetailSheet
+          open={Boolean(detail)}
+          onClose={() => onDetailClose?.()}
+          label={detailLabel}
+          openFull={detailFull}
+        >
           {detail}
         </DetailSheet>
       )}

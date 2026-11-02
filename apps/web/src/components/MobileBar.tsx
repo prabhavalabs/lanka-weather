@@ -34,7 +34,8 @@ export function MobileBar({ layers, activeCount = 0, footer, actions }: MobileBa
         <DrawerTrigger asChild>
           <Button variant="secondary" size="sm" aria-label={`Layers, ${activeCount} on`}>
             <LayersIcon />
-            Layers
+            {/* The bar also holds search and warnings: the word goes where it would squeeze the name. */}
+            <span className="max-[29.99rem]:sr-only">Layers</span>
             {activeCount > 0 && (
               <span className="numeric rounded-full bg-brand px-1.5 text-[0.6875rem] leading-4 text-brand-foreground">
                 {activeCount}

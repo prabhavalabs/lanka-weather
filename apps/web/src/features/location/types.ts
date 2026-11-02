@@ -1,6 +1,7 @@
 /** Mirrors the location endpoints of the Go service (docs/api/weather-and-floods.md). */
 import type { NearbyRiverRisk } from "../river-risk/types"
 import type { RiverStatus, RiverTrend } from "../rivers/types"
+import type { OfficialAt } from "../warnings/types"
 
 export type RegionLevel = "province" | "district" | "ds" | "gn"
 
@@ -163,17 +164,6 @@ export interface DerivedAlert {
   basis: string
 }
 
-export interface OfficialWarning {
-  id?: string
-  title: string
-  issuer?: string
-  area?: string
-  issuedAt?: string
-  validUntil?: string | null
-  severity?: string
-  summary?: string
-}
-
 export interface Summary {
   location: { lat: number; lon: number }
   generatedAt: string
@@ -189,6 +179,6 @@ export interface Summary {
   nearbyRivers?: NearbyRiverRisk[] | null
   floodForecast: { gauges: NearbyFloodGauge[]; areas: NearbyFloodArea[] } | null
   alerts: DerivedAlert[]
-  official: { status: string; warnings: OfficialWarning[]; note?: string }
+  official: OfficialAt
   unavailable: string[]
 }

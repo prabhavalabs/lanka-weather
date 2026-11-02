@@ -4,7 +4,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { readTokens } from "@/lib/tokens"
 import { basemapTokens, tuneBasemap } from "./basemap"
-import { mapStyles, panLimit, sriLankaBounds, type MapTheme } from "./config"
+import { mapStyles, minimumZoom, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
 
 // MapLibre finds its worker next to its own module. Vite pre-bundles the
@@ -51,7 +51,7 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
       bounds: sriLankaBounds,
       fitBoundsOptions: { padding: 24 },
       maxBounds: panLimit,
-      minZoom: 5,
+      minZoom: minimumZoom,
       maxZoom: 16,
       attributionControl: { compact: true },
     })

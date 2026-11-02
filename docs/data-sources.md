@@ -22,7 +22,7 @@ Status values: **planned** (not yet implemented), **active**,
 | Source | Data | Access | Cadence | Licence / terms | Status |
 |---|---|---|---|---|---|
 | NOAA GFS (`noaa-gfs`, NOAA Open Data on AWS) | 10 m wind (U/V) on the 0.25° grid, cropped to 70–92° E, 2° S–18° N, every 3 h to 72 h, for the animated wind layer | GRIB2 by HTTP byte range using the `.idx` inventory (`noaa-gfs-bdp-pds.s3.amazonaws.com`); about 1.9 MB per forecast hour, 47 MB per run. Checked every 30 min (ADR 0007) | 4 runs a day | US government work, public domain; credit "NOAA GFS" | active |
-| Department of Meteorology | Daily rainfall and temperature per station; forecasts; warnings | Website and bulletins; no public API found | Daily, plus ad hoc warnings | Government data; attribute the department | evaluating |
+| Department of Meteorology | Daily rainfall and temperature per station; forecasts; warnings | Website and bulletins; no public API found. `www.meteo.gov.lk` and `meteo.gov.lk` timed out on 2026-11-02, also when retried; its forecasts and warnings are shown as the DMC republishes them (ADR 0011) | Daily, plus ad hoc warnings | Government data; attribute the department | evaluating |
 | `nuuuwan/weather_lk` | Parsed Met Department daily station data | Raw JSON (`data/latest_flat.json`). Do not clone: the repository is about 50 GB | 6 h | Code MIT; data as upstream | planned |
 | `nuuuwan/lk_weather_3h` | Met Department three-hourly observations at 24 stations | Raw JSON (`data/alert_data.json`) | 15 min | Code MIT; data as upstream | planned |
 | NASA GIBS | IMERG precipitation, infrared cloud imagery | WMTS raster tiles, loaded by the browser | 30 min to 3 h; IMERG early run lags 4 to 7 h | NASA open data; attribution requested | planned |
@@ -34,11 +34,12 @@ Status values: **planned** (not yet implemented), **active**,
 
 | Source | Data | Access | Cadence | Licence / terms | Status |
 |---|---|---|---|---|---|
-| NBRO landslide early warnings (via DMC) | Warning level per divisional secretariat division | `nuuuwan/lk_dmc_landslides` (`data/latest_flat.json`); upstream is published as PDF notices | 3 h | Government data; code MIT | planned |
-| Disaster Management Centre | Situation reports, flood and river warnings, weather advisories | `nuuuwan/lk_dmc` data branches (PDF, text and JSON) | 2 h | Government data; code MIT | planned |
-| GDACS | Tropical cyclone tracks and alerts for all basins | RSS / GeoJSON API | Event-driven | Free use with attribution | planned |
-| Joint Typhoon Warning Center, IMD RSMC New Delhi | North Indian Ocean cyclone advisories | Text and graphic bulletins | Event-driven | Public advisories | evaluating |
-| USGS earthquakes (and `nuuuwan/lk_tsunamis`) | Earthquakes near Sri Lanka, tsunami relevance | GeoJSON feed | 1 to 15 min | Public domain | planned |
+| NBRO landslide early warnings via DMC (`nuuuwan-lk-dmc-landslides`) | NBRO's level per divisional secretariat division, every report since 2019 | `nuuuwan/lk_dmc_landslides` (`data/all.json`, about 550 kB) from raw.githubusercontent.com, every 2 h; upstream is published as PDF notices, which reach this file about 4.5 h after issue (ADR 0011) | About daily while a risk lasts | Government data; code MIT. Attribute NBRO and the DMC | active |
+| Disaster Management Centre (`dmc-reports`) | Landslide reports, water level and flood warnings, weather reports and advisories, situation reports: index metadata, official PDF links, and clean English excerpts where the text allows | `nuuuwan/lk_dmc` data branches: `data/<dataset>/docs_last100.tsv`, `summary.json` and each new document's `doc.txt`, from raw.githubusercontent.com, hourly (ADR 0011). PDFs are linked, never stored | Several a day; indexes rebuilt about hourly | Government data; code MIT. Attribute the DMC and link the PDF | active |
+| GDACS (`gdacs`) | Current tropical cyclones in the North Indian Ocean: position, track, forecast, wind buffers, cone and alert | GeoJSON API, `www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH` and one `polygons/getgeometry` per current event, hourly (ADR 0011) | Event-driven | Free use with attribution; credit "Global Disaster Alert and Coordination System (GDACS), gdacs.org" | active |
+| Joint Typhoon Warning Center, IMD RSMC New Delhi | North Indian Ocean cyclone advisories. GDACS's track draws on JTWC | Text and graphic bulletins | Event-driven | Public advisories | evaluating |
+| USGS earthquakes (`usgs-earthquakes`) | Earthquakes of the last 30 days: M4.5+ across the Indian Ocean, M2.5+ near Sri Lanka, with USGS's tsunami flag | FDSN event service, `earthquake.usgs.gov/fdsnws/event/1/query`, two queries every 15 min (ADR 0011) | Minutes | US government work, public domain; credit USGS | active |
+| `nuuuwan/lk_tsunamis` | Tsunami history for Sri Lanka | Raw files on GitHub | Occasional | Code MIT; data as upstream | planned |
 
 ## Geography
 

@@ -1,7 +1,7 @@
 // Package summary answers "what is happening here?" for one place: the
 // weather and a short forecast, the nearest river gauges and Google flood
-// forecasts, and alerts derived from them. Derived alerts are estimates;
-// official warnings, when they are collected, go in their own slot.
+// forecasts, alerts derived from them, and official warnings. Derived alerts
+// are estimates; official warnings are authoritative and have their own slot.
 package summary
 
 import (
@@ -16,6 +16,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
@@ -45,6 +46,12 @@ type RiverRiskSource interface {
 	Near(ctx context.Context, lon, lat float64) ([]riverrisk.NearbyRiver, error)
 }
 
+// OfficialSource gathers official warnings for a place's district and DS
+// division.
+type OfficialSource interface {
+	Official(ctx context.Context, districtID, dsID string) (*warnings.OfficialAt, error)
+}
+
 // Service builds summaries. Any source may be nil.
 type Service struct {
 	Weather   WeatherSource
@@ -52,6 +59,7 @@ type Service struct {
 	Floods    FloodSource
 	Regions   RegionLookup
 	RiverRisk RiverRiskSource
+	Official  OfficialSource
 	Logger    *slog.Logger
 	Now       func() time.Time
 }
@@ -85,11 +93,12 @@ type Summary struct {
 	FloodForecast FloodForecast           `json:"floodForecast"`
 	// Alerts are derived by lanka-weather and are estimates.
 	Alerts []Alert `json:"alerts"`
-	// Official will hold Department of Meteorology and DMC warnings, which
-	// are authoritative; they are not collected yet.
-	Official Official `json:"official"`
+	// Official holds NBRO, Department of Meteorology and DMC warnings, which
+	// are authoritative: the landslide level of the place's DS division,
+	// bulletins naming its district and the latest general bulletins.
+	Official *warnings.OfficialAt `json:"official"`
 	// Unavailable lists the parts that could not be filled: weather,
-	// regions, rivers, nearbyRivers or floodForecast.
+	// regions, rivers, nearbyRivers, floodForecast or official.
 	Unavailable []string `json:"unavailable"`
 }
 
@@ -141,11 +150,11 @@ type FloodGauge struct {
 	Lat             float64    `json:"lat"`
 }
 
-// Official is the slot for authoritative warnings.
-type Official struct {
-	Status   string `json:"status"`
-	Warnings []any  `json:"warnings"`
-	Note     string `json:"note"`
+// officialUnavailable says official warnings could not be read, and does not
+// let that read as calm.
+func officialUnavailable() *warnings.OfficialAt {
+	return &warnings.OfficialAt{Status: "not_available", Warnings: []warnings.Bulletin{}, General: []warnings.Bulletin{}, Stale: true,
+		Note: "Official warnings could not be read just now. Check with the Disaster Management Centre and the Department of Meteorology."}
 }
 
 // Summary builds the summary for a place. A failing source leaves its part
@@ -154,8 +163,7 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 	summary := &Summary{
 		Location: weather.Location{Lat: lat, Lon: lon}, GeneratedAt: service.now(),
 		Rivers: []River{}, NearbyRivers: []riverrisk.NearbyRiver{}, FloodForecast: FloodForecast{Gauges: []FloodGauge{}, Areas: []floods.AreaAt{}},
-		Official: Official{Status: "not_available", Warnings: []any{},
-			Note: "Department of Meteorology and Disaster Management Centre warnings are authoritative; they will appear here once collected."},
+		Official:    officialUnavailable(),
 		Unavailable: []string{},
 	}
 	inputs := Inputs{}
@@ -236,6 +244,24 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 		} else {
 			summary.NearbyRivers = nearby
 		}
+	}
+	if service.Official != nil {
+		districtID, dsID := "", ""
+		if summary.Regions != nil && summary.Regions.District != nil {
+			districtID = summary.Regions.District.ID
+		}
+		if summary.Regions != nil && summary.Regions.DS != nil {
+			dsID = summary.Regions.DS.ID
+		}
+		official, err := service.Official.Official(ctx, districtID, dsID)
+		if err != nil {
+			service.warn("summary official warnings", err)
+			summary.Unavailable = append(summary.Unavailable, "official")
+		} else {
+			summary.Official = official
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "official")
 	}
 
 	summary.Alerts = Evaluate(inputs)

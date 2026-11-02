@@ -1,0 +1,211 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "bbox": [140.2, 23.0, 140.2, 23.0],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [140.2, 23.0]
+      },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001343,
+        "episodeid": 41,
+        "eventname": "IN-FA-26",
+        "glide": "",
+        "name": "Tropical Cyclone IN-FA-26",
+        "description": "Tropical Cyclone IN-FA-26",
+        "htmldescription": "Green Tropical Cyclone IN-FA-26 in Japan, Marshall Islands from: 25 Oct 2026  to: 02 Nov 2026 .",
+        "icon": "https://www.gdacs.org/images/gdacs_icons/maps/Green/TC.png",
+        "iconoverall": "https://www.gdacs.org/images/gdacs_icons/maps/Green/TC.png",
+        "url": {
+          "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=TC&eventid=1001343&episodeid=41",
+          "report": "https://www.gdacs.org/report.aspx?eventid=1001343&episodeid=41&eventtype=TC",
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=TC&eventid=1001343"
+        },
+        "alertlevel": "Green",
+        "alertscore": 1,
+        "episodealertlevel": "Green",
+        "episodealertscore": 1.0,
+        "istemporary": "false",
+        "iscurrent": "true",
+        "country": "Japan, Marshall Islands",
+        "fromdate": "2026-10-25T06:00:00",
+        "todate": "2026-11-02T12:00:00",
+        "datemodified": "2026-11-02T14:07:58",
+        "iso3": "MHL",
+        "source": "JTWC",
+        "sourceid": "",
+        "polygonlabel": "Centroid",
+        "Class": "Point_Centroid",
+        "countryonland": "",
+        "affectedcountries": [
+          {
+            "iso2": "JP",
+            "iso3": "JPN",
+            "countryname": "Japan"
+          }
+        ],
+        "severitydata": {
+          "severity": 240.7392,
+          "severitytext": "Hurricane/Typhoon > 74 mph (maximum wind speed of 241 km/h)",
+          "severityunit": "km/h"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "bbox": [80.7, 14.7, 80.7, 14.7],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [80.7, 14.7]
+      },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001346,
+        "episodeid": 7,
+        "eventname": "MURASU-26",
+        "glide": "TC-2026-000199-IND",
+        "name": "Tropical Cyclone MURASU-26",
+        "description": "Tropical Cyclone MURASU-26",
+        "htmldescription": "Red Tropical Cyclone MURASU-26 in India from: 01 Nov 2026  to: 02 Nov 2026 .",
+        "icon": "https://www.gdacs.org/images/gdacs_icons/maps/Red/TC.png",
+        "iconoverall": "https://www.gdacs.org/images/gdacs_icons/maps/Red/TC.png",
+        "url": {
+          "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=TC&eventid=1001346&episodeid=7",
+          "report": "https://www.gdacs.org/report.aspx?eventid=1001346&episodeid=7&eventtype=TC",
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=TC&eventid=1001346"
+        },
+        "alertlevel": "Red",
+        "alertscore": 3,
+        "episodealertlevel": "Red",
+        "episodealertscore": 3.0,
+        "istemporary": "false",
+        "iscurrent": "true",
+        "country": "India",
+        "fromdate": "2026-11-01T00:00:00",
+        "todate": "2026-11-02T12:00:00",
+        "datemodified": "2026-11-02T18:01:57",
+        "iso3": "IND",
+        "source": "JTWC",
+        "sourceid": "",
+        "polygonlabel": "Centroid",
+        "Class": "Point_Centroid",
+        "countryonland": "",
+        "affectedcountries": [
+          {
+            "iso2": "IN",
+            "iso3": "IND",
+            "countryname": "India"
+          }
+        ],
+        "severitydata": {
+          "severity": 120.3696,
+          "severitytext": "Hurricane/Typhoon > 74 mph (maximum wind speed of 120 km/h)",
+          "severityunit": "km/h"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "bbox": [-107.7, 20.7, -107.7, 20.7],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-107.7, 20.7]
+      },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001341,
+        "episodeid": 35,
+        "eventname": "VANCE-26",
+        "glide": "",
+        "name": "Tropical Cyclone VANCE-26",
+        "description": "Tropical Cyclone VANCE-26",
+        "htmldescription": "Green Tropical Cyclone VANCE-26 in M\u00e9xico from: 21 Oct 2026  to: 30 Oct 2026 .",
+        "icon": "https://www.gdacs.org/images/gdacs_icons/maps/Green/TC.png",
+        "iconoverall": "https://www.gdacs.org/images/gdacs_icons/maps/Green/TC.png",
+        "url": {
+          "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=TC&eventid=1001341&episodeid=35",
+          "report": "https://www.gdacs.org/report.aspx?eventid=1001341&episodeid=35&eventtype=TC",
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=TC&eventid=1001341"
+        },
+        "alertlevel": "Green",
+        "alertscore": 1,
+        "episodealertlevel": "Green",
+        "episodealertscore": 1.0,
+        "istemporary": "false",
+        "iscurrent": "true",
+        "country": "M\u00e9xico",
+        "fromdate": "2026-10-21T15:00:00",
+        "todate": "2026-10-30T03:00:00",
+        "datemodified": "2026-10-31T00:07:32",
+        "iso3": "",
+        "source": "NOAA",
+        "sourceid": "",
+        "polygonlabel": "Centroid",
+        "Class": "Point_Centroid",
+        "countryonland": "",
+        "affectedcountries": [],
+        "severitydata": {
+          "severity": 138.888,
+          "severitytext": "Tropical Depression (maximum wind speed of 139 km/h)",
+          "severityunit": "km/h"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "bbox": [81.8, 16.4, 81.8, 16.4],
+      "geometry": {
+        "type": "Point",
+        "coordinates": [81.8, 16.4]
+      },
+      "properties": {
+        "eventtype": "TC",
+        "eventid": 1001345,
+        "episodeid": 10,
+        "eventname": "ARNAB-26",
+        "glide": "TC-2026-000197-IND",
+        "name": "Tropical Cyclone ARNAB-26",
+        "description": "Tropical Cyclone ARNAB-26",
+        "htmldescription": "Red Tropical Cyclone ARNAB-26 in India from: 26 Oct 2026  to: 28 Oct 2026 .",
+        "icon": "https://www.gdacs.org/images/gdacs_icons/maps/Orange/TC.png",
+        "iconoverall": "https://www.gdacs.org/images/gdacs_icons/maps/Red/TC.png",
+        "url": {
+          "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=TC&eventid=1001345&episodeid=10",
+          "report": "https://www.gdacs.org/report.aspx?eventid=1001345&episodeid=10&eventtype=TC",
+          "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=TC&eventid=1001345"
+        },
+        "alertlevel": "Red",
+        "alertscore": 3,
+        "episodealertlevel": "Orange",
+        "episodealertscore": 2.0,
+        "istemporary": "false",
+        "iscurrent": "false",
+        "country": "India",
+        "fromdate": "2026-10-26T00:00:00",
+        "todate": "2026-10-28T06:00:00",
+        "datemodified": "2026-10-29T08:02:06",
+        "iso3": "IND",
+        "source": "JTWC",
+        "sourceid": "",
+        "polygonlabel": "Centroid",
+        "Class": "Point_Centroid",
+        "countryonland": "",
+        "affectedcountries": [
+          {
+            "iso2": "IN",
+            "iso3": "IND",
+            "countryname": "India"
+          }
+        ],
+        "severitydata": {
+          "severity": 222.2208,
+          "severitytext": "Tropical Storm (maximum wind speed of 222 km/h)",
+          "severityunit": "km/h"
+        }
+      }
+    }
+  ]
+}

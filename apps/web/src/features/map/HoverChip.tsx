@@ -22,6 +22,17 @@ import type { RegionWeather } from "../regions/types"
 import { sampleWind, windText, type WindField } from "../wind/field"
 import { useMap } from "./MapContext"
 
+/** Other layers the chip can name, and how. */
+export interface HoverLayers {
+  /** Small points, hit with a little slack, drawn over gauges and regions. */
+  points: string[]
+  /** Areas, hit exactly, drawn over regions. */
+  areas: string[]
+  describe: (
+    feature: MapGeoJSONFeature,
+  ) => { title: string; local?: string; lines: string[] } | null
+}
+
 interface HoverChipProps {
   /** Region weather by region id, and what the choropleth shows. */
   regions?: { variable: RegionVariable | null; lookup: Map<string, RegionWeather> } | null
@@ -34,6 +45,7 @@ interface HoverChipProps {
     byFid: Map<number, { name: string; state: BasinState }>
     subbasins: Map<number, BasinState>
   } | null
+  hazards?: HoverLayers | null
 }
 
 interface Chip {
@@ -53,15 +65,15 @@ const pointSlack = 5
  * wind there when the wind layer is on. Hovered regions are outlined. Only
  * on devices with a mouse; on touch, a tap opens the panel instead.
  */
-export function HoverChip({ regions, wind, rivers, basins }: HoverChipProps) {
+export function HoverChip({ regions, wind, rivers, basins, hazards }: HoverChipProps) {
   const map = useMap()
   const canHover = useMediaQuery("(hover: hover) and (pointer: fine)")
   const [chip, setChip] = useState<Chip | null>(null)
-  const props = useRef({ regions, wind, rivers, basins })
+  const props = useRef({ regions, wind, rivers, basins, hazards })
 
   useEffect(() => {
-    props.current = { regions, wind, rivers, basins }
-  }, [regions, wind, rivers, basins])
+    props.current = { regions, wind, rivers, basins, hazards }
+  }, [regions, wind, rivers, basins, hazards])
 
   useEffect(() => {
     if (!map || !canHover) return
@@ -97,6 +109,7 @@ export function HoverChip({ regions, wind, rivers, basins }: HoverChipProps) {
         wind: field,
         rivers: riverInfo,
         basins: basinInfo,
+        hazards: hazardLayers,
       } = props.current
       const lines: string[] = []
 
@@ -114,26 +127,36 @@ export function HoverChip({ regions, wind, rivers, basins }: HoverChipProps) {
         [x - pointSlack, y - pointSlack],
         [x + pointSlack, y + pointSlack],
       ]
+      const hazardPoints = (hazardLayers?.points ?? []).filter((id) => map.getLayer(id))
+      const hazardAreas = (hazardLayers?.areas ?? []).filter((id) => map.getLayer(id))
+      const hazard: MapGeoJSONFeature | undefined = point
+        ? undefined
+        : ((hazardPoints.length
+            ? map.queryRenderedFeatures(near, { layers: hazardPoints })[0]
+            : undefined) ??
+          (hazardAreas.length
+            ? map.queryRenderedFeatures(event.point, { layers: hazardAreas })[0]
+            : undefined))
       const area =
-        !point && map.getLayer(FLOOD_AREAS)
+        !point && !hazard && map.getLayer(FLOOD_AREAS)
           ? map.queryRenderedFeatures(event.point, { layers: [FLOOD_AREAS] })[0]
           : undefined
       const riverLayers = RIVER_LINES.filter((id) => map.getLayer(id))
       const river =
-        !point && !area && riverLayers.length
+        !point && !hazard && !area && riverLayers.length
           ? map.queryRenderedFeatures(near, { layers: riverLayers })[0]
           : undefined
       const past =
-        !point && !area && !river && map.getLayer(PAST_FLOOD_FILL)
+        !point && !hazard && !area && !river && map.getLayer(PAST_FLOOD_FILL)
           ? map.queryRenderedFeatures(event.point, { layers: [PAST_FLOOD_FILL] })[0]
           : undefined
       const basinLayers = [BASIN_FILL, SUBBASIN_FILL].filter((id) => map.getLayer(id))
       const basin =
-        !point && !area && !river && !past && basinLayers.length
+        !point && !hazard && !area && !river && !past && basinLayers.length
           ? map.queryRenderedFeatures(event.point, { layers: basinLayers })[0]
           : undefined
       const region: MapGeoJSONFeature | undefined =
-        !point && !area && !river && !past && !basin && map.getLayer(REGIONS_FILL)
+        !point && !hazard && !area && !river && !past && !basin && map.getLayer(REGIONS_FILL)
           ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
           : undefined
 
@@ -143,7 +166,7 @@ export function HoverChip({ regions, wind, rivers, basins }: HoverChipProps) {
           : null,
       )
       map.getCanvas().style.cursor =
-        point || area || river || past || basin || region ? "pointer" : ""
+        point || hazard || area || river || past || basin || region ? "pointer" : ""
 
       let title = ""
       let local: string | undefined
@@ -164,6 +187,13 @@ export function HoverChip({ regions, wind, rivers, basins }: HoverChipProps) {
         lines.push(
           `Flood forecast: ${floodSeverityLabels[point.properties.severity as FloodSeverity] ?? "unknown"}`,
         )
+      } else if (hazard) {
+        const described = hazardLayers?.describe(hazard)
+        if (described) {
+          title = described.title
+          local = described.local
+          lines.push(...described.lines)
+        }
       } else if (area) {
         title = floodAreaLabels[area.properties.kind as FloodAreaKind] ?? "Flood area"
         lines.push("Google flood forecast")

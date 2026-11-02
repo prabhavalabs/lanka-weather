@@ -9,6 +9,8 @@ interface DetailSheetProps {
   onClose: () => void
   /** Accessible name of the sheet. */
   label: string
+  /** Opens at full height rather than part way, for a list to read. */
+  openFull?: boolean
   children: React.ReactNode
 }
 
@@ -27,20 +29,33 @@ function useViewportHeight() {
  * opens part way (the map above stays usable) and can be dragged up to
  * fill the screen below the top bar, or down to close. It is not modal.
  */
-export function DetailSheet({ open, onClose, label, children }: DetailSheetProps) {
+export function DetailSheet({
+  open,
+  onClose,
+  label,
+  openFull = false,
+  children,
+}: DetailSheetProps) {
   const height = useViewportHeight()
   // The sheet is as tall as the screen below the top bar; vaul measures snap
   // points from the bottom of the window, so the peek adds the bar's height.
   const peek = `${sheetPeekHeight(height) + phoneTopInset}px`
   const snapPoints = React.useMemo(() => [peek, 1], [peek])
-  const [snap, setSnap] = React.useState<number | string | null>(peek)
+  const opening = openFull ? 1 : peek
+  const [snap, setSnap] = React.useState<number | string | null>(opening)
   const full = snap === 1
 
   // Each opening starts at the peek height.
   const [wasOpen, setWasOpen] = React.useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
-    if (open) setSnap(peek)
+    if (open) setSnap(opening)
+  }
+  // A sheet already open follows what it now shows, when that wants the room.
+  const [wasFull, setWasFull] = React.useState(openFull)
+  if (openFull !== wasFull) {
+    setWasFull(openFull)
+    if (open && openFull) setSnap(1)
   }
 
   // Keep the last content while the sheet slides away.

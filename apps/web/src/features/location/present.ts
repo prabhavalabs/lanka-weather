@@ -19,7 +19,6 @@ import type { Selection } from "./selection"
 import type {
   AlertLevel,
   DerivedAlert,
-  OfficialWarning,
   PointForecast,
   RegionLevel,
   RegionRef,
@@ -225,28 +224,6 @@ export function estimateAlert(
     validUntil: alert.validUntil ?? undefined,
     summary: alert.detail,
     basis: alert.basis,
-  }
-}
-
-const officialSeverities: AlertSeverity[] = ["advisory", "watch", "warning", "emergency"]
-
-/** An official warning (Department of Meteorology, DMC), once the API carries them. */
-export function officialAlert(
-  warning: OfficialWarning,
-  index: number,
-  area: string,
-  generatedAt: string,
-): WeatherAlert {
-  const severity = officialSeverities.find((value) => value === warning.severity) ?? "warning"
-  return {
-    id: warning.id ?? `official-${index}`,
-    title: warning.title,
-    severity,
-    issuer: warning.issuer ?? "Department of Meteorology",
-    area: warning.area ?? area,
-    issuedAt: warning.issuedAt ?? generatedAt,
-    validUntil: warning.validUntil ?? undefined,
-    summary: warning.summary,
   }
 }
 

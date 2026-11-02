@@ -24,16 +24,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/dmcbulletins"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/gdacs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/gfs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/googleflood"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrobasins"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrorivers"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigationgis"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/landslides"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/openmeteo"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/usgs"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/grid"
+	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 	"github.com/prabhavalabs/lanka-weather/internal/ingest"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
@@ -45,6 +50,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
 	"github.com/prabhavalabs/lanka-weather/internal/summary"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
@@ -121,6 +127,10 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 		&irrigationgis.BasinsCollector{Pool: pool, Fetcher: client, Logger: logger},
 		&irrigationgis.PastFloodsCollector{Pool: pool, Fetcher: client, Logger: logger},
 		&hydrobasins.Collector{Pool: pool, Client: client, Logger: logger},
+		&dmcbulletins.Collector{Pool: pool, Fetcher: client},
+		&landslides.Collector{Pool: pool, Fetcher: client},
+		&usgs.Collector{Pool: pool, Fetcher: client},
+		&gdacs.Collector{Pool: pool, Fetcher: client},
 	}
 	if key := os.Getenv("LANKAWEATHER_GOOGLE_API_KEY"); key != "" {
 		list = append(list, &googleflood.Collector{Pool: pool, Client: client, APIKey: key, Logger: logger,
@@ -178,6 +188,8 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 		StaleAfter: staleAfter("flood-forecast")}
 	regionService := &regions.Service{Pool: pool}
 	riverRiskService := &riverrisk.Service{Pool: pool, Rivers: riverService, Floods: floodService, Weather: weatherService, Logger: logger}
+	warningService := &warnings.Service{Pool: pool, LandslideStaleAfter: staleAfter("landslide-warnings"),
+		BulletinStaleAfter: staleAfter("official-warnings")}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -188,9 +200,12 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Weather: weatherService,
 			Floods:  floodService,
 			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
-				Regions: regionService, RiverRisk: riverRiskService, Logger: logger},
+				Regions: regionService, RiverRisk: riverRiskService, Official: warningService, Logger: logger},
 			RiverRisk: riverRiskService,
-			Ready:     pool.Ping,
+			Warnings:  warningService,
+			Hazards: &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"),
+				CyclonesStaleAfter: staleAfter("cyclones")},
+			Ready: pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

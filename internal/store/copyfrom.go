@@ -9,6 +9,41 @@ import (
 	"context"
 )
 
+// iteratorForInsertLandslideLevels implements pgx.CopyFromSource.
+type iteratorForInsertLandslideLevels struct {
+	rows                 []InsertLandslideLevelsParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertLandslideLevels) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertLandslideLevels) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].ReportDate,
+		r.rows[0].DsID,
+		r.rows[0].DistrictID,
+		r.rows[0].Level,
+	}, nil
+}
+
+func (r iteratorForInsertLandslideLevels) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertLandslideLevels(ctx context.Context, arg []InsertLandslideLevelsParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"landslide_levels"}, []string{"report_date", "ds_id", "district_id", "level"}, &iteratorForInsertLandslideLevels{rows: arg})
+}
+
 // iteratorForStagePlaces implements pgx.CopyFromSource.
 type iteratorForStagePlaces struct {
 	rows                 []StagePlacesParams
