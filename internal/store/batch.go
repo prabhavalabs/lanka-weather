@@ -11,11 +11,147 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var (
 	ErrBatchAlreadyClosed = errors.New("batch already closed")
 )
+
+const insertMetReading3h = `-- name: InsertMetReading3h :batchexec
+INSERT INTO met_readings_3h (station_id, observed_at, rain_mm, temp_c, humidity_pct, source, fetched_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (station_id, observed_at) DO UPDATE
+SET rain_mm = EXCLUDED.rain_mm,
+    temp_c = EXCLUDED.temp_c,
+    humidity_pct = EXCLUDED.humidity_pct,
+    source = EXCLUDED.source,
+    fetched_at = EXCLUDED.fetched_at
+`
+
+type InsertMetReading3hBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type InsertMetReading3hParams struct {
+	StationID   string    `json:"station_id"`
+	ObservedAt  time.Time `json:"observed_at"`
+	RainMm      *float64  `json:"rain_mm"`
+	TempC       *float64  `json:"temp_c"`
+	HumidityPct *float64  `json:"humidity_pct"`
+	Source      string    `json:"source"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+func (q *Queries) InsertMetReading3h(ctx context.Context, arg []InsertMetReading3hParams) *InsertMetReading3hBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.StationID,
+			a.ObservedAt,
+			a.RainMm,
+			a.TempC,
+			a.HumidityPct,
+			a.Source,
+			a.FetchedAt,
+		}
+		batch.Queue(insertMetReading3h, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &InsertMetReading3hBatchResults{br, len(arg), false}
+}
+
+func (b *InsertMetReading3hBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *InsertMetReading3hBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const insertMetReadingDaily = `-- name: InsertMetReadingDaily :batchexec
+INSERT INTO met_readings_daily (station_id, report_date, observed_at, rain_mm, temp_min_c, temp_max_c, source, fetched_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (station_id, report_date) DO UPDATE
+SET observed_at = EXCLUDED.observed_at,
+    rain_mm = EXCLUDED.rain_mm,
+    temp_min_c = EXCLUDED.temp_min_c,
+    temp_max_c = EXCLUDED.temp_max_c,
+    source = EXCLUDED.source,
+    fetched_at = EXCLUDED.fetched_at
+`
+
+type InsertMetReadingDailyBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type InsertMetReadingDailyParams struct {
+	StationID  string      `json:"station_id"`
+	ReportDate pgtype.Date `json:"report_date"`
+	ObservedAt time.Time   `json:"observed_at"`
+	RainMm     *float64    `json:"rain_mm"`
+	TempMinC   *float64    `json:"temp_min_c"`
+	TempMaxC   *float64    `json:"temp_max_c"`
+	Source     string      `json:"source"`
+	FetchedAt  time.Time   `json:"fetched_at"`
+}
+
+func (q *Queries) InsertMetReadingDaily(ctx context.Context, arg []InsertMetReadingDailyParams) *InsertMetReadingDailyBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.StationID,
+			a.ReportDate,
+			a.ObservedAt,
+			a.RainMm,
+			a.TempMinC,
+			a.TempMaxC,
+			a.Source,
+			a.FetchedAt,
+		}
+		batch.Queue(insertMetReadingDaily, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &InsertMetReadingDailyBatchResults{br, len(arg), false}
+}
+
+func (b *InsertMetReadingDailyBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *InsertMetReadingDailyBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
 
 const insertRiverReading = `-- name: InsertRiverReading :batchexec
 INSERT INTO river_readings (station_id, observed_at, water_level, rainfall_mm, fetched_at)
@@ -135,6 +271,143 @@ func (b *InsertWeatherFieldBatchResults) Exec(f func(int, error)) {
 }
 
 func (b *InsertWeatherFieldBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const upsertMetStation = `-- name: UpsertMetStation :batchexec
+INSERT INTO met_stations (id, name, wmo_id, lon, lat, elevation_m, position_source, source, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name,
+    wmo_id = EXCLUDED.wmo_id,
+    lon = EXCLUDED.lon,
+    lat = EXCLUDED.lat,
+    elevation_m = EXCLUDED.elevation_m,
+    position_source = EXCLUDED.position_source,
+    source = EXCLUDED.source,
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertMetStationBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpsertMetStationParams struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	WmoID          *string   `json:"wmo_id"`
+	Lon            float64   `json:"lon"`
+	Lat            float64   `json:"lat"`
+	ElevationM     *float64  `json:"elevation_m"`
+	PositionSource string    `json:"position_source"`
+	Source         string    `json:"source"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+func (q *Queries) UpsertMetStation(ctx context.Context, arg []UpsertMetStationParams) *UpsertMetStationBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ID,
+			a.Name,
+			a.WmoID,
+			a.Lon,
+			a.Lat,
+			a.ElevationM,
+			a.PositionSource,
+			a.Source,
+			a.UpdatedAt,
+		}
+		batch.Queue(upsertMetStation, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpsertMetStationBatchResults{br, len(arg), false}
+}
+
+func (b *UpsertMetStationBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpsertMetStationBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const upsertRainTile = `-- name: UpsertRainTile :batchexec
+INSERT INTO rain_tiles (valid_at, z, x, y, png, source, fetched_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (valid_at, z, x, y) DO UPDATE
+SET png = EXCLUDED.png,
+    source = EXCLUDED.source,
+    fetched_at = EXCLUDED.fetched_at
+`
+
+type UpsertRainTileBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpsertRainTileParams struct {
+	ValidAt   time.Time `json:"valid_at"`
+	Z         int32     `json:"z"`
+	X         int32     `json:"x"`
+	Y         int32     `json:"y"`
+	Png       []byte    `json:"png"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+func (q *Queries) UpsertRainTile(ctx context.Context, arg []UpsertRainTileParams) *UpsertRainTileBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.ValidAt,
+			a.Z,
+			a.X,
+			a.Y,
+			a.Png,
+			a.Source,
+			a.FetchedAt,
+		}
+		batch.Queue(upsertRainTile, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpsertRainTileBatchResults{br, len(arg), false}
+}
+
+func (b *UpsertRainTileBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpsertRainTileBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
