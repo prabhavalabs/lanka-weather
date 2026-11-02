@@ -33,6 +33,7 @@ import { FloodLegend } from "./features/floods/FloodLegend"
 import { countBySeverity, floodSummary, isGauge } from "./features/floods/present"
 import { useFloodForecast } from "./features/floods/queries"
 import type { FloodAreaFeature } from "./features/floods/types"
+import { hazardDefaults, useHazards } from "./features/hazards/useHazards"
 import { LayerPanel } from "./features/layers/LayerPanel"
 import { count, layerStatus, type LayerStatus } from "./features/layers/status"
 import { useLayers } from "./features/layers/useLayers"
@@ -92,7 +93,7 @@ const WIND = "wind"
 const ADMIN_REGIONS = "admin-regions"
 
 /** Layers on at the first visit. */
-const defaultLayers = [ADMIN_REGIONS, RIVER_LEVELS, FLOOD_FORECAST, WIND]
+const defaultLayers = [ADMIN_REGIONS, RIVER_LEVELS, FLOOD_FORECAST, WIND, ...hazardDefaults]
 
 type RegionFill = RegionVariable | "none"
 
@@ -309,7 +310,19 @@ export function App() {
     [enable, pendingCamera, setSelection],
   )
 
-  // Clicks: a gauge, else a region (weather at its label point), else the point itself.
+  const revealPoint = useCallback((lngLat: [number, number]) => reveal(lngLat), [reveal])
+  const hazards = useHazards({
+    map,
+    available,
+    isOn: on,
+    enable,
+    selection,
+    setSelection,
+    fitBox,
+    reveal: revealPoint,
+  })
+
+  // Clicks: a gauge, else a hazard, else a region (weather at its label point), else the point itself.
   useMapClick(map, (event: MapMouseEvent) => {
     if (!map) return
     const { x, y } = event.point
@@ -323,6 +336,7 @@ export function App() {
       : null
     if (hit?.layer.id === RIVER_STATIONS) return openStation(String(hit.properties.id))
     if (hit?.layer.id === FLOOD_GAUGES) return openGauge(String(hit.properties.gaugeId))
+    if (hazards.handleClick(event)) return
 
     const region = map.getLayer(REGIONS_FILL)
       ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
@@ -406,8 +420,8 @@ export function App() {
   const close = useCallback(() => setSelection(null), [setSelection])
 
   // Layer list: one-line status, details under layers that are on, stale marks.
-  const statuses: Record<string, LayerStatus> = {}
-  const details: Record<string, ReactNode> = {}
+  const statuses: Record<string, LayerStatus> = { ...hazards.statuses }
+  const details: Record<string, ReactNode> = { ...hazards.details }
 
   const riverCounts = rivers.data
     ? countByStatus(rivers.data.features.map((feature) => feature.properties))
@@ -638,7 +652,7 @@ export function App() {
     regionsOn && isNotReady(level === "gn" ? gnWeather.error : levelWeather.error),
   ].some(Boolean)
   let notice: ReactNode = null
-  if (regionsOn && zoom < levelMinZoom[level] && map) {
+  if (regionsOn && zoom < levelMinZoom[level] && map && !hazards.farAway && zoom >= 4.5) {
     notice = (
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-card/95 py-1 pr-1 pl-3.5 text-sm shadow-panel backdrop-blur-md">
         <span>
@@ -667,8 +681,8 @@ export function App() {
   }
 
   // The detail panel for the selection.
-  let detail: ReactNode = null
-  let detailLabel = "Details"
+  let detail: ReactNode = hazards.detail
+  let detailLabel = hazards.detailLabel ?? "Details"
   if (selection?.kind === "point" || selection?.kind === "region") {
     detailLabel = "Weather here"
     detail = (
@@ -729,6 +743,7 @@ export function App() {
         <FloodLegend counts={floodCounts} />
       )}
       {sidebarCollapsed && riversOn && <RiverLegend counts={riverCounts} />}
+      {sidebarCollapsed && hazards.legends}
     </>
   )
 
@@ -752,6 +767,7 @@ export function App() {
                 onVisibleDistricts={addGnDistricts}
               />
             )}
+            {hazards.fills}
             {floodsOn && (
               <FloodForecastLayer
                 data={floods.data}
@@ -769,12 +785,14 @@ export function App() {
                 selectedId={selection?.kind === "station" ? selection.id : null}
               />
             )}
+            {hazards.points}
             {markerAt && (
               <LocationMarker lat={markerAt.lat} lon={markerAt.lon} label={detailLabel} />
             )}
             <HoverChip
               regions={regionsOn ? { variable: fillVariable, lookup: regionLookup } : null}
               wind={windOn ? wind.field : null}
+              hazards={hazards.hover}
             />
           </MapView>
         }
@@ -792,7 +810,12 @@ export function App() {
             layers={layerList}
             activeCount={activeCount}
             footer={smallPrint}
-            actions={<SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />}
+            actions={
+              <>
+                <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
+                {hazards.button(true)}
+              </>
+            }
           />
         }
         toolbar={
@@ -803,6 +826,7 @@ export function App() {
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
             />
+            {hazards.button(false)}
             {regionsOn && (
               <div className="pointer-events-auto rounded-full border border-border bg-card/95 p-1 shadow-panel backdrop-blur-md">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />
@@ -810,9 +834,17 @@ export function App() {
             )}
           </div>
         }
-        notice={notice}
+        notice={
+          hazards.banner || notice ? (
+            <div className="flex w-full flex-col items-center gap-2">
+              {hazards.banner}
+              {notice}
+            </div>
+          ) : null
+        }
         detail={detail}
         detailLabel={detailLabel}
+        detailFull={hazards.detailFull}
         onDetailClose={close}
         legends={legends}
         timeline={windTimeline}

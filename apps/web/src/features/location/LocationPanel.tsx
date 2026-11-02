@@ -4,6 +4,7 @@
  * demand (React.lazy), so it is not in the first download.
  */
 import { useMemo } from "react"
+import { AlertList } from "@/components/weather/AlertList"
 import { GaugeList, type GaugeListItem } from "@/components/weather/GaugeList"
 import { LocationWeatherPanel } from "@/components/weather/LocationWeatherPanel"
 import { Badge } from "@/components/ui/badge"
@@ -20,13 +21,13 @@ import {
 import { formatLevel, statusLabels, trendArrows } from "../rivers/present"
 import { useRegionAggregate, useRegionDetail } from "../regions/queries"
 import { RegionAggregate } from "../regions/RegionAggregate"
+import { officialSlot } from "../warnings/present"
 import {
   currentFrom,
   daysFrom,
   estimateAlert,
   hoursFrom,
   localDate,
-  officialAlert,
   placeFor,
   windFrom,
 } from "./present"
@@ -80,10 +81,7 @@ export default function LocationPanel({
   const alerts = (summary.data?.alerts ?? []).map((alert, index) =>
     estimateAlert(alert, index, area, generatedAt),
   )
-  const official = summary.data?.official
-  const officialAlerts = (official?.warnings ?? []).map((warning, index) =>
-    officialAlert(warning, index, area, generatedAt),
-  )
+  const official = officialSlot(summary.data?.official, summary.data?.regions?.district?.name)
 
   const rivers: GaugeListItem[] = (summary.data?.rivers ?? []).map((river) => ({
     id: river.id,
@@ -163,6 +161,19 @@ export default function LocationPanel({
       )}
       {riversShown && <li>River levels: Irrigation Department of Sri Lanka</li>}
       {floodsShown && <li>Flood forecasts: Google Flood Hub (Flood Forecasting API)</li>}
+      {summary.data?.official.fetchedAt && (
+        <li className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span>
+            Official warnings: NBRO and DMC ·{" "}
+            <span className="numeric">{formatAge(summary.data.official.fetchedAt)}</span>
+          </span>
+          {summary.data.official.stale && (
+            <Badge variant="chip" className="h-5 text-foreground">
+              Out of date
+            </Badge>
+          )}
+        </li>
+      )}
       {selection.kind === "region" && region.data && (
         <li>Boundaries: Survey Department and Department of Census and Statistics</li>
       )}
@@ -178,8 +189,9 @@ export default function LocationPanel({
       today={localDate()}
       wind={windFrom(point.data)}
       alerts={alerts}
-      officialAlerts={officialAlerts}
-      officialNote="Department of Meteorology and DMC warnings are authoritative. They will appear here once they are collected."
+      officialAlerts={official.alerts}
+      officialNote={official.note ?? "Official warnings could not be read just now."}
+      officialBulletins={official.bulletins}
       status={status}
       unavailableText={unavailableText(point.error, summary.data?.weather === null && !point.error)}
       highlight={
@@ -190,6 +202,17 @@ export default function LocationPanel({
       sources={sources}
       onClose={onClose}
     >
+      {status === "unavailable" && (
+        <section className="flex flex-col gap-2">
+          <h3 className="text-xs font-medium text-muted-foreground">Official warnings</h3>
+          <AlertList
+            alerts={official.alerts}
+            label="Official warnings"
+            emptyText={official.note ?? "Official warnings could not be read just now."}
+            emptyIcon="info"
+          />
+        </section>
+      )}
       <GaugeList title="River gauges nearby" items={rivers} />
       <GaugeList title="Flood forecast gauges nearby" items={floodGauges} />
       <GaugeList title="Flood areas here" items={floodAreas} />
