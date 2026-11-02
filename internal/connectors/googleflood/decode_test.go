@@ -134,3 +134,74 @@ func TestParsePolygonKML(t *testing.T) {
 		}
 	}
 }
+
+func TestIncludeUnverifiedIsOnUnlessFalse(t *testing.T) {
+	for setting, want := range map[string]bool{"": true, "true": true, "1": true, "false": false, "FALSE": false, " false ": false} {
+		if got := IncludeUnverified(setting); got != want {
+			t.Errorf("IncludeUnverified(%q) = %v, want %v", setting, got, want)
+		}
+	}
+}
+
+func TestPrioritiseAreasPutsFlashAndVerifiedFirst(t *testing.T) {
+	statuses := []Status{
+		{GaugeID: "unverified-extreme", Severity: SeverityExtreme},
+		{GaugeID: "verified-warning", Severity: SeverityAboveNormal, QualityVerified: true},
+		{GaugeID: "verified-danger", Severity: SeveritySevere, QualityVerified: true},
+	}
+	ordered := PrioritiseAreas([]Area{
+		{PolygonID: "a", GaugeID: "unverified-extreme"},
+		{PolygonID: "b", GaugeID: "verified-warning"},
+		{PolygonID: "c", GaugeID: "verified-danger"},
+		{PolygonID: "d", Kind: KindFlashLikely},
+		{PolygonID: "e", Kind: KindSignificantEvent},
+	}, statuses)
+	var got string
+	for _, area := range ordered {
+		got += area.PolygonID
+	}
+	if got != "decba" {
+		t.Fatalf("order = %s", got)
+	}
+}
+
+func TestParsePolygonReadsGooglesRealKML(t *testing.T) {
+	// Invented coordinates in the shape of what serializedPolygons returns: a
+	// KML string in a JSON envelope, with a declaration, a namespace, a named
+	// Placemark, MultiGeometry, altitudeMode, holes, and a blocky 0.1 degree grid
+	// that meets a curved coast.
+	kml := `<?xml version='1.0' encoding='UTF-8'?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark>` +
+		`<name>InundationPolygon</name><Style/><MultiGeometry>` +
+		`<Polygon><altitudeMode>clampToGround</altitudeMode><outerBoundaryIs><LinearRing><coordinates>` +
+		`80.0000244,7.0999755 80.2000102,7.1000163 80.2000102,7.3000302 80.1000013,7.2999930 80.0999871,7.2000010 80.0000244,7.1999980 80.0000244,7.0999755` +
+		`</coordinates></LinearRing></outerBoundaryIs>` +
+		`<innerBoundaryIs><LinearRing><coordinates>80.1000000,7.1500000 80.1500000,7.1500000 80.1500000,7.1800000 80.1000000,7.1500000</coordinates></LinearRing></innerBoundaryIs></Polygon>` +
+		`<Polygon><altitudeMode>clampToGround</altitudeMode><outerBoundaryIs><LinearRing><coordinates>` +
+		`80.4000000,7.0000000 80.5000000,7.0000000 80.5000000,7.1000000 80.4000000,7.0000000` +
+		`</coordinates></LinearRing></outerBoundaryIs></Polygon></MultiGeometry></Placemark></Document></kml>`
+	envelope, err := json.Marshal(map[string]string{"polygonId": "x", "kml": kml})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shape, err := ParsePolygon(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var geometry struct {
+		Type        string           `json:"type"`
+		Coordinates [][][][2]float64 `json:"coordinates"`
+	}
+	if err := json.Unmarshal(shape, &geometry); err != nil {
+		t.Fatal(err)
+	}
+	if geometry.Type != "MultiPolygon" || len(geometry.Coordinates) != 2 {
+		t.Fatalf("geometry = %s", shape)
+	}
+	if len(geometry.Coordinates[0]) != 2 || len(geometry.Coordinates[0][1]) != 4 {
+		t.Fatalf("the hole was lost: %s", shape)
+	}
+	// Every vertex survives at full precision, so the pixel grid stays a grid.
+	if len(geometry.Coordinates[0][0]) != 7 || geometry.Coordinates[0][0][1] != [2]float64{80.2000102, 7.1000163} {
+		t.Fatalf("the outer ring changed: %v", geometry.Coordinates[0][0])
+	}
+}

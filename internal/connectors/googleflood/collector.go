@@ -1,6 +1,7 @@
 package googleflood
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,18 +25,33 @@ const DefaultBaseURL = "https://floodforecasting.googleapis.com"
 
 const (
 	// Interval: gauge statuses are reissued about daily and flash floods a
-	// few times a day; hourly picks a new issue up soon at about five
-	// requests a run.
+	// few times a day; hourly picks a new issue up soon. A calm run is about
+	// 13 requests with extended coverage: 2 for statuses, 7 for 320 gauges'
+	// models, and 2 each for the worldwide searches, whose last page is empty.
 	Interval = time.Hour
 	// Retention is the longest Google's terms let gauge search results be
 	// kept.
 	Retention = 24 * time.Hour
-	// maxPages bounds one search, maxPolygons the polygons read in a run.
-	maxPages    = 5
-	maxPolygons = 40
+	// searchPageSize keeps requests low: the 131 flash floods live on
+	// 2 November 2026 came on one page of this size, against seven at 20.
+	searchPageSize = 1000
+	// maxPages bounds one search. Reaching it is logged, not silent: the worldwide
+	// searches filter after paging, so a Sri Lankan event can be on any page.
+	maxPages = 25
+	// maxPolygons bounds the polygons read in a run. Flash floods and events are
+	// read first, then verified gauges, so lower-confidence gauges in a large
+	// flood cannot use the budget up.
+	maxPolygons = 120
 	// modelBatch is the number of gauge models asked for in one request.
 	modelBatch = 50
 )
+
+// IncludeUnverified reads LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED: lower-confidence
+// gauges are collected unless it is set to false. The map keeps them off until
+// someone turns on Extended coverage.
+func IncludeUnverified(setting string) bool {
+	return !strings.EqualFold(strings.TrimSpace(setting), "false")
+}
 
 // Doer sends a request to a source.
 type Doer interface {
@@ -48,7 +65,8 @@ type Collector struct {
 	// APIKey is the Google Cloud API key; it is sent in a header only.
 	APIKey string
 	// IncludeUnverified also reads gauges Google has not quality-verified,
-	// which Flood Hub shows only in its expert mode. Off by default.
+	// which Flood Hub calls Extended coverage. cmd/lankaweather turns it on
+	// unless LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED is false.
 	IncludeUnverified bool
 	// BaseURL overrides DefaultBaseURL, for tests.
 	BaseURL string
@@ -89,7 +107,7 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 		areas = append(areas, GaugeAreas(status)...)
 	}
 	areas = append(append(areas, flash...), events...)
-	shapes := collector.polygons(ctx, areas)
+	shapes := collector.polygons(ctx, PrioritiseAreas(areas, statuses))
 	if err := collector.save(ctx, statuses, models, areas, shapes, now); err != nil {
 		return 0, err
 	}
@@ -164,11 +182,14 @@ func (collector *Collector) statuses(ctx context.Context) ([]Status, error) {
 				all = append(all, status)
 			}
 		}
-		if next == "" || next == token || len(page) == 0 {
-			break
+		// A page can be empty and still have a next one, and DecodeStatuses
+		// leaves out anything unusable, so only the token ends the loop.
+		if next == "" || next == token {
+			return all, nil
 		}
 		token = next
 	}
+	collector.warnTruncated("/v1/floodStatus:searchLatestFloodStatusByArea")
 	return all, nil
 }
 
@@ -201,7 +222,7 @@ func (collector *Collector) search(ctx context.Context, path string, decode func
 	var all []Area
 	token := ""
 	for range maxPages {
-		payload, err := collector.post(ctx, path, searchRequest{PageSize: 1000, PageToken: token})
+		payload, err := collector.post(ctx, path, searchRequest{PageSize: searchPageSize, PageToken: token})
 		if err != nil {
 			return nil, err
 		}
@@ -211,19 +232,60 @@ func (collector *Collector) search(ctx context.Context, path string, decode func
 		}
 		all = append(all, areas...)
 		if next == "" || next == token {
-			break
+			return all, nil
 		}
 		token = next
 	}
+	collector.warnTruncated(path)
 	return all, nil
+}
+
+func (collector *Collector) warnTruncated(path string) {
+	if collector.Logger != nil {
+		collector.Logger.Warn("google flood search stopped at its page limit; later pages were not read", "path", path, "pages", maxPages)
+	}
+}
+
+// PrioritiseAreas orders areas for reading when polygons are limited: flash
+// floods and significant events, then verified gauges' areas, then lower-confidence
+// gauges' areas, each from the most severe down. It does no I/O.
+func PrioritiseAreas(areas []Area, statuses []Status) []Area {
+	verified := make(map[string]bool, len(statuses))
+	severities := make(map[string]int, len(statuses))
+	for _, status := range statuses {
+		verified[status.GaugeID] = status.QualityVerified
+		severities[status.GaugeID] = status.Severity.Rank()
+	}
+	tier := func(area Area) int {
+		switch {
+		case area.GaugeID == "":
+			return 0
+		case verified[area.GaugeID]:
+			return 1
+		}
+		return 2
+	}
+	ordered := slices.Clone(areas)
+	slices.SortStableFunc(ordered, func(a, b Area) int {
+		if order := cmp.Compare(tier(a), tier(b)); order != 0 {
+			return order
+		}
+		return cmp.Compare(severities[b.GaugeID], severities[a.GaugeID])
+	})
+	return ordered
 }
 
 // polygons reads each area's polygon, up to maxPolygons. An area whose
 // polygon cannot be read is left out and logged; the gauges still count.
 func (collector *Collector) polygons(ctx context.Context, areas []Area) map[string][]byte {
 	shapes := map[string][]byte{}
+	skipped := 0
 	for _, area := range areas {
-		if len(shapes) == maxPolygons || shapes[area.PolygonID] != nil {
+		if shapes[area.PolygonID] != nil {
+			continue
+		}
+		if len(shapes) == maxPolygons {
+			skipped++
 			continue
 		}
 		payload, err := collector.get(ctx, "/v1/serializedPolygons/"+url.PathEscape(area.PolygonID))
@@ -237,6 +299,9 @@ func (collector *Collector) polygons(ctx context.Context, areas []Area) map[stri
 		if collector.Logger != nil {
 			collector.Logger.Warn("google flood polygon unreadable", "kind", area.Kind, "error", err)
 		}
+	}
+	if skipped > 0 && collector.Logger != nil {
+		collector.Logger.Warn("google flood polygons over the limit were not read", "limit", maxPolygons, "skipped", skipped)
 	}
 	return shapes
 }

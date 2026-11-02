@@ -74,6 +74,102 @@ func (fake *fakeGoogle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// pagedGoogle spreads Sri Lanka's flash floods and events over later pages,
+// after pages with nothing for Sri Lanka and an empty one, as the live API can.
+type pagedGoogle struct {
+	mutex    sync.Mutex
+	requests map[string]int
+}
+
+func (fake *pagedGoogle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		PageToken string `json:"pageToken"`
+		PageSize  int    `json:"pageSize"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	fake.mutex.Lock()
+	fake.requests[r.URL.Path]++
+	fake.mutex.Unlock()
+	foreign := `{"forecastIssueTime":"2026-11-02T00:00:00Z","forecastPeriodHours":24,"affectedCountryCodes":["IN"],"likelyAffectedPolygonId":"india"}`
+	local := func(id string) string {
+		return `{"forecastIssueTime":"2026-11-02T00:00:00Z","forecastPeriodHours":24,"affectedCountryCodes":["LK"],"likelyAffectedPolygonId":"` + id + `"}`
+	}
+	event := func(id string) string {
+		return `{"eventInterval":{"startTime":"2026-11-02T00:00:00Z","endTime":"2026-11-03T00:00:00Z"},"affectedCountryCodes":["LK"],"eventPolygonId":"` + id + `"}`
+	}
+	switch r.URL.Path {
+	case "/v1/flashFloods:search":
+		switch body.PageToken {
+		case "":
+			_, _ = w.Write([]byte(`{"flashFloodEvents":[` + foreign + `,` + local("flash-1") + `],"nextPageToken":"two"}`))
+		case "two":
+			_, _ = w.Write([]byte(`{"nextPageToken":"three"}`))
+		case "three":
+			_, _ = w.Write([]byte(`{"flashFloodEvents":[` + foreign + `,` + local("flash-2") + `],"nextPageToken":"four"}`))
+		default:
+			_, _ = w.Write([]byte(`{}`))
+		}
+	case "/v1/significantEvents:search":
+		switch body.PageToken {
+		case "":
+			_, _ = w.Write([]byte(`{"significantEvents":[` + event("event-1") + `],"nextPageToken":"two"}`))
+		case "two":
+			_, _ = w.Write([]byte(`{"significantEvents":[` + event("event-2") + `],"nextPageToken":"three"}`))
+		default:
+			_, _ = w.Write([]byte(`{}`))
+		}
+	default:
+		if strings.HasPrefix(r.URL.Path, "/v1/serializedPolygons/") {
+			_, _ = w.Write([]byte(`{"type":"Polygon","coordinates":[[[80,7],[80.1,7],[80.1,7.1],[80,7]]]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}
+}
+
+func TestCollectFollowsEveryPageOfTheWorldwideSearches(t *testing.T) {
+	pool := dbtest.Open(t, "flood_gauges", "flood_areas", "source_runs")
+	ctx := context.Background()
+	fake := &pagedGoogle{requests: map[string]int{}}
+	server := httptest.NewServer(fake)
+	t.Cleanup(server.Close)
+	now := time.Date(2026, 11, 2, 13, 0, 0, 0, time.UTC)
+
+	collector := &googleflood.Collector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: server.URL}
+	if _, err := collector.Collect(ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := store.New(pool).ListFloodAreas(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, row := range rows {
+		found[row.ID] = true
+	}
+	for _, id := range []string{"flash-1", "flash-2", "event-1", "event-2"} {
+		if !found[id] {
+			t.Errorf("%s on a later page was missed; stored %v", id, found)
+		}
+	}
+	if found["india"] {
+		t.Error("another country's flash flood was stored")
+	}
+	if fake.requests["/v1/flashFloods:search"] != 4 || fake.requests["/v1/significantEvents:search"] != 3 {
+		t.Errorf("requests = %v", fake.requests)
+	}
+
+	// A later run replaces everything: nothing lingers past Google's terms.
+	if _, err := (&googleflood.Collector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey,
+		BaseURL: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{}`)) })).URL,
+	}).Collect(ctx, now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if rows, _ := store.New(pool).ListFloodAreas(ctx); len(rows) != 0 {
+		t.Fatalf("a run that found nothing kept %d areas", len(rows))
+	}
+}
+
 func TestCollectStoresSriLankaForecasts(t *testing.T) {
 	pool := dbtest.Open(t, "flood_gauges", "flood_areas", "source_runs")
 	ctx := context.Background()
