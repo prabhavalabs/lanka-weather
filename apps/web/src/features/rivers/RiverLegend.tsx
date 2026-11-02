@@ -1,29 +1,43 @@
+import { LegendSwatch } from "@/components/LegendSwatch"
+import { MapLegend } from "@/components/weather/MapLegend"
+import { cn } from "@/lib/utils"
 import { statusColors, statusLabels, statusOrder } from "./present"
+import type { RiverStatus } from "./types"
+
+interface RiverLegendProps {
+  /** Stations per status, shown beside each entry. */
+  counts?: Record<RiverStatus, number>
+  /** Without the card, e.g. inside the layer list. */
+  bare?: boolean
+  className?: string
+}
 
 /** Key to the river-levels symbols. */
-export function RiverLegend() {
+export function RiverLegend({ counts, bare = false, className }: RiverLegendProps) {
+  const entries = (
+    <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+      {statusOrder.map((status) => (
+        <li key={status} className="flex items-center justify-between gap-2">
+          <LegendSwatch shape="circle" color={statusColors[status]} label={statusLabels[status]} />
+          {counts && <span className="numeric text-xs text-foreground">{counts[status]}</span>}
+        </li>
+      ))}
+      <li className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span
+          aria-hidden="true"
+          className="inline-block size-2.5 rounded-full bg-status-normal ring-4 ring-status-normal/30"
+        />
+        Rising
+      </li>
+      <li>
+        <LegendSwatch shape="circle" hollow color="var(--status-unknown)" label="Out of date" />
+      </li>
+    </ul>
+  )
+  if (bare) return <div className={cn(className)}>{entries}</div>
   return (
-    <div className="pointer-events-auto rounded-lg border border-white/10 bg-slate-950/85 px-3 py-2 text-[11px] text-slate-200 shadow-lg backdrop-blur">
-      <p className="mb-1 font-medium text-slate-300">River levels</p>
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-        {statusOrder.map((status) => (
-          <li key={status} className="flex items-center gap-1.5">
-            <span
-              className="inline-block size-2.5 rounded-full border border-white"
-              style={{ backgroundColor: statusColors[status] }}
-            />
-            {statusLabels[status]}
-          </li>
-        ))}
-        <li className="flex items-center gap-1.5">
-          <span className="inline-block size-2.5 rounded-full bg-sky-500 ring-4 ring-sky-500/30" />
-          Rising
-        </li>
-        <li className="flex items-center gap-1.5">
-          <span className="inline-block size-2.5 rounded-full border border-white bg-sky-500/40" />
-          Out of date
-        </li>
-      </ul>
-    </div>
+    <MapLegend title="River levels" unit="status" className={cn("w-72", className)}>
+      {entries}
+    </MapLegend>
   )
 }
