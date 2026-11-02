@@ -14,6 +14,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/places"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 )
 
@@ -35,10 +37,25 @@ type Rivers interface {
 	StationHistory(ctx context.Context, id string, period time.Duration) (rivers.History, error)
 }
 
+// Regions serves administrative regions.
+type Regions interface {
+	Collection(ctx context.Context, level regions.Level, ancestor string) (regions.Document, error)
+	Region(ctx context.Context, id string, geometry bool) (regions.Detail, error)
+	Lookup(ctx context.Context, lon, lat float64) (regions.Lookup, error)
+	Tile(ctx context.Context, z, x, y int) (regions.Document, error)
+}
+
+// Places searches places and regions by name.
+type Places interface {
+	Search(ctx context.Context, query string, limit int) (places.Result, error)
+}
+
 // Dependencies are the services the API reads from.
 type Dependencies struct {
-	Logger *slog.Logger
-	Rivers Rivers
+	Logger  *slog.Logger
+	Rivers  Rivers
+	Regions Regions
+	Places  Places
 	// Ready reports whether the service can serve requests (database reachable).
 	Ready func(ctx context.Context) error
 }
@@ -64,10 +81,16 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Get("/readyz", api.ready)
 
 	r.Route("/v1", func(r chi.Router) {
+		r.Use(middleware.Compress(5, "application/json", "application/geo+json", tileContentType))
 		r.Get("/layers", listLayers)
 		r.Get("/layers/{id}", getLayer)
 		r.Get("/rivers/levels", api.riverLevels)
 		r.Get("/rivers/stations/{id}/readings", api.stationReadings)
+		r.Get("/regions", api.regionCollection)
+		r.Get("/regions/lookup", api.regionLookup)
+		r.Get("/regions/{id}", api.region)
+		r.Get("/tiles/regions/{z}/{x}/{y}.pbf", api.regionTile)
+		r.Get("/places/search", api.searchPlaces)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
