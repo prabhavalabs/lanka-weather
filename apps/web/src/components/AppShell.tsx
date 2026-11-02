@@ -1,5 +1,7 @@
 import type * as React from "react"
 
+import { DetailSheet } from "@/components/DetailSheet"
+import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
 import { cn } from "@/lib/utils"
 
 interface AppShellProps {
@@ -22,8 +24,16 @@ interface AppShellProps {
    * the location weather panel later.
    */
   detail?: React.ReactNode
+  /** Closes the detail; on phones the sheet can be dragged down to close. */
+  onDetailClose?: () => void
+  /** Accessible name of the detail sheet on phones. */
+  detailLabel?: string
   /** Map legends, bottom left over the map (md and up). */
   legends?: React.ReactNode
+  /** A short notice centred under the toolbar or the phone bar, e.g. "Zoom in to see GN divisions". */
+  notice?: React.ReactNode
+  /** Phones only: a control along the bottom of the map, e.g. the wind forecast time; hidden under an open sheet. */
+  timeline?: React.ReactNode
   className?: string
 }
 
@@ -38,9 +48,14 @@ export function AppShell({
   mobileBar,
   toolbar,
   detail,
+  onDetailClose,
+  detailLabel = "Details",
   legends,
+  notice,
+  timeline,
   className,
 }: AppShellProps) {
+  const desktop = useMediaQuery(desktopQuery, true)
   return (
     <main
       className={cn(
@@ -48,8 +63,10 @@ export function AppShell({
         // Width of the sidebar column, which the toolbar and legends sit beside.
         sidebarCollapsed ? "[--sidebar-w:4.5rem]" : "[--sidebar-w:22.75rem]",
         "[--detail-w:24.5rem]",
-        // MapLibre's bottom-right controls move left of an open detail column (styles/map.css).
+        // MapLibre's bottom-right controls move left of an open detail column (styles/map.css),
+        // and on phones above the timeline.
         detail && "md:[--map-controls-right:var(--detail-w)]",
+        timeline && !detail && "max-md:[--map-controls-bottom:8.5rem]",
         className,
       )}
     >
@@ -74,11 +91,34 @@ export function AppShell({
         </div>
       )}
 
-      {detail && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex max-h-[62dvh] flex-col p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:inset-x-auto md:top-0 md:right-0 md:bottom-0 md:max-h-none md:w-(--detail-w) md:p-3">
-          <div className="pointer-events-auto min-h-0 overflow-y-auto overscroll-contain rounded-3xl [scrollbar-width:none] md:[scrollbar-width:thin]">
+      {notice && (
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-[calc(max(0.75rem,env(safe-area-inset-top))+4.25rem)] z-10 flex justify-center px-3 md:top-16 md:right-3 md:left-[calc(var(--sidebar-w)+0.75rem)]",
+            detail && "md:right-[calc(var(--detail-w)+0.75rem)]",
+          )}
+        >
+          {notice}
+        </div>
+      )}
+
+      {detail && desktop && (
+        <div className="pointer-events-none absolute top-0 right-0 bottom-0 z-30 flex w-(--detail-w) flex-col p-3">
+          <div className="pointer-events-auto min-h-0 overflow-y-auto overscroll-contain rounded-3xl [scrollbar-width:thin]">
             {detail}
           </div>
+        </div>
+      )}
+
+      {!desktop && (
+        <DetailSheet open={Boolean(detail)} onClose={() => onDetailClose?.()} label={detailLabel}>
+          {detail}
+        </DetailSheet>
+      )}
+
+      {timeline && !detail && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+          {timeline}
         </div>
       )}
 

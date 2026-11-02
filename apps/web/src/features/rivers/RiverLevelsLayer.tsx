@@ -1,19 +1,17 @@
-import type {
-  ExpressionSpecification,
-  GeoJSONSource,
-  MapLayerMouseEvent,
-  Map as MapLibreMap,
-} from "maplibre-gl"
+import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import type { FeatureCollection } from "geojson"
 import { useEffect, useRef } from "react"
 import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
+import { slotBefore, styleReady } from "../map/slots"
 import { statusTokens } from "./present"
 import type { RiverLevelsCollection } from "./types"
 
 const SOURCE = "river-levels"
 const HALO = "river-levels-rising"
-const CIRCLES = "river-levels-circles"
+/** The stations: what clicks and hovers hit. */
+export const RIVER_STATIONS = "river-levels-circles"
+const CIRCLES = RIVER_STATIONS
 const LABELS = "river-levels-labels"
 
 const empty: RiverLevelsCollection = {
@@ -78,67 +76,76 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
     })
   }
   if (!map.getLayer(HALO)) {
-    map.addLayer({
-      id: HALO,
-      type: "circle",
-      source: SOURCE,
-      filter: ["all", ["==", ["get", "trend"], "rising"], ["!", ["get", "stale"]]],
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 10, 10, 16],
-        "circle-color": statusColor(palette),
-        "circle-opacity": 0.3,
+    map.addLayer(
+      {
+        id: HALO,
+        type: "circle",
+        source: SOURCE,
+        filter: ["all", ["==", ["get", "trend"], "rising"], ["!", ["get", "stale"]]],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 10, 10, 16],
+          "circle-color": statusColor(palette),
+          "circle-opacity": 0.3,
+        },
       },
-    })
+      slotBefore(map, "points"),
+    )
   }
   if (!map.getLayer(CIRCLES)) {
-    map.addLayer({
-      id: CIRCLES,
-      type: "circle",
-      source: SOURCE,
-      layout: { "circle-sort-key": severity },
-      paint: {
-        "circle-radius": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          6,
-          ["case", selected, 7, 5],
-          10,
-          ["case", selected, 11, 9],
-        ],
-        "circle-color": statusColor(palette),
-        "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
-        "circle-stroke-width": ["case", selected, 3, 1.25],
-        "circle-stroke-color": ["case", selected, palette.strokeSelected, palette.stroke],
+    map.addLayer(
+      {
+        id: CIRCLES,
+        type: "circle",
+        source: SOURCE,
+        layout: { "circle-sort-key": severity },
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            6,
+            ["case", selected, 7, 5],
+            10,
+            ["case", selected, 11, 9],
+          ],
+          "circle-color": statusColor(palette),
+          "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
+          "circle-stroke-width": ["case", selected, 3, 1.25],
+          "circle-stroke-color": ["case", selected, palette.strokeSelected, palette.stroke],
+        },
       },
-    })
+      slotBefore(map, "points"),
+    )
   }
   if (!map.getLayer(LABELS)) {
-    map.addLayer({
-      id: LABELS,
-      type: "symbol",
-      source: SOURCE,
-      minzoom: 8.5,
-      layout: {
-        "text-field": ["get", "name"],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 12,
-        "text-offset": [0, 1.2],
-        "text-anchor": "top",
-        "text-optional": true,
+    map.addLayer(
+      {
+        id: LABELS,
+        type: "symbol",
+        source: SOURCE,
+        minzoom: 8.5,
+        layout: {
+          "text-field": ["get", "name"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 12,
+          "text-offset": [0, 1.2],
+          "text-anchor": "top",
+          "text-optional": true,
+        },
+        paint: {
+          "text-color": palette.label,
+          "text-halo-color": palette.halo,
+          "text-halo-width": 1.5,
+        },
       },
-      paint: {
-        "text-color": palette.label,
-        "text-halo-color": palette.halo,
-        "text-halo-width": 1.5,
-      },
-    })
+      slotBefore(map, "points"),
+    )
   }
 }
 
 function removeLayers(map: MapLibreMap) {
   // The map may already be torn down or mid style change.
-  if (!map.getStyle()) return
+  if (!styleReady(map)) return
   for (const id of [LABELS, CIRCLES, HALO]) if (map.getLayer(id)) map.removeLayer(id)
   if (map.getSource(SOURCE)) map.removeSource(SOURCE)
 }
@@ -146,19 +153,17 @@ function removeLayers(map: MapLibreMap) {
 interface RiverLevelsLayerProps {
   data: RiverLevelsCollection | undefined
   selectedId: string | null
-  onSelect: (id: string | null) => void
 }
 
-/** River gauging stations, coloured by flood status, with a halo when rising. */
-export function RiverLevelsLayer({ data, selectedId, onSelect }: RiverLevelsLayerProps) {
+/**
+ * River gauging stations, coloured by flood status, with a halo when rising.
+ * Clicks are handled by the map's click handler (App), which knows which
+ * layer is on top.
+ */
+export function RiverLevelsLayer({ data, selectedId }: RiverLevelsLayerProps) {
   const map = useMap()
   const dataRef = useRef(data ?? empty)
   const selectedRef = useRef(selectedId)
-  const onSelectRef = useRef(onSelect)
-
-  useEffect(() => {
-    onSelectRef.current = onSelect
-  }, [onSelect])
 
   useEffect(() => {
     if (!map) return
@@ -168,23 +173,10 @@ export function RiverLevelsLayer({ data, selectedId, onSelect }: RiverLevelsLaye
         map.setFeatureState({ source: SOURCE, id: selectedRef.current }, { selected: true })
       }
     }
-    const click = (event: MapLayerMouseEvent) => {
-      const id = event.features?.[0]?.properties?.id
-      if (typeof id === "string") onSelectRef.current(id)
-    }
-    const enter = () => (map.getCanvas().style.cursor = "pointer")
-    const leave = () => (map.getCanvas().style.cursor = "")
-
     add()
     map.on("style.load", add)
-    map.on("click", CIRCLES, click)
-    map.on("mouseenter", CIRCLES, enter)
-    map.on("mouseleave", CIRCLES, leave)
     return () => {
       map.off("style.load", add)
-      map.off("click", CIRCLES, click)
-      map.off("mouseenter", CIRCLES, enter)
-      map.off("mouseleave", CIRCLES, leave)
       removeLayers(map)
     }
   }, [map])

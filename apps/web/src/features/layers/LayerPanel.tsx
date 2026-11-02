@@ -15,6 +15,8 @@ interface LayerPanelProps {
   summaries?: Record<string, string>
   /** Extra content per layer id under a layer that is on, e.g. a status bar or legend. */
   details?: Record<string, ReactNode>
+  /** Layers whose data is older than the catalogue allows; marked "Out of date". */
+  stale?: Record<string, boolean>
   className?: string
 }
 
@@ -24,6 +26,7 @@ export function LayerPanel({
   onToggle,
   summaries = {},
   details = {},
+  stale = {},
   className,
 }: LayerPanelProps) {
   const { data, error, isPending } = useLayers()
@@ -93,11 +96,19 @@ export function LayerPanel({
                       >
                         <span
                           className={cn(
-                            "block truncate text-sm font-medium",
+                            "flex items-center gap-2 text-sm font-medium",
                             planned && "text-muted-foreground",
                           )}
                         >
-                          {layer.title}
+                          <span className="truncate">{layer.title}</span>
+                          {on && !planned && stale[layer.id] && (
+                            <Badge
+                              variant="chip"
+                              className="h-5 px-1.5 text-[0.6875rem] text-foreground"
+                            >
+                              Out of date
+                            </Badge>
+                          )}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {on && summaries[layer.id] ? summaries[layer.id] : layer.attribution}
