@@ -4,10 +4,12 @@ import { useLayers } from "./useLayers"
 interface LayerPanelProps {
   enabled: string[]
   onToggle: (id: string) => void
+  /** One-line status per layer id, shown while the layer is on. */
+  summaries?: Record<string, string>
 }
 
 /** Lists the layer catalogue grouped by category, with a switch per layer. */
-export function LayerPanel({ enabled, onToggle }: LayerPanelProps) {
+export function LayerPanel({ enabled, onToggle, summaries = {} }: LayerPanelProps) {
   const { data, error, isPending, isFetching, dataUpdatedAt } = useLayers()
 
   return (
@@ -49,7 +51,11 @@ export function LayerPanel({ enabled, onToggle }: LayerPanelProps) {
                         <span className="flex-1">
                           <span className="block text-sm">{layer.title}</span>
                           <span className="block text-xs text-slate-400">
-                            {planned ? "Coming soon" : layer.attribution}
+                            {planned
+                              ? "Coming soon"
+                              : enabled.includes(layer.id) && summaries[layer.id]
+                                ? summaries[layer.id]
+                                : layer.attribution}
                           </span>
                         </span>
                       </label>

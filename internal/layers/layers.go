@@ -58,6 +58,9 @@ type Layer struct {
 	// StaleAfterSeconds is the age after which data is shown as stale.
 	StaleAfterSeconds int    `json:"staleAfterSeconds"`
 	Attribution       string `json:"attribution"`
+	// DataPath is the API path serving the layer's data, for available
+	// layers whose data comes from the API.
+	DataPath string `json:"dataPath,omitempty"`
 }
 
 func seconds(d time.Duration) int { return int(d / time.Second) }
@@ -69,11 +72,12 @@ var catalogue = []Layer{
 		Description:       "Water level at gauging stations, compared with alert and flood thresholds.",
 		Category:          CategoryHydrology,
 		Kind:              KindGeoJSON,
-		Status:            StatusPlanned,
-		Sources:           []string{"irrigation-gauges", "nuuuwan-lk-irrigation"},
+		Status:            StatusAvailable,
+		Sources:           []string{"irrigation-gauges"},
 		RefreshSeconds:    seconds(15 * time.Minute),
-		StaleAfterSeconds: seconds(2 * time.Hour),
+		StaleAfterSeconds: seconds(3 * time.Hour),
 		Attribution:       "Irrigation Department of Sri Lanka",
+		DataPath:          "/v1/rivers/levels",
 	},
 	{
 		ID:                "flood-forecast",
@@ -235,6 +239,8 @@ func Validate(list []Layer) error {
 			return fmt.Errorf("layer %q: stale limit is shorter than the refresh interval", layer.ID)
 		case layer.Attribution == "":
 			return fmt.Errorf("layer %q: attribution is required", layer.ID)
+		case layer.Status == StatusAvailable && layer.Kind == KindGeoJSON && layer.DataPath == "":
+			return fmt.Errorf("layer %q: an available GeoJSON layer needs a data path", layer.ID)
 		}
 		seen[layer.ID] = true
 	}

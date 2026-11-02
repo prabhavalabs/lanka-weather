@@ -1,0 +1,24 @@
+# Local development database. Start with `make db-up`.
+name: lanka-weather
+
+services:
+  postgres:
+    # Multi-architecture build of the official PostGIS image (postgis/postgis
+    # publishes amd64 only), so it runs natively on Apple silicon and in CI.
+    image: imresamu/postgis:17-3.5
+    environment:
+      POSTGRES_USER: lankaweather
+      POSTGRES_PASSWORD: lankaweather
+      POSTGRES_DB: lankaweather
+    ports:
+      - "127.0.0.1:55440:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lankaweather -d lankaweather"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres:

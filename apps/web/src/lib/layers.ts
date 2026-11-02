@@ -14,6 +14,8 @@ export interface Layer {
   refreshSeconds: number
   staleAfterSeconds: number
   attribution: string
+  /** API path serving the layer's data, for layers whose data comes from the API. */
+  dataPath?: string
 }
 
 export const categoryOrder: LayerCategory[] = ["hazard", "hydrology", "weather", "geography"]

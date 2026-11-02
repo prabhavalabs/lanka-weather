@@ -1,0 +1,164 @@
+{
+  "objectIdFieldName": "objectid",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "exceededTransferLimit": false,
+  "features": [
+    {
+      "attributes": {
+        "objectid": 1550350,
+        "basin": "Kalu Ganga",
+        "gauge": "Rathnapura",
+        "water_level": 2.15,
+        "rain_fall": 0.6,
+        "CreationDate": 1793619978800,
+        "alertpull": 5.2,
+        "minorpull": 7.5,
+        "majorpull": 9.5
+      },
+      "geometry": {
+        "x": 80.39712666666667,
+        "y": 6.6787616666666665
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550339,
+        "basin": "Kelani Ganga",
+        "gauge": "Nagalagam Street",
+        "water_level": 1.8,
+        "rain_fall": 0,
+        "CreationDate": 1793619358429,
+        "alertpull": 4,
+        "minorpull": 5,
+        "majorpull": 7
+      },
+      "geometry": {
+        "x": 79.87849166666666,
+        "y": 6.958406666666667
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550338,
+        "basin": "Kelani Ganga",
+        "gauge": "Norwood",
+        "water_level": 0.94,
+        "rain_fall": 8.1,
+        "CreationDate": 1793619353296,
+        "alertpull": 1.5,
+        "minorpull": 3,
+        "majorpull": 4.5
+      },
+      "geometry": {
+        "x": 80.61118166666667,
+        "y": 6.840260000000001
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550316,
+        "basin": "Gal Oya",
+        "gauge": "Ampara",
+        "water_level": 0,
+        "rain_fall": 0,
+        "CreationDate": 1793619046171,
+        "alertpull": null,
+        "minorpull": null,
+        "majorpull": null
+      },
+      "geometry": {
+        "x": 81.670945,
+        "y": 7.2910966666666654
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550314,
+        "basin": "Mahaweli Ganga",
+        "gauge": "Weraganthota",
+        "water_level": -3.12,
+        "rain_fall": 0,
+        "CreationDate": 1793619016393,
+        "alertpull": 5,
+        "minorpull": 6,
+        "majorpull": 8
+      },
+      "geometry": {
+        "x": 80.98838333333333,
+        "y": 7.317593333333334
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550310,
+        "basin": "Kalu Ganga",
+        "gauge": "Rathnapura",
+        "water_level": 2.2,
+        "rain_fall": 0,
+        "CreationDate": 1793616045658,
+        "alertpull": 5.2,
+        "minorpull": 7.5,
+        "majorpull": 9.5
+      },
+      "geometry": {
+        "x": 80.397115,
+        "y": 6.678769999999999
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550288,
+        "basin": "Kelani Ganga",
+        "gauge": "Norwood",
+        "water_level": 0.94,
+        "rain_fall": 0,
+        "CreationDate": 1793615561919,
+        "alertpull": 1.5,
+        "minorpull": 3,
+        "majorpull": 4.5
+      },
+      "geometry": {
+        "x": 80.61119833333333,
+        "y": 6.840263333333333
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550287,
+        "basin": "Kelani Ganga",
+        "gauge": "Nagalagam Street",
+        "water_level": 1.7,
+        "rain_fall": 0,
+        "CreationDate": 1793615559169,
+        "alertpull": 4,
+        "minorpull": 5,
+        "majorpull": 7
+      },
+      "geometry": {
+        "x": 79.87852333333333,
+        "y": 6.958348333333333
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 1550274,
+        "basin": "Gal Oya",
+        "gauge": "Ampara",
+        "water_level": 0,
+        "rain_fall": 0,
+        "CreationDate": 1793615442334,
+        "alertpull": null,
+        "minorpull": null,
+        "majorpull": null
+      },
+      "geometry": {
+        "x": 81.67003500000001,
+        "y": 7.290798333333333
+      }
+    }
+  ]
+}
