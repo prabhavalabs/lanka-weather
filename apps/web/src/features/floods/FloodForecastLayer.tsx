@@ -284,7 +284,8 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
         type: "symbol",
         source: SOURCE,
         filter: ["all", isGauge, ["in", ["get", "trend"], ["literal", ["rise", "fall"]]]],
-        minzoom: 7,
+        // A calm forecast often rises, so at country scale arrows would only be noise.
+        minzoom: 8,
         layout: {
           "icon-image": ["match", ["get", "trend"], "rise", RISE, FALL],
           "icon-size": 0.5,

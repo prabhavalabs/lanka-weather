@@ -189,8 +189,8 @@ export function countBySeverity(gauges: { properties: { severity: FloodSeverity 
 }
 
 /**
- * "10 gauges · none at warning or above" or "10 gauges · 2 at warning or above ·
- * 1 area", of what the map shows.
+ * "10 gauges · none raised" or "10 gauges · 2 raised · 1 area", of what the map
+ * shows. Raised means at warning or above.
  */
 export function floodSummary(collection: FloodForecastCollection): string {
   const gauges = collection.features.filter(isGauge)
@@ -199,7 +199,7 @@ export function floodSummary(collection: FloodForecastCollection): string {
   const areas = collection.features.length - gauges.length
   const parts = [
     `${gauges.length} ${gauges.length === 1 ? "gauge" : "gauges"}`,
-    raised === 0 ? "none at warning or above" : `${raised} at warning or above`,
+    raised === 0 ? "none raised" : `${raised} raised`,
   ]
   if (areas > 0) parts.push(`${areas} ${areas === 1 ? "area" : "areas"}`)
   return parts.join(" · ")

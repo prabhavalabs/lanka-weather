@@ -4,7 +4,7 @@
  */
 import type { MapGeoJSONFeature } from "maplibre-gl"
 import { formatAge, formatNumber } from "@/lib/format"
-import { RAIN_GAUGE_POINTS } from "../raingauges/RainGaugesLayer"
+import { RAIN_GAUGE_LAYERS } from "../raingauges/RainGaugesLayer"
 import { bandLabels } from "../raingauges/present"
 import type { RainBand } from "../raingauges/types"
 import {
@@ -18,7 +18,7 @@ import { formatRain } from "../stations/present"
 
 /** Point layers these layers draw, for clicks and hovers. */
 export const observedPointLayers = [
-  RAIN_GAUGE_POINTS,
+  ...RAIN_GAUGE_LAYERS,
   MET_STATIONS,
   RIVER_RAIN_POINTS,
   RAIN_MET_POINTS,
@@ -41,7 +41,7 @@ export function observedChip(point: Hit): { title: string; lines: string[] } | n
       ],
     }
   }
-  if (point.layer.id === RAIN_GAUGE_POINTS) {
+  if (RAIN_GAUGE_LAYERS.includes(point.layer.id)) {
     const observedAt = typeof properties.observedAt === "string" ? properties.observedAt : null
     const rain = typeof properties.rain24hMm === "number" ? properties.rain24hMm : null
     return {
@@ -72,8 +72,9 @@ export function observedChip(point: Hit): { title: string; lines: string[] } | n
 export function observedTarget(
   hit: Hit,
 ): { kind: "met" | "station" | "raingauge"; id: string } | null {
-  if (hit.layer.id === RAIN_GAUGE_POINTS)
+  if (RAIN_GAUGE_LAYERS.includes(hit.layer.id)) {
     return { kind: "raingauge", id: String(hit.properties.id) }
+  }
   if (hit.layer.id === MET_STATIONS) return { kind: "met", id: String(hit.properties.id) }
   if (hit.layer.id === RAIN_MET_POINTS) return { kind: "met", id: String(hit.properties.stationId) }
   if (hit.layer.id === RIVER_RAIN_POINTS) {

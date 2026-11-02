@@ -312,12 +312,12 @@ export default function LocationPanel({
             sea={summary.data?.sea}
             onSelectStation={onSelectMetStation}
           />
+          <GaugeList title="Rain gauge nearby, last 24 hours" items={liveRain} />
         </>
       }
       sources={sources}
       onClose={onClose}
     >
-      <GaugeList title="Rain gauge nearby, last 24 hours" items={liveRain} />
       <GaugeList title="Rivers nearby" items={nearbyRivers} />
       {status === "unavailable" && (
         <section className="flex flex-col gap-2">

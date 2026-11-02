@@ -9,8 +9,17 @@ import { bandMinZoom, bandOrder, bandTokens } from "./present"
 import type { RainBand, RainGaugeCollection } from "./types"
 
 const SOURCE = "rain-gauges"
-/** The gauges: what clicks and hovers hit. */
-export const RAIN_GAUGE_POINTS = "rain-gauge-points"
+/**
+ * The gauges, by what they say, each from its own zoom. Separate layers rather than a
+ * size of zero: a hidden layer is not drawn, and a click cannot land on it. These are
+ * what clicks and hovers hit.
+ */
+const tiers = [
+  { id: "rain-gauge-quiet", bands: ["none", "unknown"] },
+  { id: "rain-gauge-light", bands: ["light"] },
+  { id: "rain-gauge-points", bands: ["very_heavy", "heavy", "moderate"] },
+] as const satisfies { id: string; bands: RainBand[] }[]
+export const RAIN_GAUGE_LAYERS: string[] = tiers.map((tier) => tier.id)
 const LABELS = "rain-gauge-labels"
 const DROPLET = "rain-gauge-droplet"
 
@@ -64,10 +73,7 @@ const band: ExpressionSpecification = ["get", "band"]
 const selected: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false]
 const rain: ExpressionSpecification = ["coalesce", ["get", "rain24hMm"], -1]
 
-/**
- * A gauge's size at a zoom, for what it says. A size of zero is not drawn and cannot
- * be clicked, so a gauge first appears at its band's zoom (`bandMinZoom`).
- */
+/** A gauge's size at a zoom, for what it says; each tier's first zoom keeps its own. */
 function size(at: {
   heavy: number
   moderate: number
@@ -92,16 +98,12 @@ const iconSize: ExpressionSpecification = [
   ["linear"],
   ["zoom"],
   5,
-  size({ heavy: 0.6, moderate: 0.32, light: 0, quiet: 0 }),
+  size({ heavy: 0.6, moderate: 0.32, light: 0.42, quiet: 0.36 }),
   7,
-  size({ heavy: 0.72, moderate: 0.4, light: 0, quiet: 0 }),
+  size({ heavy: 0.72, moderate: 0.4, light: 0.42, quiet: 0.36 }),
   bandMinZoom.light,
-  size({ heavy: 0.86, moderate: 0.58, light: 0, quiet: 0 }),
-  bandMinZoom.light + 0.25,
-  size({ heavy: 0.86, moderate: 0.58, light: 0.42, quiet: 0 }),
+  size({ heavy: 0.86, moderate: 0.58, light: 0.42, quiet: 0.36 }),
   bandMinZoom.none,
-  size({ heavy: 1, moderate: 0.78, light: 0.55, quiet: 0 }),
-  bandMinZoom.none + 0.25,
   size({ heavy: 1, moderate: 0.78, light: 0.55, quiet: 0.36 }),
   12,
   size({ heavy: 1.2, moderate: 1, light: 0.8, quiet: 0.55 }),
@@ -126,12 +128,15 @@ function addLayers(map: MapLibreMap, data: RainGaugeCollection) {
       attribution: "Rain gauges: HMIS, via Sri Lanka Water Levels (waterlevels.lk)",
     })
   }
-  if (!map.getLayer(RAIN_GAUGE_POINTS)) {
+  for (const tier of tiers) {
+    if (map.getLayer(tier.id)) continue
     map.addLayer(
       {
-        id: RAIN_GAUGE_POINTS,
+        id: tier.id,
         type: "symbol",
         source: SOURCE,
+        filter: ["in", band, ["literal", tier.bands]],
+        minzoom: bandMinZoom[tier.bands[0]],
         layout: {
           "icon-image": DROPLET,
           "icon-size": iconSize,
@@ -220,7 +225,7 @@ function addLayers(map: MapLibreMap, data: RainGaugeCollection) {
 
 function removeLayers(map: MapLibreMap) {
   if (!styleReady(map)) return
-  for (const id of [LABELS, RAIN_GAUGE_POINTS]) {
+  for (const id of [LABELS, ...RAIN_GAUGE_LAYERS]) {
     if (map.getLayer(id)) map.removeLayer(id)
   }
   if (map.getSource(SOURCE)) map.removeSource(SOURCE)
