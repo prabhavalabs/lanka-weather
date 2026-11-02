@@ -26,7 +26,10 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/gfs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/googleflood"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrobasins"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrorivers"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigationgis"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/openmeteo"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
@@ -112,6 +115,10 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindCurrent, Logger: logger},
 		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindForecast, Logger: logger},
 		&gfs.Collector{Pool: pool, Client: client, Logger: logger},
+		&hydrorivers.Collector{Pool: pool, Fetcher: client},
+		&irrigationgis.BasinsCollector{Pool: pool, Fetcher: client, Logger: logger},
+		&irrigationgis.PastFloodsCollector{Pool: pool, Fetcher: client, Logger: logger},
+		&hydrobasins.Collector{Pool: pool, Client: client, Logger: logger},
 	}
 	if key := os.Getenv("LANKAWEATHER_GOOGLE_API_KEY"); key != "" {
 		list = append(list, &googleflood.Collector{Pool: pool, Client: client, APIKey: key, Logger: logger,
