@@ -25,6 +25,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
 	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 	"github.com/prabhavalabs/lanka-weather/internal/ingest"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
@@ -92,9 +93,11 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 // collectors lists every data source the worker collects.
 func collectors(pool *pgxpool.Pool) []source.Collector {
 	client := source.NewClient(os.Getenv("LANKAWEATHER_CONTACT"))
+	// Regions load before places, so places can be placed in their regions.
 	return []source.Collector{
 		&irrigation.Collector{Pool: pool, Fetcher: client},
 		&adminregions.Collector{Pool: pool, Fetcher: client},
+		&osmplaces.Collector{Pool: pool, Fetcher: client},
 	}
 }
 

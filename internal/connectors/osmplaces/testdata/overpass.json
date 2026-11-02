@@ -1,0 +1,96 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-11-02T13:47:51Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "node",
+      "id": 2908772560,
+      "lat": 7.2931208,
+      "lon": 80.6350358,
+      "tags": {
+        "name": "Kandy",
+        "name:en": "Kandy",
+        "name:si": "මහනුවර",
+        "name:ta": "கண்டி",
+        "place": "city",
+        "population": "125000",
+        "alt_name": "Senkadagala;Maha Nuwara"
+      }
+    },
+    {
+      "type": "node",
+      "id": 50794342,
+      "lat": 6.9344,
+      "lon": 79.8428,
+      "tags": {
+        "name": "Colombo",
+        "name:si": "කොළඹ",
+        "name:ta": "கொழும்பு",
+        "place": "city",
+        "population": "753,000"
+      }
+    },
+    {
+      "type": "node",
+      "id": 3666851318,
+      "lat": 6.9101,
+      "lon": 79.8512,
+      "tags": { "name": "Kollupitiya", "place": "suburb", "population": "~15000" }
+    },
+    {
+      "type": "node",
+      "id": 10166661526,
+      "lat": 7.3254,
+      "lon": 80.691,
+      "tags": { "name": "kandy", "place": "hamlet" }
+    },
+    {
+      "type": "node",
+      "id": 4455834909,
+      "lat": 6.95,
+      "lon": 79.96,
+      "tags": { "name": "මට්ටක්කුලිය", "place": "village", "population": "about 7000" }
+    },
+    {
+      "type": "node",
+      "id": 4634651864,
+      "lat": 7.41,
+      "lon": 80.65,
+      "tags": { "name": "Kandana", "place": "town" }
+    },
+    {
+      "type": "node",
+      "id": 7000000001,
+      "lat": 6.8,
+      "lon": 79.79,
+      "tags": { "name": "Mount Lavinia Beach", "place": "locality" }
+    },
+    {
+      "type": "node",
+      "id": 7000000002,
+      "lat": 8.5,
+      "lon": 81.5,
+      "tags": { "name": "Far Village", "place": "village" }
+    },
+    { "type": "node", "id": 7000000003, "lat": 7.0, "lon": 80.0, "tags": { "place": "village" } },
+    {
+      "type": "node",
+      "id": 7000000004,
+      "lat": 7.0,
+      "lon": 80.0,
+      "tags": { "name": "Not a place kind", "place": "island" }
+    },
+    {
+      "type": "node",
+      "id": 7000000005,
+      "lat": 9.28,
+      "lon": 79.31,
+      "tags": { "name": "Rameswaram", "place": "town" }
+    },
+    { "type": "way", "id": 7000000006, "tags": { "name": "A way", "place": "village" } }
+  ]
+}
