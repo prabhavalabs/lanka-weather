@@ -176,8 +176,9 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Places:  &places.Service{Pool: pool},
 			Weather: weatherService,
 			Floods:  floodService,
-			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService, Logger: logger},
-			Ready:   pool.Ping,
+			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
+				Regions: regionService, Logger: logger},
+			Ready: pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -33,11 +34,17 @@ type FloodSource interface {
 	AreasAt(ctx context.Context, lon, lat float64) ([]floods.AreaAt, error)
 }
 
+// RegionLookup finds the administrative regions containing a point.
+type RegionLookup interface {
+	Lookup(ctx context.Context, lon, lat float64) (regions.Lookup, error)
+}
+
 // Service builds summaries. Any source may be nil.
 type Service struct {
 	Weather WeatherSource
 	Rivers  RiverSource
 	Floods  FloodSource
+	Regions RegionLookup
 	Logger  *slog.Logger
 	Now     func() time.Time
 }
@@ -58,6 +65,9 @@ const (
 type Summary struct {
 	Location    weather.Location `json:"location"`
 	GeneratedAt time.Time        `json:"generatedAt"`
+	// Regions are the province, district, DS and GN division containing
+	// the place; null outside Sri Lanka or before regions are loaded.
+	Regions *Regions `json:"regions"`
 	// Weather is the current conditions, the next 24 hours and three days;
 	// null when the place is outside the grid or nothing is collected.
 	Weather       *weather.Point `json:"weather"`
@@ -69,8 +79,17 @@ type Summary struct {
 	// are authoritative; they are not collected yet.
 	Official Official `json:"official"`
 	// Unavailable lists the parts that could not be filled: weather,
-	// rivers or floodForecast.
+	// regions, rivers or floodForecast.
 	Unavailable []string `json:"unavailable"`
+}
+
+// Regions is the administrative hierarchy of the place. A level is null
+// where no region of it contains the place (at sea, for example).
+type Regions struct {
+	Province *regions.Ref `json:"province"`
+	District *regions.Ref `json:"district"`
+	DS       *regions.Ref `json:"ds"`
+	GN       *regions.Ref `json:"gn"`
 }
 
 // River is a river gauge near the place.
@@ -145,6 +164,19 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 		}
 	} else {
 		summary.Unavailable = append(summary.Unavailable, "weather")
+	}
+
+	if service.Regions != nil {
+		lookup, err := service.Regions.Lookup(ctx, lon, lat)
+		switch {
+		case err != nil:
+			service.warn("summary regions", err)
+			summary.Unavailable = append(summary.Unavailable, "regions")
+		case lookup.Province != nil || lookup.District != nil || lookup.DS != nil || lookup.GN != nil:
+			summary.Regions = &Regions{Province: lookup.Province, District: lookup.District, DS: lookup.DS, GN: lookup.GN}
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "regions")
 	}
 
 	if service.Rivers != nil {

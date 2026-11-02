@@ -3,10 +3,12 @@ package summary
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -52,14 +54,32 @@ func (fake fakeFloods) AreasAt(context.Context, float64, float64) ([]floods.Area
 	return nil, nil
 }
 
+type fakeRegions struct{ err error }
+
+func (fake fakeRegions) Lookup(_ context.Context, lon, lat float64) (regions.Lookup, error) {
+	if fake.err != nil || lon < 79 {
+		return regions.Lookup{Lat: lat, Lon: lon}, fake.err
+	}
+	return regions.Lookup{Lat: lat, Lon: lon,
+		Province: &regions.Ref{ID: "LK-1", Level: regions.LevelProvince, Name: "Western"},
+		District: &regions.Ref{ID: "LK-11", Level: regions.LevelDistrict, Name: "Colombo"},
+		DS:       &regions.Ref{ID: "LK-1103", Level: regions.LevelDS, Name: "Colombo"},
+		GN:       &regions.Ref{ID: "LK-1103005", Level: regions.LevelGN, Name: "Fort"},
+	}, nil
+}
+
 func TestSummaryForColombo(t *testing.T) {
-	service := &Service{Weather: fakeWeather{}, Rivers: fakeRivers{}, Floods: fakeFloods{}, Now: func() time.Time { return start }}
+	service := &Service{Weather: fakeWeather{}, Rivers: fakeRivers{}, Floods: fakeFloods{}, Regions: fakeRegions{},
+		Now: func() time.Time { return start }}
 	summary, err := service.Summary(context.Background(), 79.8612, 6.9271)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if summary.Weather == nil || len(summary.Unavailable) != 0 {
 		t.Fatalf("unavailable = %v", summary.Unavailable)
+	}
+	if summary.Regions == nil || summary.Regions.District.ID != "LK-11" || summary.Regions.GN.Name != "Fort" {
+		t.Fatalf("regions = %+v", summary.Regions)
 	}
 	if len(summary.Rivers) != 3 || summary.Rivers[0].ID != "nagalagam-street" || summary.Rivers[0].DistanceKm > 5 {
 		t.Fatalf("rivers = %+v", summary.Rivers)
@@ -81,7 +101,17 @@ func TestSummaryListsUnavailableParts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.Weather != nil || len(summary.Unavailable) != 3 || summary.Rivers == nil || summary.Alerts == nil {
+	if summary.Weather != nil || len(summary.Unavailable) != 4 || summary.Rivers == nil || summary.Alerts == nil {
 		t.Fatalf("summary = %+v", summary)
+	}
+
+	// At sea the lookup finds nothing: no hierarchy, but nothing failed.
+	service = &Service{Regions: fakeRegions{}}
+	if summary, _ := service.Summary(context.Background(), 70, 10); summary.Regions != nil || slices.Contains(summary.Unavailable, "regions") {
+		t.Fatalf("at sea = %+v, unavailable %v", summary.Regions, summary.Unavailable)
+	}
+	service = &Service{Regions: fakeRegions{err: errors.New("down")}}
+	if summary, _ := service.Summary(context.Background(), 80, 7); summary.Regions != nil || !slices.Contains(summary.Unavailable, "regions") {
+		t.Fatalf("failed lookup = %+v, unavailable %v", summary.Regions, summary.Unavailable)
 	}
 }
