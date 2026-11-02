@@ -39,3 +39,29 @@ func TestByID(t *testing.T) {
 		t.Fatal("missing should not exist")
 	}
 }
+
+func TestWeatherLayersAreAvailable(t *testing.T) {
+	cases := map[string]string{
+		"wind":           "/v1/weather/wind",
+		"flood-forecast": "/v1/floods/forecast",
+		"temperature":    "/v1/weather/current",
+	}
+	for id, path := range cases {
+		layer, ok := ByID(id)
+		if !ok || layer.Status != StatusAvailable || layer.DataPath != path {
+			t.Errorf("%s = %+v", id, layer)
+		}
+	}
+	temperature, _ := ByID("temperature")
+	if temperature.Kind != KindGrid || temperature.RefreshSeconds != 3600 {
+		t.Fatalf("temperature = %+v", temperature)
+	}
+}
+
+func TestValidateRequiresDataPathForAPILayers(t *testing.T) {
+	layer, _ := ByID("wind")
+	layer.DataPath = ""
+	if err := Validate([]Layer{layer}); err == nil {
+		t.Fatal("an available wind layer without a data path must be rejected")
+	}
+}

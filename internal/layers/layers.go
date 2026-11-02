@@ -33,6 +33,9 @@ const (
 	KindVector Kind = "vector"
 	// KindWind is the animated particle overlay drawn from a wind field.
 	KindWind Kind = "wind"
+	// KindGrid layers are values on a regular grid served by the API,
+	// drawn as a colour field or contours.
+	KindGrid Kind = "grid"
 )
 
 // Status says whether a layer has data behind it yet.
@@ -85,11 +88,12 @@ var catalogue = []Layer{
 		Description:       "Forecast flood status at river gauges and expected inundation areas.",
 		Category:          CategoryHydrology,
 		Kind:              KindGeoJSON,
-		Status:            StatusPlanned,
+		Status:            StatusAvailable,
 		Sources:           []string{"google-flood-forecasting"},
-		RefreshSeconds:    seconds(6 * time.Hour),
-		StaleAfterSeconds: seconds(24 * time.Hour),
-		Attribution:       "Google Flood Forecasting",
+		RefreshSeconds:    seconds(1 * time.Hour),
+		StaleAfterSeconds: seconds(30 * time.Hour),
+		Attribution:       "Google Flood Hub (Flood Forecasting API)",
+		DataPath:          "/v1/floods/forecast",
 	},
 	{
 		ID:                "reservoirs",
@@ -106,14 +110,28 @@ var catalogue = []Layer{
 	{
 		ID:                "wind",
 		Title:             "Wind",
-		Description:       "Animated wind speed and direction 10 m above ground.",
+		Description:       "Animated wind 10 m above ground from the NOAA GFS model, now and every 3 hours to 3 days ahead.",
 		Category:          CategoryWeather,
 		Kind:              KindWind,
-		Status:            StatusPlanned,
+		Status:            StatusAvailable,
 		Sources:           []string{"noaa-gfs"},
-		RefreshSeconds:    seconds(6 * time.Hour),
+		RefreshSeconds:    seconds(1 * time.Hour),
 		StaleAfterSeconds: seconds(12 * time.Hour),
 		Attribution:       "NOAA GFS",
+		DataPath:          "/v1/weather/wind",
+	},
+	{
+		ID:                "temperature",
+		Title:             "Temperature",
+		Description:       "Current temperature, humidity, rain and wind on a 0.2° grid over Sri Lanka, from weather models.",
+		Category:          CategoryWeather,
+		Kind:              KindGrid,
+		Status:            StatusAvailable,
+		Sources:           []string{"open-meteo"},
+		RefreshSeconds:    seconds(1 * time.Hour),
+		StaleAfterSeconds: seconds(3 * time.Hour),
+		Attribution:       "Weather data by Open-Meteo.com (CC BY 4.0)",
+		DataPath:          "/v1/weather/current",
 	},
 	{
 		ID:                "rainfall",
@@ -239,8 +257,8 @@ func Validate(list []Layer) error {
 			return fmt.Errorf("layer %q: stale limit is shorter than the refresh interval", layer.ID)
 		case layer.Attribution == "":
 			return fmt.Errorf("layer %q: attribution is required", layer.ID)
-		case layer.Status == StatusAvailable && layer.Kind == KindGeoJSON && layer.DataPath == "":
-			return fmt.Errorf("layer %q: an available GeoJSON layer needs a data path", layer.ID)
+		case layer.Status == StatusAvailable && layer.Kind != KindRaster && layer.Kind != KindVector && layer.DataPath == "":
+			return fmt.Errorf("layer %q: an available layer served by the API needs a data path", layer.ID)
 		}
 		seen[layer.ID] = true
 	}
