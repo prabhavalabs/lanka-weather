@@ -74,7 +74,7 @@ In this order, `group` in brackets:
 | `cyclones` | `hazards` | Systems in the North Indian Ocean, with distance and direction |
 | `earthquakes` | `hazards` | The last 7 days' significant events: see ADR 0014 |
 | `weather` | `now` | Hottest, coolest, three wettest and windiest districts. `estimate: true` |
-| `rain` | `now` | The three wettest gauges over 24 hours, measured |
+| `rain` | `now` | The five wettest live rain gauges over 24 hours, measured, once at least 20 report; otherwise the wettest river gauges |
 | `air` | `now` | The worst index on the grid. `estimate: true` |
 | `sea` | `now` | The highest wave on the grid. `estimate: true` |
 
@@ -89,6 +89,6 @@ In this order, `group` in brackets:
 ## Targets
 
 `target` says what a click opens. `kind` is one of `warnings` (with a type as `id`), `landslide`,
-`river` (with `reach`), `station`, `reservoir`, `reservoirs`, `cyclone`, `quake`, `region` (with
+`river` (with `reach`), `station`, `raingauge`, `reservoir`, `reservoirs`, `cyclone`, `quake`, `region` (with
 `fill`: `temperature`, `rain` or `wind`), `place`, or `layer`. `layer` names a layer to switch on,
 and `lon` and `lat` a place to show.

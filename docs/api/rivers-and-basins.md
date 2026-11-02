@@ -162,9 +162,40 @@ Every official river basin, and each sub-basin with something to say.
 `no_forecast` means nothing current covers the basin, which is not the same as calm.
 
 A gauge's `state` is empty when it says nothing: it is out of date, or has no thresholds.
-`verified` is false for a Google gauge it has not quality-verified, read only with
-`LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED=true`. `onlyUnverified` says a basin's state rests on those
-alone. A sub-basin not listed has no forecast.
+`verified` is false for a Google gauge it has not quality-verified, read unless
+`LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED=false`. `onlyUnverified` says a basin's state rests on those
+alone, and `verifiedState` says what verified evidence alone reads, which the map draws while Extended
+coverage is off. An area with `lowerConfidence` belongs to such a gauge and counts with them. A sub-basin
+not listed has no forecast.
+
+## `GET /v1/rivers/canals`
+
+Colombo's canal levels, in the envelope (ADR 0015). The source gives no positions, so there are none.
+
+```json
+{
+  "gauges": [
+    {
+      "id": "mattakkuliya-n", "name": "Mattakkuliya N", "group": "Kelani River", "state": "higher",
+      "levelM": 0.249, "observedAt": "2026-11-02T19:15:00Z", "change3hM": 0.04,
+      "last24h": [{ "t": "2026-11-01T20:00:00Z", "level_m": 0.472 }], "stale": false
+    }
+  ],
+  "sea": { "levelM": 0.141, "trend": "steady", "observedAt": "2026-11-02T19:15:00Z" },
+  "tide": { "note": "Predicted from harmonics…", "events": [{ "kind": "high", "at": "2026-11-03T01:23:00Z" }] },
+  "meta": {
+    "source": "waterlevels-lk-canals", "credit": "Canal levels: CUrW / SLLDC (pub.curwsl.org)",
+    "attribution": "Data © CUrW / SLLDC (pub.curwsl.org)", "via": "Sri Lanka Water Levels (waterlevels.lk)",
+    "licence": "…", "upstreamUrl": "http://pub.curwsl.org/",
+    "note": "Context, not a flood warning. Levels are metres above mean sea level.",
+    "fetchedAt": "…", "sourceTime": "…", "generatedAt": "…", "total": 33, "reporting": 27, "raised": 1, "stale": false
+  }
+}
+```
+
+`state` is the source's word: `normal`, `rising`, `higher` or `offline`. A missing figure is null, never
+zero. `stale` means the reading is over 3 hours old or missing, whatever the state, and such a gauge does
+not count in `reporting` or `raised`. `meta.stale` means none reports.
 
 ## `GET /v1/floods/basins/{id}`
 

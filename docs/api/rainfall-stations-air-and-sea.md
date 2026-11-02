@@ -36,6 +36,32 @@ Properties: `id`, `stationId`, `kind` (`met` or `gauge`), `name`, `rainMm`,
 `observed`, and `fresh` and `stale` counts. Stale limits: 6 hours for summed
 3-hourly readings, 36 for a daily report, 3 for a gauge.
 
+## `GET /v1/rain/gauges`
+
+About 275 live rain gauges as GeoJSON: rolling 24-hour totals, measured, from HMIS through Sri Lanka
+Water Levels (ADR 0015). Layer `rain-gauges`, collected every 30 minutes, cached 2 minutes.
+
+| Property | Meaning |
+|---|---|
+| `id` | A slug of the device's name, stable and safe in a URL |
+| `name`, `institution` | The gauge and who runs it: NBRO, Met Department, Irrigation Department, ACCIMT |
+| `rain24hMm` | The current rolling 24-hour total. **Null when out of date**, so it cannot read as dry |
+| `lastRain24hMm` | The newest figure there is, however old |
+| `band` | `none`, `light` (under 10 mm), `moderate` (10 to 50), `heavy` (50 to 100), `very_heavy` (100 or more), or `unknown` when out of date |
+| `observedAt` | When the newest reading was taken; null if it never has been |
+| `stale` | The newest reading is over 3 hours old |
+| `source`, `sourceTime`, `fetchedAt` | The source, the file's own time, and when it was stored |
+
+`meta` adds `attribution`, `note`, `fetchedAt`, `sourceTime`, `generatedAt`, `staleAfterSeconds`,
+`total`, `fresh`, `stale`, `wet` (current, 10 mm or more) and `institutions` (gauges by who runs them).
+
+Nothing shorter than 24 hours is given or can be derived: a rolling sum says nothing about any one hour.
+
+## `GET /v1/rain/gauges/{id}`
+
+`{ gauge, series, meta }` in the envelope. `series` is up to 48 hours of `{ at, rain24hMm }`, oldest
+first. Errors: 404 `gauge_not_found`.
+
 ## `GET /v1/stations`
 
 Department of Meteorology stations as GeoJSON. Cached 5 minutes.
@@ -78,6 +104,13 @@ land as closed longitude, latitude rings, simplified to about 1 km, for
 clipping a field to the coast. Directions are where waves come from.
 
 ## Additions to `GET /v1/summary`
+
+- **`rainGauge`:** the nearest live rain gauge within 30 km, the properties above with `distanceKm`,
+  `lon`, `lat` and `attribution`. It is the nearest current one, or the nearest out-of-date one, which
+  says so, if none is current. Null when none is near.
+- **`canals`:** for a place within 20 km of Colombo's centre, `{ total, reporting, raised, fetchedAt,
+  stale, attribution, note }`; null elsewhere. See `GET /v1/rivers/canals`.
+
 
 Each is null when it does not apply, and listed in `unavailable` only if it
 failed.

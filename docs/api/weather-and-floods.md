@@ -388,8 +388,11 @@ Each gauge is a `Point` feature with `properties.kind = "gauge"`:
 | `trend` | `rise`, `fall`, `no_change` or `unknown` |
 | `forecastStart`, `forecastEnd` | The forecast window |
 | `thresholds` | The gauge model's warning, danger and extreme-danger levels, in `unit` (`m3/s` or `m`) |
-| `qualityVerified` | Whether Google has verified the gauge |
+| `qualityVerified` | Whether Google has verified the gauge's model. A false one is lower confidence: Flood Hub's Extended coverage. It is read unless `LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED=false`, is off on the map by default, and raises no river risk, alert or overview count |
 | `stale` | True when issued more than 30 hours ago |
+
+The map words severities as Flood Hub does: `extreme` is Extreme, `severe` Danger, `above_normal`
+Warning, `no_flooding` Normal and `unknown` No data. These are forecasts, not official warnings.
 
 Flood areas are `MultiPolygon` features. `properties.kind` is one of:
 
@@ -400,12 +403,18 @@ Flood areas are `MultiPolygon` features. `properties.kind` is one of:
 - `significant_event`.
 
 Each area has `severity`, `validFrom`, `validUntil`, the `gaugeId` it belongs
-to, and source `details` (for example affected population).
+to, and source `details` (for example affected population). `severity` is a
+gauge's severity, `likely` or `highly_likely` for a flash flood, or an event's
+population band. `lowerConfidence` marks an area of an unverified gauge.
+`details.mapType` says whether an inundation map's levels mean `probability`,
+which the map words Very high, High and Moderate for `high`, `medium` and `low`,
+or `depth`. Highly likely is not inside likely: the likely polygon has holes
+where highly likely is, so the two do not stack.
 
 Nothing fetched more than 24 hours ago is served, as Google's terms
 require. `meta.configured` is false when no API key is set.
 
-Example: 6.1 KB. On 2 November 2026 Sri Lanka had 10 verified gauges, all
+On 2 November 2026 Sri Lanka had 10 verified and 300 lower-confidence gauges, all
 at `no_flooding`, and no areas; one gauge is shown here.
 
 ```json
@@ -441,8 +450,11 @@ at `no_flooding`, and no areas; one gauge is shown here.
     "configured": true,
     "fetchedAt": "2026-11-02T14:50:47.299015Z",
     "generatedAt": "2026-11-02T14:51:01.897245Z",
-    "gauges": 10,
-    "areas": 0
+    "gauges": 310,
+    "areas": 0,
+    "verifiedGauges": 10,
+    "lowerConfidenceGauges": 300,
+    "flashAreas": 0
   }
 }
 ```
@@ -478,8 +490,10 @@ picked. It contains:
 - **`rivers`:** up to three Irrigation Department gauges within 50 km,
   nearest first, with distance, status, trend, level and thresholds. Same
   fields as `/v1/rivers/levels`.
-- **`floodForecast.gauges`:** up to three Google gauges within 75 km.
-- **`floodForecast.areas`:** the Google flood areas that contain the place.
+- **`floodForecast.gauges`:** up to three verified Google gauges within 75 km.
+- **`floodForecast.areas`:** the Google flood areas that contain the place, leaving out those of
+  gauges Google has not verified.
+- **`rainGauge`** and **`canals`:** see `docs/api/rainfall-stations-air-and-sea.md`.
 - **`alerts`:** derived alerts, most serious first. See below.
 - **`official`:** NBRO, Department of Meteorology and DMC warnings, which are
   authoritative: the landslide level of the place's DS division, bulletins
