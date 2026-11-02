@@ -80,6 +80,8 @@ type Dependencies struct {
 	Weather Weather
 	Floods  Floods
 	Summary Summaries
+	// Reservoirs serves the reservoirs layer.
+	Reservoirs Reservoirs
 	// Now is the clock for requests without an explicit time; nil is
 	// time.Now.
 	Now func() time.Time
@@ -124,6 +126,9 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/weather/regions", api.weatherRegions)
 		r.Get("/floods/forecast", api.floodForecast)
 		r.Get("/summary", api.summary)
+		r.Get("/reservoirs", api.reservoirLayer)
+		r.Get("/reservoirs/areas", api.reservoirAreas)
+		r.Get("/reservoirs/{id}/readings", api.reservoirReadings)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {

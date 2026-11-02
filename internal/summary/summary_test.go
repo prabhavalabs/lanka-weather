@@ -9,6 +9,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -114,4 +115,58 @@ func TestSummaryListsUnavailableParts(t *testing.T) {
 	if summary, _ := service.Summary(context.Background(), 80, 7); summary.Regions != nil || !slices.Contains(summary.Unavailable, "regions") {
 		t.Fatalf("failed lookup = %+v, unavailable %v", summary.Regions, summary.Unavailable)
 	}
+}
+
+func TestSummaryListsOnlyCurrentNearbyReservoirsSpillingOrReleasing(t *testing.T) {
+	point := func(lon, lat float64) *reservoirs.Point {
+		return &reservoirs.Point{Type: "Point", Coordinates: [2]float64{lon, lat}}
+	}
+	feature := func(id string, geometry *reservoirs.Point, status string, stale bool) reservoirs.Feature {
+		return reservoirs.Feature{ID: id, Geometry: geometry, Properties: reservoirs.Properties{ID: id, Name: id, Status: status, Stale: stale, Mapped: geometry != nil}}
+	}
+	service := &Service{Reservoirs: fakeReservoirs{layer: reservoirs.FeatureCollection{Features: []reservoirs.Feature{
+		feature("further", point(80.2, 7.0), "releasing", false),
+		feature("nearest", point(80.0, 7.0), "spilling", false),
+		feature("calm", point(80.0, 7.0), "holding", false),
+		feature("no-news", point(80.0, 7.0), "nodata", false),
+		feature("old-news", point(80.0, 7.0), "spilling", true),
+		feature("not-mapped", nil, "spilling", false),
+		feature("far-away", point(81.5, 8.5), "spilling", false),
+	}}}}
+	summary, err := service.Summary(context.Background(), 80.0, 7.01)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Reservoirs) != 2 || summary.Reservoirs[0].ID != "nearest" || summary.Reservoirs[1].ID != "further" {
+		t.Fatalf("reservoirs = %+v", summary.Reservoirs)
+	}
+	if slices.Contains(summary.Unavailable, "reservoirs") {
+		t.Fatalf("unavailable = %v", summary.Unavailable)
+	}
+
+	failing := &Service{Reservoirs: fakeReservoirs{err: errors.New("down")}}
+	summary, err = failing.Summary(context.Background(), 80.0, 7.01)
+	if err != nil || !slices.Contains(summary.Unavailable, "reservoirs") || len(summary.Reservoirs) != 0 {
+		t.Fatalf("summary = %+v, err %v", summary, err)
+	}
+}
+
+// A gauge read through another site is credited to whoever measured it.
+func TestRiverAlertBasisNamesTheSource(t *testing.T) {
+	alerts := riverAlerts([]NearbyRiver{
+		{Name: "Pugoda", DistanceKm: 3, Status: "alert", Source: "waterlevels-lk-gauges", Attribution: "RiverNet via waterlevels.lk"},
+		{Name: "Hanwella", DistanceKm: 5, Status: "alert", Source: "irrigation-gauges", Attribution: "Irrigation Department of Sri Lanka"},
+	})
+	if len(alerts) != 2 || alerts[0].Basis != "RiverNet via waterlevels.lk gauge reading and the station's published thresholds" || alerts[1].Basis != basisRivers {
+		t.Fatalf("alerts = %+v", alerts)
+	}
+}
+
+type fakeReservoirs struct {
+	layer reservoirs.FeatureCollection
+	err   error
+}
+
+func (fake fakeReservoirs) Layer(context.Context) (reservoirs.FeatureCollection, error) {
+	return fake.layer, fake.err
 }
