@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Excerpt of https://gibs.earthdata.nasa.gov/colormaps/v1.3/GPM_Precipitation_Rate.xml, recorded 2026-11-02. -->
+<ColorMaps>
+  <ColorMap title="Rain Rate" units="mm/hr">
+    <Entries>
+      <ColorMapEntry rgb="0,118,78" transparent="false" sourceValue="[0.1,0.1059)" value="[0.1,0.1059)" ref="2"/>
+      <ColorMapEntry rgb="69,192,0" transparent="false" sourceValue="[0.4732,0.5012)" value="[0.4732,0.5012)" ref="29"/>
+      <ColorMapEntry rgb="195,228,0" transparent="false" sourceValue="[1,1.0593)" value="[1,1.0593)" ref="42"/>
+      <ColorMapEntry rgb="255,176,6" transparent="false" sourceValue="[1.9953,2.1135)" value="[1.9953,2.1135)" ref="54"/>
+      <ColorMapEntry rgb="255,71,48" transparent="false" sourceValue="[4.7315,5.0119)" value="[4.7315,5.0119)" ref="69"/>
+      <ColorMapEntry rgb="231,0,0" transparent="false" sourceValue="[10,10.5925)" value="[10,10.5925)" ref="82"/>
+      <ColorMapEntry rgb="156,0,0" transparent="false" sourceValue="[19.9526,21.1349)" value="[19.9526,21.1349)" ref="94"/>
+      <ColorMapEntry rgb="63,0,0" transparent="false" sourceValue="[47.3151,50.1187)" value="[47.3151,50.1187)" ref="109"/>
+      <ColorMapEntry rgb="51,0,0" transparent="false" sourceValue="[53.0884,+INF)" value="[53.0884,+INF)" ref="111"/>
+    </Entries>
+  </ColorMap>
+</ColorMaps>
