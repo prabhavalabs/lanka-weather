@@ -34,7 +34,7 @@ Planned data layers include:
 | Path | Contents |
 |---|---|
 | `cmd/lankaweather/` | Go entry point: `serve` (HTTP API); `worker` and `migrate` follow |
-| `internal/` | Go packages: layer catalogue, HTTP API, and later connectors, ingest and store |
+| `internal/` | Go packages: layer catalogue, HTTP API, connectors, ingest, store, regions and place search |
 | `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre |
 | `packages/` | Shared TypeScript packages, when needed |
 | `docs/` | Architecture overview, data-source catalogue and decision records |
@@ -61,7 +61,7 @@ through Corepack: `corepack enable`) and Docker.
 cp .env.example .env   # local settings; .env is never committed
 make bootstrap         # install Node and Go dependencies
 make db-up             # PostgreSQL with PostGIS on 127.0.0.1:55440
-make collect           # migrate, then fetch every source once
+make collect           # migrate, then fetch every source once (about 2 minutes)
 make dev-api           # terminal 1: API on http://localhost:8080
 make dev-worker        # terminal 2: scheduler that keeps data current
 make dev-web           # terminal 3: web app on http://localhost:5173
@@ -88,6 +88,17 @@ change the API's listen address.
 | `GET /v1/layers` | Layer catalogue with refresh cadence and staleness limits |
 | `GET /v1/rivers/levels` | River gauging stations as GeoJSON: level, flood status, trend, data age |
 | `GET /v1/rivers/stations/{id}/readings?hours=72` | One station's readings (1 to 720 hours) |
+| `GET /v1/regions?level=province\|district\|ds` | Region boundaries as GeoJSON, simplified per level; `level=gn&parent=LK-2130` for the GN divisions of one district or DS division |
+| `GET /v1/tiles/regions/{z}/{x}/{y}.pbf` | Mapbox Vector Tiles of every level (`province` z0+, `district` z6+, `ds` z8+, `gn` z10+, up to z14) |
+| `GET /v1/regions/{id}?geometry=true` | One region: names in English, Sinhala and Tamil, hierarchy, centroid, bounding box, area, 2024 population |
+| `GET /v1/regions/lookup?lat=6.9271&lon=79.8612` | The province, district, DS and GN division containing a point |
+| `GET /v1/places/search?q=kandy&limit=10` | Cities, towns, villages and regions by name, typo-tolerant, with coordinates, hierarchy and bounding box |
+
+Region ids are Department of Census and Statistics codes: `LK-2`
+(province), `LK-21` (district), `LK-2130` (DS division), `LK-2130120`
+(GN division). Boundary responses carry an `ETag` and a day's
+`Cache-Control`. The full contract, with example responses, is in
+[ADR 0006](docs/decisions/0006-admin-regions-and-search.md#api-contract).
 
 Before opening a pull request, run everything CI runs:
 
