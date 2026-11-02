@@ -52,6 +52,10 @@ func run(args []string) error {
 	if _, err := network.Collect(ctx, now); err != nil {
 		return err
 	}
-	fmt.Println("seed", args[0], "done; the API reports seeded while it is in place")
+	if args[0] == "apply" {
+		fmt.Println("pretend flood written; the API reports seeded while it is in place")
+	} else {
+		fmt.Println("pretend flood removed")
+	}
 	return nil
 }

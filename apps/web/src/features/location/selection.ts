@@ -6,18 +6,37 @@
  *   (a searched place);
  * - `?region=LK-21`: an administrative region, at its label point;
  * - `?station=peradeniya`: a river gauge;
- * - `?gauge=hybas_4121155030`: a Google flood forecast gauge.
+ * - `?gauge=hybas_4121155030`: a Google flood forecast gauge;
+ * - `?river=kelani-ganga&reach=41405515`: a river, optionally a stretch of it;
+ * - `?basin=kelani-ganga`: a flood-forecast river basin;
+ * - `?area=...`: one of Google's flood polygons;
+ * - `?past=kelani-ganga-flood-2016-major`: a past flood.
  */
 export type Selection =
   | { kind: "point"; lat: number; lon: number; name?: string }
   | { kind: "region"; id: string }
   | { kind: "station"; id: string }
   | { kind: "gauge"; id: string }
+  | { kind: "river"; id: string; reach?: number }
+  | { kind: "basin"; id: string }
+  | { kind: "area"; id: string }
+  | { kind: "past"; id: string }
 
 /** The area the API answers for (`/v1/summary`, `/v1/regions/lookup`). */
 export const pointBounds = { south: 5.5, north: 10.5, west: 79, east: 82.5 }
 
-const selectionKeys = ["at", "name", "region", "station", "gauge"]
+const selectionKeys = [
+  "at",
+  "name",
+  "region",
+  "station",
+  "gauge",
+  "river",
+  "reach",
+  "basin",
+  "area",
+  "past",
+]
 const maxNameLength = 80
 
 /** Coordinates rounded to four decimals (about 11 m), enough for weather and short in URLs. */
@@ -84,6 +103,23 @@ export function parseSelection(search: string): Selection | null {
   const gauge = safeId(params.get("gauge"))
   if (gauge) return { kind: "gauge", id: gauge }
 
+  const river = safeId(params.get("river"))
+  if (river) {
+    const reach = Number(params.get("reach"))
+    return Number.isSafeInteger(reach) && reach > 0
+      ? { kind: "river", id: river, reach }
+      : { kind: "river", id: river }
+  }
+
+  const basin = safeId(params.get("basin"))
+  if (basin) return { kind: "basin", id: basin }
+
+  const area = safeId(params.get("area"))
+  if (area) return { kind: "area", id: area }
+
+  const past = safeId(params.get("past"))
+  if (past) return { kind: "past", id: past }
+
   return null
 }
 
@@ -106,6 +142,15 @@ export function selectionSearch(selection: Selection | null, current = ""): stri
     params.set("station", selection.id)
   } else if (selection?.kind === "gauge") {
     params.set("gauge", selection.id)
+  } else if (selection?.kind === "river") {
+    params.set("river", selection.id)
+    if (selection.reach) params.set("reach", String(selection.reach))
+  } else if (selection?.kind === "basin") {
+    params.set("basin", selection.id)
+  } else if (selection?.kind === "area") {
+    params.set("area", selection.id)
+  } else if (selection?.kind === "past") {
+    params.set("past", selection.id)
   }
   const text = params.toString().replace(/%2C/g, ",")
   return text ? `?${text}` : ""
@@ -122,5 +167,6 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
       a.name === b.name
     )
   }
+  if (a.kind === "river" && b.kind === "river") return a.id === b.id && a.reach === b.reach
   return "id" in a && "id" in b && a.id === b.id
 }

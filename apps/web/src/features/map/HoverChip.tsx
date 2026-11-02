@@ -2,9 +2,15 @@ import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl"
 import { useEffect, useRef, useState } from "react"
 import { formatNumber } from "@/lib/format"
 import { useMediaQuery } from "@/lib/useMediaQuery"
-import { floodSeverityLabels, gaugeName } from "../floods/present"
-import { FLOOD_GAUGES } from "../floods/FloodForecastLayer"
-import type { FloodSeverity } from "../floods/types"
+import { basinStateLabels } from "../floods/basins"
+import { BASIN_FILL, SUBBASIN_FILL } from "../floods/FloodBasinsLayer"
+import { floodAreaLabels, floodSeverityLabels, gaugeName } from "../floods/present"
+import { FLOOD_AREAS, FLOOD_GAUGES } from "../floods/FloodForecastLayer"
+import { PAST_FLOOD_FILL } from "../floods/PastFloods"
+import type { FloodAreaKind, FloodSeverity } from "../floods/types"
+import { riskLabels } from "../river-risk/present"
+import { RIVER_LINES } from "../river-risk/RiverNetworkLayer"
+import type { BasinState, ReachRisk, RiverRisk } from "../river-risk/types"
 import { regionLabel } from "../location/present"
 import type { RegionLevel } from "../location/types"
 import { statusLabels } from "../rivers/present"
@@ -21,6 +27,13 @@ interface HoverChipProps {
   regions?: { variable: RegionVariable | null; lookup: Map<string, RegionWeather> } | null
   /** The wind field on the map, read under the pointer. */
   wind?: WindField | null
+  /** Rivers and stretches with their estimated risk. */
+  rivers?: { byId: Map<string, RiverRisk>; reaches: Map<number, ReachRisk> } | null
+  /** Basin names and states, by feature id; sub-basin states by feature id. */
+  basins?: {
+    byFid: Map<number, { name: string; state: BasinState }>
+    subbasins: Map<number, BasinState>
+  } | null
 }
 
 interface Chip {
@@ -40,15 +53,15 @@ const pointSlack = 5
  * wind there when the wind layer is on. Hovered regions are outlined. Only
  * on devices with a mouse; on touch, a tap opens the panel instead.
  */
-export function HoverChip({ regions, wind }: HoverChipProps) {
+export function HoverChip({ regions, wind, rivers, basins }: HoverChipProps) {
   const map = useMap()
   const canHover = useMediaQuery("(hover: hover) and (pointer: fine)")
   const [chip, setChip] = useState<Chip | null>(null)
-  const props = useRef({ regions, wind })
+  const props = useRef({ regions, wind, rivers, basins })
 
   useEffect(() => {
-    props.current = { regions, wind }
-  }, [regions, wind])
+    props.current = { regions, wind, rivers, basins }
+  }, [regions, wind, rivers, basins])
 
   useEffect(() => {
     if (!map || !canHover) return
@@ -79,7 +92,12 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
       const event = pending
       if (!event) return
       const { x, y } = event.point
-      const { regions: regionInfo, wind: field } = props.current
+      const {
+        regions: regionInfo,
+        wind: field,
+        rivers: riverInfo,
+        basins: basinInfo,
+      } = props.current
       const lines: string[] = []
 
       const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES].filter((id) => map.getLayer(id))
@@ -92,8 +110,30 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
             { layers: pointLayers },
           )[0]
         : undefined
+      const near: [[number, number], [number, number]] = [
+        [x - pointSlack, y - pointSlack],
+        [x + pointSlack, y + pointSlack],
+      ]
+      const area =
+        !point && map.getLayer(FLOOD_AREAS)
+          ? map.queryRenderedFeatures(event.point, { layers: [FLOOD_AREAS] })[0]
+          : undefined
+      const riverLayers = RIVER_LINES.filter((id) => map.getLayer(id))
+      const river =
+        !point && !area && riverLayers.length
+          ? map.queryRenderedFeatures(near, { layers: riverLayers })[0]
+          : undefined
+      const past =
+        !point && !area && !river && map.getLayer(PAST_FLOOD_FILL)
+          ? map.queryRenderedFeatures(event.point, { layers: [PAST_FLOOD_FILL] })[0]
+          : undefined
+      const basinLayers = [BASIN_FILL, SUBBASIN_FILL].filter((id) => map.getLayer(id))
+      const basin =
+        !point && !area && !river && !past && basinLayers.length
+          ? map.queryRenderedFeatures(event.point, { layers: basinLayers })[0]
+          : undefined
       const region: MapGeoJSONFeature | undefined =
-        !point && map.getLayer(REGIONS_FILL)
+        !point && !area && !river && !past && !basin && map.getLayer(REGIONS_FILL)
           ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
           : undefined
 
@@ -102,7 +142,8 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
           ? { sourceLayer: region.sourceLayer, id: region.id }
           : null,
       )
-      map.getCanvas().style.cursor = point || region ? "pointer" : ""
+      map.getCanvas().style.cursor =
+        point || area || river || past || basin || region ? "pointer" : ""
 
       let title = ""
       let local: string | undefined
@@ -123,6 +164,33 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
         lines.push(
           `Flood forecast: ${floodSeverityLabels[point.properties.severity as FloodSeverity] ?? "unknown"}`,
         )
+      } else if (area) {
+        title = floodAreaLabels[area.properties.kind as FloodAreaKind] ?? "Flood area"
+        lines.push("Google flood forecast")
+      } else if (river) {
+        const known = riverInfo?.byId.get(String(river.properties.river))
+        const reach = typeof river.id === "number" ? riverInfo?.reaches.get(river.id) : undefined
+        title = known?.name ?? "Stream"
+        if (reach) {
+          lines.push(reach.name)
+          lines.push(`${riskLabels[reach.level]} · Estimate`)
+        } else if (known) {
+          lines.push("Tributary, not assessed")
+        }
+      } else if (past) {
+        title = String(past.properties.name ?? "Past flood")
+        lines.push("Past event, not a forecast")
+      } else if (basin) {
+        const fid = typeof basin.id === "number" ? basin.id : -1
+        const isSubbasin = basin.layer.id === SUBBASIN_FILL
+        const parent = isSubbasin
+          ? basinInfo?.byFid.get(Number(basin.properties.basin))
+          : basinInfo?.byFid.get(fid)
+        title = parent?.name ?? String(basin.properties.name ?? "River basin")
+        const state: BasinState = isSubbasin
+          ? (basinInfo?.subbasins.get(fid) ?? "no_forecast")
+          : (parent?.state ?? "no_forecast")
+        lines.push(`${isSubbasin ? "Sub-basin" : "Basin"}: ${basinStateLabels[state]}`)
       } else if (region) {
         const level = region.properties.level as RegionLevel
         title = regionLabel({ level, name: String(region.properties.name ?? "") })

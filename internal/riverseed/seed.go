@@ -149,8 +149,8 @@ func Apply(ctx context.Context, pool *pgxpool.Pool, now time.Time) error {
 	})
 }
 
-// Clear removes what Apply wrote. River stations keep their seed mark's previous
-// source only as far as the next collection restores it.
+// Clear removes what Apply wrote. Raised Google gauges go back to "no flooding"
+// until the next collection replaces them with what Google really says.
 func Clear(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := guard(ctx, pool); err != nil {
 		return err

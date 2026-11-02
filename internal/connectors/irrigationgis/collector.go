@@ -362,7 +362,7 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 				continue
 			}
 			event.Service = floodMapService
-			add(event, feature.Shape())
+			add(event, ExtentShape(feature.Rings))
 		}
 	}
 	// Each of its seven features is several megabytes.
@@ -383,7 +383,7 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 			date := day
 			event.Date = &date
 		}
-		add(event, feature.Shape())
+		add(event, ExtentShape(feature.Rings))
 	}
 	cells, err := r.extents(ctx, puttalamService, 0, "FID", pageSize)
 	if err != nil {
@@ -391,11 +391,11 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 	}
 	puttalam := PuttalamEvent()
 	puttalam.Service = puttalamService
-	combined := make(geo.MultiPolygon, 0, len(cells))
+	var rings []geo.Ring
 	for _, cell := range cells {
-		combined = append(combined, cell.Shape()...)
+		rings = append(rings, cell.Rings...)
 	}
-	add(puttalam, combined)
+	add(puttalam, ExtentShape(rings))
 
 	minimum := collector.Minimum
 	if minimum <= 0 {

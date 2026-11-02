@@ -78,6 +78,22 @@ func seconds(d time.Duration) int { return int(d / time.Second) }
 
 var catalogue = []Layer{
 	{
+		ID:    "rivers",
+		Title: "Rivers",
+		Description: "Sri Lanka's rivers, with an estimate of each stretch's risk of overflowing from its gauges, " +
+			"Google's forecast and forecast rain. Follow official warnings.",
+		Category:          CategoryHydrology,
+		Kind:              KindVector,
+		Status:            StatusAvailable,
+		Sources:           []string{"hydrosheds-hydrorivers", "irrigation-river-basins", "irrigation-gauges", "google-flood-forecasting", "open-meteo"},
+		RefreshSeconds:    seconds(15 * time.Minute),
+		StaleAfterSeconds: seconds(3 * time.Hour),
+		Attribution:       "HydroRIVERS (HydroSHEDS), Irrigation Department of Sri Lanka",
+		DataPath:          "/v1/rivers/risk",
+		TilePath:          "/v1/tiles/rivers/{z}/{x}/{y}.pbf",
+		MaxZoom:           14,
+	},
+	{
 		ID:                "river-levels",
 		Title:             "River levels",
 		Description:       "Water level at gauging stations, compared with alert and flood thresholds.",
@@ -105,22 +121,6 @@ var catalogue = []Layer{
 		// Sub-basin and river-basin boundaries, outlined by forecast status.
 		TilePath: "/v1/tiles/river-basins/{z}/{x}/{y}.pbf",
 		MaxZoom:  14,
-	},
-	{
-		ID:    "rivers",
-		Title: "Rivers",
-		Description: "Sri Lanka's rivers, with an estimate of each stretch's risk of overflowing from its gauges, " +
-			"Google's forecast and forecast rain. Follow official warnings.",
-		Category:          CategoryHydrology,
-		Kind:              KindVector,
-		Status:            StatusAvailable,
-		Sources:           []string{"hydrosheds-hydrorivers", "irrigation-river-basins", "irrigation-gauges", "google-flood-forecasting", "open-meteo"},
-		RefreshSeconds:    seconds(15 * time.Minute),
-		StaleAfterSeconds: seconds(3 * time.Hour),
-		Attribution:       "HydroRIVERS (HydroSHEDS), Irrigation Department of Sri Lanka",
-		DataPath:          "/v1/rivers/risk",
-		TilePath:          "/v1/tiles/rivers/{z}/{x}/{y}.pbf",
-		MaxZoom:           14,
 	},
 	{
 		ID:                "past-floods",

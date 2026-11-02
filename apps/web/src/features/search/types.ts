@@ -46,3 +46,11 @@ export type SearchChoice =
       bbox: [number, number, number, number] | null
     }
   | { type: "station"; id: string; name: string; lat: number; lon: number }
+  | {
+      type: "river"
+      id: string
+      name: string
+      lat: number
+      lon: number
+      bbox: [number, number, number, number]
+    }

@@ -296,7 +296,7 @@ func gaugeFinding(gauge Gauge) Finding {
 		// It will reach the next threshold soon at this rate.
 		if hours := (target - *gauge.Level) / *gauge.RatePerHour; hours <= leadTime.Hours() {
 			level = then
-			text += fmt.Sprintf(" Rising %s an hour, it would reach %s level in about %s.",
+			text += fmt.Sprintf(" Rising %s an hour, it would reach %s level in %s.",
 				format(*gauge.RatePerHour, gauge.Unit), name, roundHours(hours))
 			return finding(level, text)
 		}
@@ -323,9 +323,9 @@ func roundHours(hours float64) string {
 	}
 	rounded := int(hours + 0.5)
 	if rounded == 1 {
-		return "an hour"
+		return "about an hour"
 	}
-	return fmt.Sprintf("%d hours", rounded)
+	return fmt.Sprintf("about %d hours", rounded)
 }
 
 // forecastRule reads Google's forecast severity. Google's three levels follow

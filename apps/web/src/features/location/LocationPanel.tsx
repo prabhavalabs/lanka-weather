@@ -17,6 +17,7 @@ import {
   formatWindow,
   gaugeName,
 } from "../floods/present"
+import { riskBadge, riskLabels } from "../river-risk/present"
 import { formatLevel, statusLabels, trendArrows } from "../rivers/present"
 import { useRegionAggregate, useRegionDetail } from "../regions/queries"
 import { RegionAggregate } from "../regions/RegionAggregate"
@@ -38,6 +39,7 @@ export interface LocationPanelProps {
   onClose: () => void
   onSelectStation: (id: string) => void
   onSelectGauge: (id: string) => void
+  onSelectRiver?: (id: string) => void
 }
 
 function unavailableText(error: unknown, outside: boolean) {
@@ -55,6 +57,7 @@ export default function LocationPanel({
   onClose,
   onSelectStation,
   onSelectGauge,
+  onSelectRiver,
 }: LocationPanelProps) {
   const regionId = selection.kind === "region" ? selection.id : null
   const region = useRegionDetail(regionId)
@@ -84,6 +87,19 @@ export default function LocationPanel({
   const officialAlerts = (official?.warnings ?? []).map((warning, index) =>
     officialAlert(warning, index, area, generatedAt),
   )
+
+  const nearbyRivers: GaugeListItem[] = (summary.data?.nearbyRivers ?? []).map((river) => ({
+    id: river.id,
+    title: river.name,
+    subtitle: (
+      <>
+        <span className="numeric">{river.distanceKm.toFixed(1)} km</span> · Estimate ·{" "}
+        {river.reachName}
+      </>
+    ),
+    badge: { variant: riskBadge[river.level], label: riskLabels[river.level] },
+    onSelect: onSelectRiver ? () => onSelectRiver(river.id) : undefined,
+  }))
 
   const rivers: GaugeListItem[] = (summary.data?.rivers ?? []).map((river) => ({
     id: river.id,
@@ -190,6 +206,7 @@ export default function LocationPanel({
       sources={sources}
       onClose={onClose}
     >
+      <GaugeList title="Rivers nearby" items={nearbyRivers} />
       <GaugeList title="River gauges nearby" items={rivers} />
       <GaugeList title="Flood forecast gauges nearby" items={floodGauges} />
       <GaugeList title="Flood areas here" items={floodAreas} />

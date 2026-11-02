@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
+import type { RiverRisk } from "../river-risk/types"
 import type { StationFeature } from "../rivers/types"
-import { addRecent, maxRecent, searchEntry, stationEntries, validRecent } from "./present"
+import {
+  addRecent,
+  maxRecent,
+  searchEntry,
+  stationEntries,
+  validRecent,
+  riverEntries,
+} from "./present"
 import type { PlaceSearchResult } from "./types"
 
 const kandyCity: PlaceSearchResult = {
@@ -130,5 +138,70 @@ describe("recent searches", () => {
   it("drops malformed stored entries", () => {
     expect(validRecent("nope")).toEqual([])
     expect(validRecent([entry, { id: 1 }, { ...entry, choice: { lat: "x" } }])).toEqual([entry])
+  })
+})
+
+describe("riverEntries", () => {
+  const river = (id: string, name: string, extra: Partial<RiverRisk> = {}): RiverRisk => ({
+    id,
+    name,
+    nameSi: null,
+    aliases: [],
+    named: true,
+    parentId: null,
+    level: "normal",
+    reasons: [],
+    uplandKm2: 1000,
+    lengthKm: 100,
+    bbox: [80, 7, 81, 8],
+    reaches: [],
+    gaugedReaches: 0,
+    observedAt: null,
+    ...extra,
+  })
+
+  it("finds a river by a word of its name, largest first, fitted to its box", () => {
+    const entries = riverEntries(
+      [
+        river("kalu-ganga", "Kalu Ganga", { uplandKm2: 2900 }),
+        river("kelani-ganga", "Kelani Ganga", { uplandKm2: 2300 }),
+        river("mahaweli-ganga", "Mahaweli Ganga", { uplandKm2: 10000 }),
+      ],
+      "ganga",
+    )
+    expect(entries.map((entry) => entry.title)).toEqual([
+      "Mahaweli Ganga",
+      "Kalu Ganga",
+      "Kelani Ganga",
+    ])
+    expect(entries[0]!.kind).toBe("river")
+    expect(entries[0]!.choice).toMatchObject({
+      type: "river",
+      id: "mahaweli-ganga",
+      bbox: [80, 7, 81, 8],
+    })
+  })
+
+  it("finds a river by its Sinhala or other name", () => {
+    const list = [
+      river("malwathu-oya", "Malwathu Oya", { nameSi: "මල්වතු ඔය", aliases: ["Aruvi Aru"] }),
+    ]
+    expect(riverEntries(list, "aruvi")).toHaveLength(1)
+    expect(riverEntries(list, "මල්වතු")).toHaveLength(1)
+    expect(riverEntries(list, "nothing")).toHaveLength(0)
+  })
+
+  it("leaves out unnamed rivers and very short queries", () => {
+    const list = [
+      river("river-1", "Unnamed river near Mannar", { named: false }),
+      river("kelani-ganga", "Kelani Ganga"),
+    ]
+    expect(riverEntries(list, "mannar")).toHaveLength(0)
+    expect(riverEntries(list, "k")).toHaveLength(0)
+  })
+
+  it("is kept in recent searches", () => {
+    const [entry] = riverEntries([river("kelani-ganga", "Kelani Ganga")], "kelani")
+    expect(validRecent([entry])).toHaveLength(1)
   })
 })

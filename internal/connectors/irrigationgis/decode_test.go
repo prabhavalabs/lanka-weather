@@ -207,3 +207,17 @@ func TestDecodeServiceLayersAndLastEdit(t *testing.T) {
 		t.Fatalf("last edit = %d", got)
 	}
 }
+
+func TestExtentShapeDropsRingsTooSmallToMatter(t *testing.T) {
+	big := square(80, 7, 0.01)[0]    // about 1.2 km²
+	cell := square(81, 7, 0.0001)[0] // about 120 m²: one raster cell of water
+	hole := geo.Ring{{80.002, 7.002}, {80.008, 7.002}, {80.008, 7.008}, {80.002, 7.008}, {80.002, 7.002}}
+	speck := geo.Ring{{80.0005, 7.0005}, {80.0006, 7.0005}, {80.0006, 7.0006}, {80.0005, 7.0006}, {80.0005, 7.0005}}
+	shape := ExtentShape([]geo.Ring{big, cell, hole, speck})
+	if len(shape) != 1 {
+		t.Fatalf("polygons = %d, want the big one", len(shape))
+	}
+	if len(shape[0]) != 2 {
+		t.Fatalf("rings = %d, want the big one with its large hole", len(shape[0]))
+	}
+}

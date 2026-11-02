@@ -93,3 +93,51 @@ describe("sameSelection", () => {
     expect(sameSelection(null, null)).toBe(true)
   })
 })
+
+describe("river, basin, flood area and past flood selections", () => {
+  it("round-trips through the URL", () => {
+    for (const [query, selection] of [
+      ["?river=kelani-ganga", { kind: "river", id: "kelani-ganga" }],
+      [
+        "?river=kelani-ganga&reach=41405515",
+        { kind: "river", id: "kelani-ganga", reach: 41405515 },
+      ],
+      ["?basin=mahaweli-ganga", { kind: "basin", id: "mahaweli-ganga" }],
+      [
+        "?area=seed-kelani-ganga-flood-2016-major",
+        { kind: "area", id: "seed-kelani-ganga-flood-2016-major" },
+      ],
+      ["?past=yan-oya-flood-2016", { kind: "past", id: "yan-oya-flood-2016" }],
+    ] as const) {
+      expect(parseSelection(query)).toEqual(selection)
+      expect(selectionSearch(selection)).toBe(query)
+    }
+  })
+
+  it("ignores a stretch that is not a number", () => {
+    expect(parseSelection("?river=kelani-ganga&reach=abc")).toEqual({
+      kind: "river",
+      id: "kelani-ganga",
+    })
+    expect(parseSelection("?river=kelani-ganga&reach=-4")).toEqual({
+      kind: "river",
+      id: "kelani-ganga",
+    })
+  })
+
+  it("rejects malformed ids", () => {
+    expect(parseSelection("?river=<script>")).toBeNull()
+    expect(parseSelection("?basin=a b c")).toBeNull()
+  })
+
+  it("clears every selection key when closing", () => {
+    expect(selectionSearch(null, "?river=kelani-ganga&reach=4&kit")).toBe("?kit=")
+  })
+
+  it("tells stretches of one river apart", () => {
+    expect(
+      sameSelection({ kind: "river", id: "a", reach: 1 }, { kind: "river", id: "a", reach: 2 }),
+    ).toBe(false)
+    expect(sameSelection({ kind: "river", id: "a" }, { kind: "basin", id: "a" })).toBe(false)
+  })
+})

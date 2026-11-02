@@ -57,7 +57,8 @@ func TestAssess(t *testing.T) {
 		{"rising fast towards alert", Inputs{Gauges: []Gauge{hanwella(5.5, ptr(0.5))}}, LevelWatch, "would reach alert level in about 2 hours"},
 		{"rising slowly is not projected", Inputs{Gauges: []Gauge{hanwella(4.0, ptr(0.1))}}, LevelNormal, "below its alert"},
 		{"at alert, rising to minor", Inputs{Gauges: []Gauge{hanwella(6.8, ptr(0.5))}}, LevelHigh, "would reach minor flood level"},
-		{"at minor, rising to major", Inputs{Gauges: []Gauge{hanwella(9.0, ptr(0.5))}}, LevelSevere, "about an hour"},
+		{"at minor, rising to major", Inputs{Gauges: []Gauge{hanwella(9.0, ptr(0.5))}}, LevelSevere, "in about an hour"},
+		{"minutes from the next level", Inputs{Gauges: []Gauge{hanwella(9.4, ptr(0.5))}}, LevelSevere, "in less than an hour"},
 		{"above major has nowhere further to go", Inputs{Gauges: []Gauge{hanwella(10, ptr(1))}}, LevelSevere, "major flood"},
 
 		// Google's forecast.

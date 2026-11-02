@@ -54,7 +54,11 @@ func (q *Queries) BuildReachGeometry(ctx context.Context) (int64, error) {
 const buildReachParts = `-- name: BuildReachParts :execrows
 INSERT INTO river_reach_parts (reach_fid, width_class, river_id, river_name, named, min_zoom, geom_3857)
 SELECT q.reach_fid, q.width_class, rv.id, rv.name, rv.named,
-       CASE WHEN rv.named THEN 0 WHEN rv.upland_km2 >= 300 THEN 7 ELSE 8 END,
+       CASE WHEN rv.named AND rv.upland_km2 >= 500 THEN 0
+            WHEN rv.named AND rv.upland_km2 >= 150 THEN 7
+            WHEN rv.named THEN 8
+            WHEN rv.upland_km2 >= 300 THEN 8
+            ELSE 9 END,
        ST_Multi(ST_ChaikinSmoothing(q.geom, 1))
 FROM (
     SELECT s.reach_fid,
@@ -74,8 +78,9 @@ JOIN rivers rv ON rv.id = r.river_id
 `
 
 // The lines drawn on the map: per reach and width class, smoothed a little
-// because HydroRIVERS lines follow a 15 arc-second grid. Named rivers are
-// always drawn; unnamed ones from zoom 7 or 8, by size.
+// because HydroRIVERS lines follow a 15 arc-second grid. The large named rivers
+// are always drawn, so the country reads at a glance; smaller ones and unnamed
+// ones follow as you zoom in.
 func (q *Queries) BuildReachParts(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, buildReachParts)
 	if err != nil {
@@ -90,7 +95,7 @@ SET west = ST_XMin(q.box), south = ST_YMin(q.box), east = ST_XMax(q.box), north 
     label_geom = q.line
 FROM (
     SELECT s.river_id, ST_Extent(s.geom)::box2d AS box,
-           ST_Multi(ST_LineMerge(ST_Collect(s.geom_3857))) AS line
+           ST_Multi(ST_ChaikinSmoothing(ST_SimplifyPreserveTopology(ST_LineMerge(ST_Collect(s.geom_3857)), 1500), 3)) AS line
     FROM river_segments s
     WHERE s.river_id IS NOT NULL AND s.reach_fid IS NOT NULL
     GROUP BY s.river_id
@@ -98,7 +103,9 @@ FROM (
 WHERE q.river_id = rv.id
 `
 
-// Each river's box, and the merged line its name is placed along.
+// Each river's box, and the line its name is placed along: simplified and
+// smoothed hard, because a label cannot follow a line stepping along a 15
+// arc-second grid. It is never drawn.
 func (q *Queries) BuildRiverExtents(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, buildRiverExtents)
 	if err != nil {

@@ -410,6 +410,36 @@ func (event *PastEvent) identify() {
 	event.FID = int64(hash.Sum32())
 }
 
+// minExtentRingM2 is the smallest ring of a flood extent kept: a tenth of a
+// hectare. The extents are traced from rasters, so most of their rings are a
+// few cells of water or dry land. On the largest (Kala Oya, November 2025) rings
+// this size or bigger are 12,000 of 68,000, with 97.6% of the area.
+const minExtentRingM2 = 1000
+
+// ExtentShape turns a flood extent's rings into a polygon, without the rings too
+// small to matter on a map. Pure.
+func ExtentShape(rings []geo.Ring) geo.MultiPolygon {
+	kept := make([]geo.Ring, 0, len(rings))
+	for _, ring := range rings {
+		if ringAreaM2(ring) >= minExtentRingM2 {
+			kept = append(kept, ring)
+		}
+	}
+	return geo.PolygonFromRings(kept)
+}
+
+// ringAreaM2 is a ring's area, near enough at Sri Lanka's latitudes.
+func ringAreaM2(ring geo.Ring) float64 {
+	if len(ring) < 4 {
+		return 0
+	}
+	area := 0.0
+	for i := 1; i < len(ring); i++ {
+		area += ring[i-1][0]*ring[i][1] - ring[i][0]*ring[i-1][1]
+	}
+	return math.Abs(area) / 2 * 111320 * 111320 * math.Cos(ring[0][1]*math.Pi/180)
+}
+
 // PuttalamEvent describes the one event the Puttalam service holds. It says
 // so only in its name (which spells the cyclone "Detwah"), and each of its
 // 31,985 features is a single raster cell.

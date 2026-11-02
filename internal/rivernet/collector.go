@@ -16,6 +16,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrorivers"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigationgis"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/store"
 )
 
@@ -91,8 +92,8 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 // when one could change the result. River_stations is hashed whole, whichever
 // collector added the row.
 func (collector *Collector) fingerprint(ctx context.Context, queries *store.Queries, stations []store.ListNetworkStationsRow, gauges []store.ListNetworkFloodGaugesRow) (string, error) {
-	parts := []string{"format-1"}
-	for _, name := range []string{hydrorivers.SourceName, irrigationgis.BasinsSource} {
+	parts := []string{"format-3"}
+	for _, name := range []string{hydrorivers.SourceName, irrigationgis.BasinsSource, regions.BoundarySource} {
 		version, err := queries.GetSourceVersion(ctx, name)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return "", fmt.Errorf("read %s version: %w", name, err)
@@ -309,6 +310,10 @@ func (collector *Collector) save(ctx context.Context, network Network, matches [
 			}
 			if row.Aliases == nil {
 				row.Aliases = []string{}
+			}
+			if !river.Named {
+				// NameUnnamedRivers adds its district once regions are loaded.
+				row.Name = "Unnamed river"
 			}
 			if river.NameSI != "" {
 				row.NameSi = &river.NameSI

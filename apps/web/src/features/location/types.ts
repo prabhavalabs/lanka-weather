@@ -1,4 +1,5 @@
 /** Mirrors the location endpoints of the Go service (docs/api/weather-and-floods.md). */
+import type { NearbyRiverRisk } from "../river-risk/types"
 import type { RiverStatus, RiverTrend } from "../rivers/types"
 
 export type RegionLevel = "province" | "district" | "ds" | "gn"
@@ -184,6 +185,8 @@ export interface Summary {
   } | null
   weather: PointForecast | null
   rivers: NearbyRiver[] | null
+  /** Rivers near the place, with the estimated risk of their nearest stretch. */
+  nearbyRivers?: NearbyRiverRisk[] | null
   floodForecast: { gauges: NearbyFloodGauge[]; areas: NearbyFloodArea[] } | null
   alerts: DerivedAlert[]
   official: { status: string; warnings: OfficialWarning[]; note?: string }

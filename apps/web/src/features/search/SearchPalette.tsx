@@ -9,8 +9,16 @@ import { SearchCommand } from "@/components/weather/SearchCommand"
 import { apiGet } from "@/lib/api"
 import { useDebouncedValue } from "@/lib/useDebouncedValue"
 import { useLocalStorage } from "@/lib/useLocalStorage"
+import type { RiverRisk } from "../river-risk/types"
 import type { RiverLevelsCollection } from "../rivers/types"
-import { addRecent, searchEntry, stationEntries, validRecent, type SearchEntry } from "./present"
+import {
+  addRecent,
+  riverEntries,
+  searchEntry,
+  stationEntries,
+  validRecent,
+  type SearchEntry,
+} from "./present"
 import type { PlaceSearchResponse, SearchChoice } from "./types"
 
 export interface SearchPaletteProps {
@@ -19,6 +27,8 @@ export interface SearchPaletteProps {
   onChoose: (choice: SearchChoice) => void
   /** River gauges, when loaded, to search by name. */
   rivers?: RiverLevelsCollection
+  /** Rivers themselves, when loaded, to search by name. */
+  riverNetwork?: RiverRisk[]
 }
 
 const recentKey = "lanka-weather:recent-searches"
@@ -28,6 +38,7 @@ export default function SearchPalette({
   onOpenChange,
   onChoose,
   rivers,
+  riverNetwork,
 }: SearchPaletteProps) {
   const [query, setQuery] = useState("")
   const [storedRecent, setRecent] = useLocalStorage<unknown>(recentKey, [])
@@ -52,8 +63,9 @@ export default function SearchPalette({
     if (!term) return []
     const places = (search.data?.results ?? []).map(searchEntry)
     const stations = rivers ? stationEntries(rivers.features, term) : []
-    return [...places, ...stations]
-  }, [search.data, rivers, term])
+    const named = riverNetwork ? riverEntries(riverNetwork, term) : []
+    return [...named, ...places, ...stations]
+  }, [search.data, rivers, riverNetwork, term])
 
   const byId = useMemo(() => {
     const map = new Map<string, SearchEntry>()

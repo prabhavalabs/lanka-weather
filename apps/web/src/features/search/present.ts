@@ -5,6 +5,8 @@
 import type { SearchResult } from "@/components/weather/types"
 import { levelWords, regionLabel } from "../location/present"
 import type { RegionLevel } from "../location/types"
+import { riskLabels, riverSearchNames } from "../river-risk/present"
+import type { RiverRisk } from "../river-risk/types"
 import type { StationFeature } from "../rivers/types"
 import type { PlaceKind, PlaceSearchResult, SearchChoice } from "./types"
 
@@ -122,6 +124,40 @@ export function stationEntries(
     })
 }
 
+/**
+ * Named rivers whose name, Sinhala name or other name has a word starting with
+ * the query, largest first.
+ */
+export function riverEntries(rivers: RiverRisk[], query: string, limit = 5): SearchEntry[] {
+  const folded = query.trim().toLowerCase()
+  if (folded.length < 2) return []
+  const matches = (name: string) =>
+    name
+      .toLowerCase()
+      .split(/[\s,()&-]+/)
+      .some((word) => word.startsWith(folded))
+  return rivers
+    .filter((river) => river.named && riverSearchNames(river).some(matches))
+    .sort((a, b) => b.uplandKm2 - a.uplandKm2)
+    .slice(0, limit)
+    .map((river) => ({
+      id: `river:${river.id}`,
+      kind: "river" as const,
+      title: river.name,
+      localName: river.nameSi ?? undefined,
+      subtitle: river.parentId ? "Tributary" : "River",
+      meta: riskLabels[river.level],
+      choice: {
+        type: "river" as const,
+        id: river.id,
+        name: river.name,
+        lon: (river.bbox[0] + river.bbox[2]) / 2,
+        lat: (river.bbox[1] + river.bbox[3]) / 2,
+        bbox: river.bbox,
+      },
+    }))
+}
+
 export const maxRecent = 6
 
 /** Recent searches with `entry` first, without duplicates, at most `maxRecent`. */
@@ -139,7 +175,7 @@ export function validRecent(value: unknown): SearchEntry[] {
         item !== null &&
         typeof item.id === "string" &&
         typeof item.title === "string" &&
-        ["place", "station", "area"].includes(item.kind) &&
+        ["place", "station", "area", "river"].includes(item.kind) &&
         typeof item.choice === "object" &&
         item.choice !== null &&
         Number.isFinite(item.choice.lat) &&

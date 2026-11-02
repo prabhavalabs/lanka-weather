@@ -27,8 +27,18 @@ import type { Layer } from "@/lib/layers"
 import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
 import { useTheme } from "@/lib/theme"
 import { useLocalStorage } from "@/lib/useLocalStorage"
-import { FloodForecastLayer, FLOOD_GAUGES } from "./features/floods/FloodForecastLayer"
+import { anyUnverified, countBasins } from "./features/floods/basins"
+import { BasinPanel } from "./features/floods/BasinPanel"
+import { FloodAreaPanel } from "./features/floods/FloodAreaPanel"
+import { FloodBasinsLayer, BASIN_FILL, SUBBASIN_FILL } from "./features/floods/FloodBasinsLayer"
+import { FloodForecastLayer, FLOOD_AREAS, FLOOD_GAUGES } from "./features/floods/FloodForecastLayer"
 import { FloodGaugePanel } from "./features/floods/FloodGaugePanel"
+import {
+  PAST_FLOOD_FILL,
+  PastFloodPanel,
+  PastFloodsLayer,
+  PastFloodsList,
+} from "./features/floods/PastFloods"
 import { FloodLegend } from "./features/floods/FloodLegend"
 import { countBySeverity, floodSummary, isGauge } from "./features/floods/present"
 import { useFloodForecast } from "./features/floods/queries"
@@ -60,6 +70,11 @@ import { useGnWeather, useRegionDetail, useRegionWeather } from "./features/regi
 import { RegionLegend } from "./features/regions/RegionLegend"
 import { RegionsLayer, REGIONS_FILL } from "./features/regions/RegionsLayer"
 import type { RegionLevel } from "./features/regions/types"
+import { riversAtRisk } from "./features/river-risk/present"
+import { useFloodBasins, usePastFloods, useRiverRisk } from "./features/river-risk/queries"
+import { RiverNetworkLayer, RIVER_LINES } from "./features/river-risk/RiverNetworkLayer"
+import { RiverRiskLegend } from "./features/river-risk/RiverRiskLegend"
+import { RiversAtRisk } from "./features/river-risk/RiversAtRisk"
 import { countByStatus, statusColors, statusLabels, statusOrder } from "./features/rivers/present"
 import { useRiverLevels } from "./features/rivers/queries"
 import { RiverLegend } from "./features/rivers/RiverLegend"
@@ -84,15 +99,20 @@ const loadSearch = () => import("./features/search/SearchPalette")
 const SearchPalette = lazy(loadSearch)
 const LocationPanel = lazy(() => import("./features/location/LocationPanel"))
 const WindLayer = lazy(() => import("./features/wind/WindLayer"))
+const RiverPanel = lazy(() => import("./features/river-risk/RiverPanel"))
 
 const RIVER_LEVELS = "river-levels"
 const FLOOD_FORECAST = "flood-forecast"
 const TEMPERATURE = "temperature"
 const WIND = "wind"
 const ADMIN_REGIONS = "admin-regions"
+const RIVERS = "rivers"
+const PAST_FLOODS = "past-floods"
 
 /** Layers on at the first visit. */
-const defaultLayers = [ADMIN_REGIONS, RIVER_LEVELS, FLOOD_FORECAST, WIND]
+const defaultLayers = [RIVERS, ADMIN_REGIONS, RIVER_LEVELS, FLOOD_FORECAST, WIND]
+/** Default layers added since people may have saved their choice; offered to them once. */
+const newDefaultLayers = [RIVERS]
 
 type RegionFill = RegionVariable | "none"
 
@@ -108,6 +128,7 @@ const pointSlack = 6
 
 export function App() {
   const [enabled, setEnabled] = useLocalStorage<string[]>("lanka-weather:layers", defaultLayers)
+  const [offered, setOffered] = useLocalStorage<string[]>("lanka-weather:layers-offered", [])
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(
     "lanka-weather:sidebar-collapsed",
     false,
@@ -115,7 +136,7 @@ export function App() {
   const [level, setLevel] = useLocalStorage<RegionLevel>("lanka-weather:region-level", "district")
   const [regionFill, setRegionFill] = useLocalStorage<RegionFill>(
     "lanka-weather:region-fill",
-    "temperature",
+    "none",
   )
   const [gridVariable, setGridVariable] = useLocalStorage<GridVariable>(
     "lanka-weather:grid-variable",
@@ -126,6 +147,7 @@ export function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchLoaded, setSearchLoaded] = useState(false)
   const [gnDistricts, setGnDistricts] = useState<string[]>([])
+  const [clickedAt, setClickedAt] = useState<{ lat: number; lon: number } | null>(null)
   const zoom = useMapZoom(map)
   const desktop = useMediaQuery(desktopQuery, true)
   const { resolved: theme } = useTheme()
@@ -142,12 +164,24 @@ export function App() {
   const gridLayer = available(TEMPERATURE)
   const windLayer = available(WIND)
   const regionsLayer = available(ADMIN_REGIONS)
+  const riversNetworkLayer = available(RIVERS)
+  const pastFloodsLayer = available(PAST_FLOODS)
   const on = (id: string) => enabled.includes(id) && available(id) !== undefined
   const riversOn = on(RIVER_LEVELS)
   const floodsOn = on(FLOOD_FORECAST)
   const gridOn = on(TEMPERATURE)
   const windOn = on(WIND)
   const regionsOn = on(ADMIN_REGIONS)
+  const riverNetworkOn = on(RIVERS)
+  const pastFloodsOn = on(PAST_FLOODS)
+
+  // Someone who saved their layers before a default was added still gets it, once.
+  useEffect(() => {
+    const unseen = newDefaultLayers.filter((id) => !offered.includes(id))
+    if (unseen.length === 0) return
+    setOffered((current) => [...current, ...unseen])
+    setEnabled((current) => [...new Set([...current, ...unseen])])
+  }, [offered, setOffered, setEnabled])
 
   // Region colours give way to the weather field, which shows the same weather in more detail.
   const fillVariable: RegionVariable | null =
@@ -157,7 +191,16 @@ export function App() {
     riverLayer,
     riversOn || selection?.kind === "station" || searchLoaded,
   )
-  const floods = useFloodForecast(floodLayer, floodsOn || selection?.kind === "gauge")
+  const floods = useFloodForecast(
+    floodLayer,
+    floodsOn || selection?.kind === "gauge" || selection?.kind === "area",
+  )
+  const riverRisk = useRiverRisk(
+    riversNetworkLayer,
+    riverNetworkOn || selection?.kind === "river" || searchLoaded,
+  )
+  const basins = useFloodBasins(floodLayer, floodsOn || selection?.kind === "basin")
+  const pastFloods = usePastFloods(pastFloodsLayer, pastFloodsOn || selection?.kind === "past")
   const grid = useCurrentGrid(gridLayer, gridOn)
   const wind = useWindForecast(windLayer, windOn)
   const levelWeather = useRegionWeather(level, {
@@ -198,6 +241,25 @@ export function App() {
     selection?.kind === "gauge"
       ? floods.data?.features.filter(isGauge).find((feature) => feature.id === selection.id)
       : undefined
+  const selectedRiver =
+    selection?.kind === "river"
+      ? riverRisk.data?.rivers.find((river) => river.id === selection.id)
+      : undefined
+  const selectedBasin =
+    selection?.kind === "basin"
+      ? basins.data?.basins.find((basin) => basin.id === selection.id)
+      : undefined
+  const selectedPast =
+    selection?.kind === "past"
+      ? pastFloods.data?.events.find((event) => event.id === selection.id)
+      : undefined
+  const selectedArea =
+    selection?.kind === "area"
+      ? (floods.data?.features ?? []).find(
+          (feature): feature is FloodAreaFeature =>
+            !isGauge(feature) && feature.id === selection.id,
+        )
+      : undefined
 
   const enable = useCallback(
     (id: string) => setEnabled((current) => (current.includes(id) ? current : [...current, id])),
@@ -208,6 +270,10 @@ export function App() {
     const turningOn = !enabled.includes(id)
     if (!turningOn && id === RIVER_LEVELS && selection?.kind === "station") setSelection(null)
     if (!turningOn && id === FLOOD_FORECAST && selection?.kind === "gauge") setSelection(null)
+    if (!turningOn && id === FLOOD_FORECAST && selection?.kind === "basin") setSelection(null)
+    if (!turningOn && id === FLOOD_FORECAST && selection?.kind === "area") setSelection(null)
+    if (!turningOn && id === RIVERS && selection?.kind === "river") setSelection(null)
+    if (!turningOn && id === PAST_FLOODS && selection?.kind === "past") setSelection(null)
     setEnabled((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     )
@@ -282,13 +348,36 @@ export function App() {
     } else if (selection.kind === "gauge") {
       if (!gauge) return
       lngLat = gauge.geometry.coordinates
+    } else if (selection.kind === "river") {
+      if (!selectedRiver) return
+      bbox = selectedRiver.bbox
+      lngLat = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+    } else if (selection.kind === "basin") {
+      if (!selectedBasin) return
+      bbox = selectedBasin.bbox
+      lngLat = selectedBasin.labelPoint
+    } else if (selection.kind === "past") {
+      if (!selectedPast) return
+      bbox = selectedPast.bbox
+      lngLat = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
     }
     pending.current = null
     if (!lngLat) return
     if (move.target === "fit" && bbox) fitBox(bbox)
     else if (move.target === "fit" || move.target === "zoom") reveal(lngLat, { zoom: 10 })
     else reveal(lngLat)
-  }, [map, selection, regionDetail.data, station, gauge, reveal, fitBox])
+  }, [
+    map,
+    selection,
+    regionDetail.data,
+    station,
+    gauge,
+    selectedRiver,
+    selectedBasin,
+    selectedPast,
+    reveal,
+    fitBox,
+  ])
 
   const openStation = useCallback(
     (id: string) => {
@@ -309,7 +398,57 @@ export function App() {
     [enable, pendingCamera, setSelection],
   )
 
-  // Clicks: a gauge, else a region (weather at its label point), else the point itself.
+  const openRiver = useCallback(
+    (id: string, reach?: number, target: "fit" | "none" = "fit") => {
+      enable(RIVERS)
+      const next: Selection = reach ? { kind: "river", id, reach } : { kind: "river", id }
+      if (target === "fit") pendingCamera(next, "fit")
+      else pending.current = null
+      setSelection(next)
+    },
+    [enable, pendingCamera, setSelection],
+  )
+  const openArea = useCallback(
+    (id: string) => {
+      enable(FLOOD_FORECAST)
+      pending.current = null
+      setSelection({ kind: "area", id })
+    },
+    [enable, setSelection],
+  )
+  const openPast = useCallback(
+    (id: string, target: "fit" | "none" = "fit") => {
+      enable(PAST_FLOODS)
+      const next: Selection = { kind: "past", id }
+      if (target === "fit") pendingCamera(next, "fit")
+      else pending.current = null
+      setSelection(next)
+    },
+    [enable, pendingCamera, setSelection],
+  )
+  const openRegion = useCallback(
+    (id: string) => {
+      const next: Selection = { kind: "region", id }
+      pendingCamera(next, "fit")
+      setSelection(next)
+    },
+    [pendingCamera, setSelection],
+  )
+  const weatherAt = useCallback(
+    (at: { lat: number; lon: number }) => {
+      const next: Selection = {
+        kind: "point",
+        lat: roundCoordinate(at.lat),
+        lon: roundCoordinate(at.lon),
+      }
+      pendingCamera(next, "reveal")
+      setSelection(next)
+    },
+    [pendingCamera, setSelection],
+  )
+
+  // Clicks: a gauge, a flood area, a river, a past flood, a flood basin, else a
+  // region (weather at its label point), else the point itself.
   useMapClick(map, (event: MapMouseEvent) => {
     if (!map) return
     const { x, y } = event.point
@@ -323,6 +462,46 @@ export function App() {
       : null
     if (hit?.layer.id === RIVER_STATIONS) return openStation(String(hit.properties.id))
     if (hit?.layer.id === FLOOD_GAUGES) return openGauge(String(hit.properties.gaugeId))
+
+    const area = map.getLayer(FLOOD_AREAS)
+      ? map.queryRenderedFeatures(event.point, { layers: [FLOOD_AREAS] })[0]
+      : null
+    if (area && typeof area.properties.id === "string") return openArea(area.properties.id)
+
+    const riverLayers = RIVER_LINES.filter((id) => map.getLayer(id))
+    const river = riverLayers.length
+      ? map.queryRenderedFeatures(box, { layers: riverLayers })[0]
+      : null
+    if (river && river.properties.river) {
+      const reach =
+        riverLayers[0] && river.sourceLayer === "reaches" && typeof river.id === "number"
+          ? river.id
+          : undefined
+      return openRiver(String(river.properties.river), reach, "none")
+    }
+
+    const past = map.getLayer(PAST_FLOOD_FILL)
+      ? map.queryRenderedFeatures(event.point, { layers: [PAST_FLOOD_FILL] })[0]
+      : null
+    if (past && typeof past.properties.id === "string") return openPast(past.properties.id, "none")
+
+    // The basin holds a link to the weather at the clicked place.
+    const basinLayers = [BASIN_FILL, SUBBASIN_FILL].filter((id) => map.getLayer(id))
+    const basinHit = basinLayers.length
+      ? map.queryRenderedFeatures(event.point, { layers: basinLayers })[0]
+      : null
+    if (basinHit) {
+      const fid =
+        basinHit.layer.id === SUBBASIN_FILL
+          ? Number(basinHit.properties.basin)
+          : Number(basinHit.id)
+      const basin = basins.data?.basins.find((item) => item.fid === fid)
+      if (basin) {
+        setClickedAt({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+        pending.current = null
+        return setSelection({ kind: "basin", id: basin.id })
+      }
+    }
 
     const region = map.getLayer(REGIONS_FILL)
       ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
@@ -365,6 +544,11 @@ export function App() {
           pending.current = null
           fitBox(choice.bbox)
         } else pendingCamera(next, "fit")
+      } else if (choice.type === "river") {
+        enable(RIVERS)
+        pending.current = null
+        setSelection({ kind: "river", id: choice.id })
+        fitBox(choice.bbox)
       } else {
         enable(RIVER_LEVELS)
         pending.current = null
@@ -471,7 +655,55 @@ export function App() {
       }
     }
   }
-  if (floodCounts) details[FLOOD_FORECAST] = <FloodLegend bare counts={floodCounts} />
+  const basinCounts = basins.data ? countBasins(basins.data.basins) : undefined
+  const basinsUnverified = basins.data ? anyUnverified(basins.data.basins) : false
+  const areaCount = floods.data?.meta.areas ?? 0
+  if (floodCounts) {
+    details[FLOOD_FORECAST] = (
+      <FloodLegend
+        bare
+        counts={floodCounts}
+        basinCounts={basinCounts}
+        unverified={basinsUnverified}
+        areaCount={areaCount}
+      />
+    )
+  }
+
+  if (riversNetworkLayer) {
+    const atRiskCount = riverRisk.data ? riversAtRisk(riverRisk.data.rivers).length : 0
+    statuses[RIVERS] = layerStatus({
+      layer: riversNetworkLayer,
+      parts: riverRisk.data
+        ? [
+            count(riverRisk.data.rivers.filter((river) => river.named).length, "river"),
+            atRiskCount === 0 ? "none at risk" : `${atRiskCount} at risk`,
+          ]
+        : [],
+      observedAt: riverRisk.data?.meta.gaugesObservedAt,
+      ageLabel: "read",
+      error: riverRisk.error,
+      pending: riverRisk.isPending,
+    })
+  }
+  details[RIVERS] = <RiversAtRisk data={riverRisk.data} onSelect={(id) => openRiver(id)} />
+
+  if (pastFloodsLayer) {
+    statuses[PAST_FLOODS] = {
+      state: "ready",
+      summary: pastFloods.data
+        ? `${count(pastFloods.data.events.length, "mapped event")} · past, not a forecast`
+        : "Loading…",
+      stale: false,
+    }
+  }
+  details[PAST_FLOODS] = (
+    <PastFloodsList
+      data={pastFloods.data}
+      selectedId={selection?.kind === "past" ? selection.id : null}
+      onSelect={(id) => openPast(id)}
+    />
+  )
 
   if (gridLayer) {
     const values = grid.data?.values[gridVariables[gridVariable].key]
@@ -638,7 +870,17 @@ export function App() {
     regionsOn && isNotReady(level === "gn" ? gnWeather.error : levelWeather.error),
   ].some(Boolean)
   let notice: ReactNode = null
-  if (regionsOn && zoom < levelMinZoom[level] && map) {
+  if (riverRisk.data?.meta.seeded || floods.data?.meta.seeded || basins.data?.meta.seeded) {
+    // Local test data must never pass as a real flood.
+    notice = (
+      <p
+        role="alert"
+        className="pointer-events-auto rounded-full border border-destructive bg-card px-3.5 py-1.5 text-sm font-medium text-destructive shadow-panel"
+      >
+        TEST DATA: this flood is not real. Local seed in use.
+      </p>
+    )
+  } else if (regionsOn && zoom < levelMinZoom[level] && map) {
     notice = (
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-card/95 py-1 pr-1 pl-3.5 text-sm shadow-panel backdrop-blur-md">
         <span>
@@ -680,8 +922,74 @@ export function App() {
           onClose={close}
           onSelectStation={openStation}
           onSelectGauge={openGauge}
+          onSelectRiver={openRiver}
         />
       </Suspense>
+    )
+  } else if (selection?.kind === "river") {
+    detailLabel = "River"
+    detail = (
+      <Suspense fallback={<DetailPlaceholder icon={<WavesIcon />} title="River" onClose={close} />}>
+        <RiverPanel
+          id={selection.id}
+          reachFid={selection.reach}
+          onClose={close}
+          onSelectRiver={openRiver}
+          onSelectStation={openStation}
+          onSelectRegion={openRegion}
+        />
+      </Suspense>
+    )
+  } else if (selection?.kind === "basin") {
+    detailLabel = "River basin"
+    detail =
+      selectedBasin && basins.data ? (
+        <BasinPanel
+          basin={selectedBasin}
+          meta={basins.data.meta}
+          clickedAt={clickedAt}
+          onClose={close}
+          onSelectStation={openStation}
+          onSelectGauge={openGauge}
+          onSelectRiver={openRiver}
+          onSelectArea={openArea}
+          onWeatherAt={weatherAt}
+        />
+      ) : (
+        <DetailPlaceholder
+          icon={<WavesIcon />}
+          title="River basin"
+          message={basins.isPending ? undefined : "This basin is not in the flood forecast."}
+          onClose={close}
+        />
+      )
+  } else if (selection?.kind === "area") {
+    detailLabel = "Flood area"
+    detail = selectedArea ? (
+      <FloodAreaPanel
+        area={selectedArea}
+        seeded={floods.data?.meta.seeded}
+        onClose={close}
+        onSelectGauge={openGauge}
+      />
+    ) : (
+      <DetailPlaceholder
+        icon={<WavesIcon />}
+        title="Flood area"
+        message={floods.isPending ? undefined : "This flood area is no longer in the forecast."}
+        onClose={close}
+      />
+    )
+  } else if (selection?.kind === "past") {
+    detailLabel = "Past flood"
+    detail = (
+      <PastFloodPanel
+        event={selectedPast}
+        loading={pastFloods.isPending}
+        note={pastFloods.data?.note}
+        attribution={pastFloods.data?.meta.attribution}
+        onClose={close}
+      />
     )
   } else if (selection?.kind === "station") {
     detailLabel = "River gauge"
@@ -725,11 +1033,34 @@ export function App() {
       {fillVariable && (
         <RegionLegend variable={fillVariable} level={level} className={legendClass} />
       )}
+      {sidebarCollapsed && riverNetworkOn && <RiverRiskLegend card />}
       {sidebarCollapsed && floodsOn && floodGauges.length > 0 && (
-        <FloodLegend counts={floodCounts} />
+        <FloodLegend
+          counts={floodCounts}
+          basinCounts={basinCounts}
+          unverified={basinsUnverified}
+          areaCount={areaCount}
+        />
       )}
       {sidebarCollapsed && riversOn && <RiverLegend counts={riverCounts} />}
     </>
+  )
+
+  const riverHover = useMemo(() => {
+    const list = riverRisk.data?.rivers ?? []
+    return {
+      byId: new Map(list.map((river) => [river.id, river])),
+      reaches: new Map(
+        list.flatMap((river) => river.reaches.map((reach) => [reach.fid, reach] as const)),
+      ),
+    }
+  }, [riverRisk.data])
+  const basinHover = useMemo(
+    () => ({
+      byFid: new Map((basins.data?.basins ?? []).map((basin) => [basin.fid, basin])),
+      subbasins: new Map((basins.data?.subbasins ?? []).map((sub) => [sub.fid, sub.state])),
+    }),
+    [basins.data],
   )
 
   const markerAt =
@@ -750,6 +1081,24 @@ export function App() {
                 weather={regionList}
                 selectedId={regionId && regionLevelOf(regionId) === level ? regionId : null}
                 onVisibleDistricts={addGnDistricts}
+              />
+            )}
+            {pastFloodsOn && pastFloodsLayer && (
+              <PastFloodsLayer layer={pastFloodsLayer} selectedFid={selectedPast?.fid ?? null} />
+            )}
+            {floodsOn && floodLayer && (
+              <FloodBasinsLayer
+                layer={floodLayer}
+                data={basins.data}
+                selectedFid={selectedBasin?.fid ?? null}
+              />
+            )}
+            {riverNetworkOn && riversNetworkLayer && (
+              <RiverNetworkLayer
+                layer={riversNetworkLayer}
+                rivers={riverRisk.data?.rivers}
+                version={riverRisk.data?.meta.networkVersion}
+                selectedId={selection?.kind === "river" ? selection.id : null}
               />
             )}
             {floodsOn && (
@@ -775,6 +1124,8 @@ export function App() {
             <HoverChip
               regions={regionsOn ? { variable: fillVariable, lookup: regionLookup } : null}
               wind={windOn ? wind.field : null}
+              rivers={riverNetworkOn ? riverHover : null}
+              basins={floodsOn ? basinHover : null}
             />
           </MapView>
         }
@@ -824,6 +1175,7 @@ export function App() {
             onOpenChange={setSearchOpen}
             onChoose={choose}
             rivers={rivers.data}
+            riverNetwork={riverRisk.data?.rivers}
           />
         </Suspense>
       )}
