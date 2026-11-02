@@ -76,3 +76,147 @@ func (b *InsertRiverReadingBatchResults) Close() error {
 	b.closed = true
 	return b.br.Close()
 }
+
+const insertWeatherField = `-- name: InsertWeatherField :batchexec
+INSERT INTO weather_fields (run_id, variable, source, valid_from, step_seconds, steps, node_values, fetched_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type InsertWeatherFieldBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type InsertWeatherFieldParams struct {
+	RunID       int64     `json:"run_id"`
+	Variable    string    `json:"variable"`
+	Source      string    `json:"source"`
+	ValidFrom   time.Time `json:"valid_from"`
+	StepSeconds int32     `json:"step_seconds"`
+	Steps       int32     `json:"steps"`
+	NodeValues  []float32 `json:"node_values"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+func (q *Queries) InsertWeatherField(ctx context.Context, arg []InsertWeatherFieldParams) *InsertWeatherFieldBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.RunID,
+			a.Variable,
+			a.Source,
+			a.ValidFrom,
+			a.StepSeconds,
+			a.Steps,
+			a.NodeValues,
+			a.FetchedAt,
+		}
+		batch.Queue(insertWeatherField, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &InsertWeatherFieldBatchResults{br, len(arg), false}
+}
+
+func (b *InsertWeatherFieldBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *InsertWeatherFieldBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
+const upsertWeatherGridNode = `-- name: UpsertWeatherGridNode :batchexec
+INSERT INTO weather_grid_nodes (grid, node, lon, lat, land, elevation_m, cell, source, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6,
+        ST_MakeEnvelope($7::float8, $8::float8, $9::float8,
+                        $10::float8, 4326),
+        $11, $12)
+ON CONFLICT (grid, node) DO UPDATE
+SET lon = EXCLUDED.lon,
+    lat = EXCLUDED.lat,
+    land = EXCLUDED.land,
+    elevation_m = COALESCE(EXCLUDED.elevation_m, weather_grid_nodes.elevation_m),
+    cell = EXCLUDED.cell,
+    source = EXCLUDED.source,
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertWeatherGridNodeBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type UpsertWeatherGridNodeParams struct {
+	Grid       string    `json:"grid"`
+	Node       int32     `json:"node"`
+	Lon        float64   `json:"lon"`
+	Lat        float64   `json:"lat"`
+	Land       bool      `json:"land"`
+	ElevationM *float64  `json:"elevation_m"`
+	West       float64   `json:"west"`
+	South      float64   `json:"south"`
+	East       float64   `json:"east"`
+	North      float64   `json:"north"`
+	Source     string    `json:"source"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// The cell is the square of one grid step centred on the node.
+func (q *Queries) UpsertWeatherGridNode(ctx context.Context, arg []UpsertWeatherGridNodeParams) *UpsertWeatherGridNodeBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.Grid,
+			a.Node,
+			a.Lon,
+			a.Lat,
+			a.Land,
+			a.ElevationM,
+			a.West,
+			a.South,
+			a.East,
+			a.North,
+			a.Source,
+			a.UpdatedAt,
+		}
+		batch.Queue(upsertWeatherGridNode, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &UpsertWeatherGridNodeBatchResults{br, len(arg), false}
+}
+
+func (b *UpsertWeatherGridNodeBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *UpsertWeatherGridNodeBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
