@@ -481,13 +481,13 @@ picked. It contains:
 - **`floodForecast.gauges`:** up to three Google gauges within 75 km.
 - **`floodForecast.areas`:** the Google flood areas that contain the place.
 - **`alerts`:** derived alerts, most serious first. See below.
-- **`official`:** the slot for Department of Meteorology and DMC warnings,
-  which are authoritative. They are not collected yet, so `status` is
-  `"not_available"` and `warnings` is empty. The web app should show this
-  slot above derived alerts once it fills.
+- **`official`:** NBRO, Department of Meteorology and DMC warnings, which are
+  authoritative: the landslide level of the place's DS division, bulletins
+  naming its district and the latest general bulletins. See
+  [warnings and hazards](warnings-and-hazards.md).
 - **`unavailable`:** the parts that could not be filled (`weather`,
-  `regions`, `rivers`, `floodForecast`). The rest of the summary is still
-  returned.
+  `regions`, `rivers`, `floodForecast`, `official`). The rest of the summary is
+  still returned.
 
 Example for Colombo (`lat=6.9271&lon=79.8612`): 5.9 KB. The arrays and the
 second and third rivers are cut here.
@@ -526,9 +526,13 @@ second and third rivers are cut here.
     "floodForecast": { "gauges": [], "areas": [] },
     "alerts": [],
     "official": {
-      "status": "not_available",
+      "status": "available",
+      "landslide": { "status": "none", "level": null, "note": "Last report 31 Oct 2026; none currently active as far as we know." },
       "warnings": [],
-      "note": "Department of Meteorology and Disaster Management Centre warnings are authoritative; they will appear here once collected."
+      "general": [],
+      "note": "Bulletins reach us through nuuuwan/lk_dmc, usually within hours of being issued. The PDF on dmc.gov.lk is the official version.",
+      "stale": false,
+      "fetchedAt": "2026-11-02T19:53:04Z"
     },
     "unavailable": []
   }

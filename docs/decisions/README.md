@@ -16,3 +16,4 @@ supersedes the old one, not by editing an accepted record.
 | [0007](0007-weather-grid-and-flood-forecast.md) | Weather grid, wind field and flood forecast | Accepted |
 | [0008](0008-weather-by-region.md) | Weather by region reads the regions table | Accepted |
 | [0009](0009-web-map-and-location-panel.md) | One map of every layer, with a location panel | Accepted |
+| [0011](0011-official-warnings-and-hazards.md) | Official warnings, landslide levels, earthquakes and cyclones | Accepted |
