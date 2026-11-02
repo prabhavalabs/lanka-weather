@@ -23,6 +23,35 @@ type AdminRegion struct {
 	Geom       []byte  `json:"geom"`
 }
 
+type CanalContext struct {
+	ID            bool       `json:"id"`
+	Credit        string     `json:"credit"`
+	Licence       string     `json:"licence"`
+	UpstreamUrl   string     `json:"upstream_url"`
+	SeaLevelM     *float64   `json:"sea_level_m"`
+	SeaTrend      *string    `json:"sea_trend"`
+	SeaObservedAt *time.Time `json:"sea_observed_at"`
+	TideNote      string     `json:"tide_note"`
+	Tide          []byte     `json:"tide"`
+	Source        string     `json:"source"`
+	SourceTime    time.Time  `json:"source_time"`
+	FetchedAt     time.Time  `json:"fetched_at"`
+}
+
+type CanalGauge struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	CanalGroup string     `json:"canal_group"`
+	State      string     `json:"state"`
+	LevelM     *float64   `json:"level_m"`
+	ObservedAt *time.Time `json:"observed_at"`
+	Change3hM  *float64   `json:"change_3h_m"`
+	Last24h    []byte     `json:"last_24h"`
+	Source     string     `json:"source"`
+	SourceTime time.Time  `json:"source_time"`
+	FetchedAt  time.Time  `json:"fetched_at"`
+}
+
 type Cyclone struct {
 	EventID        int64     `json:"event_id"`
 	EpisodeID      int32     `json:"episode_id"`
@@ -260,6 +289,29 @@ type PlaceStaging struct {
 	Population *int32   `json:"population"`
 	Lon        float64  `json:"lon"`
 	Lat        float64  `json:"lat"`
+}
+
+type RainGauge struct {
+	ID               string     `json:"id"`
+	Device           string     `json:"device"`
+	Name             string     `json:"name"`
+	Institution      string     `json:"institution"`
+	Lon              float64    `json:"lon"`
+	Lat              float64    `json:"lat"`
+	LatestObservedAt *time.Time `json:"latest_observed_at"`
+	LatestRainMm     *float64   `json:"latest_rain_mm"`
+	Source           string     `json:"source"`
+	SourceTime       time.Time  `json:"source_time"`
+	FetchedAt        time.Time  `json:"fetched_at"`
+}
+
+type RainGaugeReading struct {
+	GaugeID    string    `json:"gauge_id"`
+	ObservedAt time.Time `json:"observed_at"`
+	RainMm     float64   `json:"rain_mm"`
+	Source     string    `json:"source"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
 }
 
 type RainTile struct {

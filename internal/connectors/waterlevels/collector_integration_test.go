@@ -10,10 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/waterlevels"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
+	"github.com/prabhavalabs/lanka-weather/internal/platform/database/dbtest"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
@@ -236,6 +238,59 @@ func TestGaugesAndForecastsIntegration(t *testing.T) {
 	}
 	if forecasts != 0 {
 		t.Fatalf("forecasts after pruning = %d", forecasts)
+	}
+}
+
+func TestCanalsIntegration(t *testing.T) {
+	pool := dbtest.Open(t, "canal_gauges", "canal_context")
+	ctx := context.Background()
+	now := time.Date(2026, 11, 2, 20, 0, 0, 0, time.UTC)
+	collector := &waterlevels.CanalCollector{Pool: pool, Fetcher: replay{file: "testdata/canals.json"}, Minimum: 2}
+	if stored, err := collector.Collect(ctx, now); err != nil || stored != 3 {
+		t.Fatalf("stored %d, %v", stored, err)
+	}
+	service := &canals.Service{Pool: pool, Now: func() time.Time { return now }}
+	document, err := service.Current(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Meta.Total != 3 || document.Meta.Reporting != 2 || document.Meta.Raised != 1 || document.Meta.Stale {
+		t.Fatalf("meta = %+v", document.Meta)
+	}
+	if document.Meta.Credit != "Canal levels: CUrW / SLLDC (pub.curwsl.org)" || document.Meta.Attribution != waterlevels.CanalCredit || document.Meta.Note != canals.Note {
+		t.Fatalf("the credit must be the source's: %+v", document.Meta)
+	}
+	if document.Sea == nil || *document.Sea.LevelM != 0.141 || len(document.Tide.Events) != 1 {
+		t.Fatalf("sea %+v, tide %+v", document.Sea, document.Tide)
+	}
+	byName := map[string]canals.Gauge{}
+	for _, gauge := range document.Gauges {
+		byName[gauge.Name] = gauge
+	}
+	if silent := byName["Test Silent"]; silent.LevelM != nil || !silent.Stale || silent.State != "offline" {
+		t.Fatalf("silent = %+v", silent)
+	}
+	if higher := byName["Test Rising N"]; higher.State != "higher" || higher.Stale {
+		t.Fatalf("higher = %+v", higher)
+	}
+	if brief, err := service.BriefAt(ctx, 80.63, 7.29); err != nil || brief != nil {
+		t.Fatalf("Kandy is not the Colombo area: %+v, %v", brief, err)
+	}
+	if brief, err := service.BriefAt(ctx, 79.86, 6.93); err != nil || brief == nil || brief.Reporting != 2 {
+		t.Fatalf("brief = %+v, %v", brief, err)
+	}
+	// Old readings stop counting, whatever state they were left in.
+	later := now.Add(4 * time.Hour)
+	service.Now = func() time.Time { return later }
+	if stale, _ := service.Current(ctx); stale.Meta.Reporting != 0 || !stale.Meta.Stale || stale.Meta.Raised != 0 {
+		t.Fatalf("stale meta = %+v", stale.Meta)
+	}
+	// A short response is rejected, and what was stored stays.
+	if _, err := (&waterlevels.CanalCollector{Pool: pool, Fetcher: replay{file: "testdata/canals.json"}}).Collect(ctx, now); err == nil {
+		t.Fatal("three gauges should be under the minimum")
+	}
+	if kept, _ := service.Current(ctx); kept.Meta.Total != 3 {
+		t.Fatalf("kept %d", kept.Meta.Total)
 	}
 }
 

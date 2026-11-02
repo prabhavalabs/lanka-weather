@@ -232,6 +232,68 @@ func (b *InsertNextHourBatchResults) Close() error {
 	return b.br.Close()
 }
 
+const insertRainGaugeReading = `-- name: InsertRainGaugeReading :batchexec
+INSERT INTO rain_gauge_readings (gauge_id, observed_at, rain_mm, source, source_time, fetched_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (gauge_id, observed_at) DO UPDATE
+SET rain_mm = EXCLUDED.rain_mm,
+    source_time = EXCLUDED.source_time,
+    fetched_at = EXCLUDED.fetched_at
+`
+
+type InsertRainGaugeReadingBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type InsertRainGaugeReadingParams struct {
+	GaugeID    string    `json:"gauge_id"`
+	ObservedAt time.Time `json:"observed_at"`
+	RainMm     float64   `json:"rain_mm"`
+	Source     string    `json:"source"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+func (q *Queries) InsertRainGaugeReading(ctx context.Context, arg []InsertRainGaugeReadingParams) *InsertRainGaugeReadingBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.GaugeID,
+			a.ObservedAt,
+			a.RainMm,
+			a.Source,
+			a.SourceTime,
+			a.FetchedAt,
+		}
+		batch.Queue(insertRainGaugeReading, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &InsertRainGaugeReadingBatchResults{br, len(arg), false}
+}
+
+func (b *InsertRainGaugeReadingBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *InsertRainGaugeReadingBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const insertRiverReading = `-- name: InsertRiverReading :batchexec
 INSERT INTO river_readings (station_id, observed_at, water_level, rainfall_mm, fetched_at)
 VALUES ($1, $2, $3, $4, $5)

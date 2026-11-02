@@ -25,10 +25,12 @@ const (
 	// docs/data-sources.md and source_runs.
 	ReservoirsSource = "waterlevels-lk-reservoirs"
 	GaugesSource     = "waterlevels-lk-gauges"
+	CanalsSource     = "waterlevels-lk-canals"
 
-	// ReservoirsURL and LevelsURL are the endpoints robots.txt allows.
+	// ReservoirsURL, LevelsURL and CanalsURL are the endpoints robots.txt allows.
 	ReservoirsURL = "https://waterlevels.lk/api/reservoirs"
 	LevelsURL     = "https://waterlevels.lk/api/levels"
+	CanalsURL     = "https://waterlevels.lk/api/canals"
 
 	// Attribution is the credit for anything read from the site.
 	Attribution = "Sri Lanka Water Levels (waterlevels.lk)"
