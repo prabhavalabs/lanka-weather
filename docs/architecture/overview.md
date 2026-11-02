@@ -144,10 +144,12 @@ ADR 0007 records the decisions behind this flow.
    serves the following without calling any source:
    - `/v1/weather/current`: a compact grid, gzipped once per run;
    - `/v1/weather/point`: bilinear interpolation at a point;
-   - `/v1/weather/regions`: aggregates over administrative regions;
+   - `/v1/weather/regions`: aggregates over administrative regions, read
+     from the `regions` table through the `admin_regions` view (ADR 0008);
    - `/v1/weather/wind`: TerraGuard's wind-field format;
    - `/v1/floods/forecast`: GeoJSON;
-   - `/v1/summary`: one place, with derived alerts labelled as estimates.
+   - `/v1/summary`: one place, with its regions and derived alerts labelled
+     as estimates.
 
    The contract is in [the API document](../api/weather-and-floods.md).
 

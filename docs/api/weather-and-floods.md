@@ -40,6 +40,7 @@ Errors shared by these endpoints:
 | 400 | `invalid_coordinates` | `lat`/`lon` missing, not numbers, or out of range |
 | 400 | `invalid_time` | `t` is not RFC 3339 or `now` |
 | 400 | `invalid_level` | `level` is not `province`, `district`, `ds` or `gn` |
+| 400 | `invalid_parent` | `parent` is not a region code above `level` (regions only) |
 | 404 | `outside_grid` | The point is outside the weather grid (79.4–82.2° E, 5.6–10.0° N) |
 | 404 | `no_wind_field` | No stored run covers `t` |
 | 503 | `no_data` | No weather run has been collected yet |
@@ -251,22 +252,32 @@ Example: 38.9 KB, 16 KB gzipped. Base64 is cut here.
 `Cache-Control: public, max-age=600`. Do not persist wind fields in the
 IndexedDB cache (ADR 0002).
 
-## `GET /v1/weather/regions?level=province|district|ds|gn`
+## `GET /v1/weather/regions?level=province|district|ds|gn&parent=`
 
 Current weather and today's range for every administrative region of a
-level, for a choropleth.
+level, for a choropleth. Region ids are the codes of `/v1/regions` and the
+vector tiles (ADR 0006); a tile feature's numeric id is the code's digits
+(`LK-1103005` is feature `1103005`).
+
+`parent` (optional) limits the list to the regions within one region above
+`level`, written as in `/v1/regions` (`LK-11`, `lk11`):
+`level=gn&parent=LK-1103` returns the GN divisions of one DS division.
+Unlike `/v1/regions`, GN divisions are also served for the whole country
+(14,019 regions: 3.2 MB of JSON, 270 KB gzipped), because the values are
+small and the aggregate is computed once per weather run.
 
 How each region's values are computed:
 
 - **Regions larger than one grid cell** (about 490 km²: provinces,
-  districts, the largest DS divisions) aggregate the cells they intersect:
+  districts, the 30 largest DS divisions) aggregate the cells they
+  intersect:
   - means are weighted by the share of each cell inside the region;
   - the lowest and highest values are taken over cells at least 10 %
     inside it.
   - `method` is `"cells"` and `cells` counts them.
 - **Smaller regions, and every GN division,** take the value interpolated
-  at a point inside them (PostGIS `ST_PointOnSurface`). `method` is
-  `"point"`.
+  at a point inside them (the region's `label_point`, computed when the
+  regions are loaded). `method` is `"point"`.
 
 The fields of each region:
 
@@ -278,14 +289,14 @@ The fields of each region:
 | `precipitationTodayMm` | Today's forecast total (mean) |
 | `windSpeedMaxKmh`, `windGustsMaxKmh` | Highest current wind and gust |
 
-Until the regions table is merged (see [Regions](#regions-join-requirements)),
-this answers `503 not_available`:
+Until the regions collector has loaded a level, this answers
+`503 not_available`; until the first weather run is stored, `503 no_data`:
 
 ```json
 { "error": { "code": "not_available", "message": "administrative regions are not loaded yet" } }
 ```
 
-Once regions are loaded. This example is illustrative:
+Example (`level=district`, cut to one region):
 
 ```json
 {
@@ -308,16 +319,20 @@ Once regions are loaded. This example is illustrative:
 }
 ```
 
-### Regions: join requirements
+With `parent`, `data.parent` repeats the parent's code.
 
-The endpoint reads regions through `weather.RegionSource`:
+### Regions: how the join works
+
+ADR 0008 records this design. The endpoint reads regions through
+`weather.RegionSource`:
 
 ```go
 type Region struct {
-    ID, Name string
-    Lon, Lat float64   // a point inside the region
-    Nodes    []int     // lattice indexes of grid nodes whose cells intersect it
-    Weights  []float64 // share of each cell inside the region, 0 to 1
+    ID, Name                     string
+    ProvinceID, DistrictID, DSID string    // ancestors, or the region itself at its level
+    Lon, Lat                     float64   // a point inside the region
+    Nodes                        []int     // lattice indexes of grid nodes whose cells intersect it
+    Weights                      []float64 // share of each cell inside the region, 0 to 1
 }
 
 type RegionSource interface {
@@ -325,43 +340,41 @@ type RegionSource interface {
 }
 ```
 
-`weather.UnavailableRegions` (the default) always returns
-`ErrRegionsUnavailable`. `weather.PostGISRegions` reads a relation (table or
-view) that must have:
+`weather.PostGISRegions`, the default, reads the `admin_regions` view
+(migration 00004) over the `regions` table (migration 00002):
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `text` (or castable) | Unique per region; returned as `id` |
-| `level` | `text` | Exactly `province`, `district`, `ds` or `gn` |
-| `name` | `text` | Display name |
-| `geom` | `geometry(MultiPolygon, 4326)` or `geometry(Polygon, 4326)` | **geometry, not geography; SRID 4326**, longitude/latitude order, valid polygons |
+| `id` | `text` | DCS code, unique per region; returned as `id` |
+| `level` | `text` | `province`, `district`, `ds` or `gn` |
+| `name` | `text` | English name |
+| `province_id`, `district_id`, `ds_id` | `text` | Ancestors, or the region itself at its own level; `NULL` below it |
+| `area_km2` | `double precision` | Decides between cells and a point |
+| `label_point` | `geometry(Point, 4326)` | A point inside the region |
+| `geom` | `geometry(MultiPolygon, 4326)` | Boundary as published, GiST-indexed |
 
-Indexes and setup:
+How it runs:
 
-- A GiST index on `geom` and a B-tree on `level` keep the join fast.
-- It joins `weather_grid_nodes` (migration 00003) on
-  `grid = 'lk-0.2' AND ST_Intersects(cell, geom)`, with `cell` in
-  `geometry(Polygon, 4326)`.
-- It uses `ST_Area(geom::geography)` to decide between cells and a point,
-  and `ST_PointOnSurface(geom)` for the point.
-- Results are cached for six hours.
+- Province, district and DS levels join `weather_grid_nodes` (migration
+  00003) on `grid = 'lk-0.2' AND ST_Intersects(cell, geom)`, and weigh
+  each cell by `ST_Area(ST_Intersection(cell, geom)) / ST_Area(cell)`.
+  On the full boundaries this takes about 15 ms per level.
+- GN divisions skip the join: their 14,019 points are read in about 65 ms,
+  and the four grid nodes around each point are found in memory.
+- Each level's regions and weights are kept in memory for six hours, and
+  loaded in the background when the API starts. Each weather run's
+  aggregate is computed once per level and kept until the next run; a
+  `parent` only filters it.
+- Before the regions are loaded, or before the grid cells are stored, a
+  level is not cached, so it is picked up as soon as the collectors have
+  run.
 
-To connect it after merging the regions migration (00002):
+Configuration:
 
-1. If the regions table has other names, create a view with these four
-   columns. For example:
-
-   ```sql
-   CREATE VIEW admin_regions AS
-     SELECT code AS id, level, name_en AS name, geom FROM regions;
-   ```
-
-2. Set `LANKAWEATHER_WEATHER_REGIONS=postgis`, and
-   `LANKAWEATHER_WEATHER_REGIONS_RELATION=<name>` if it is not
-   `admin_regions`. Alternatively, construct `weather.PostGISRegions` in
-   `cmd/lankaweather/main.go`.
-3. The integration test `internal/weather/regions_integration_test.go`
-   shows the expected shape with a throwaway table.
+- `LANKAWEATHER_WEATHER_REGIONS_RELATION` names another relation with the
+  same columns.
+- `LANKAWEATHER_WEATHER_REGIONS=none` switches region weather off; the
+  endpoint then answers `503 not_available`.
 
 ## `GET /v1/floods/forecast`
 
@@ -456,6 +469,10 @@ A flood area feature, for illustration:
 Everything known about one place, for the search panel after a place is
 picked. It contains:
 
+- **`regions`:** the province, district, DS and GN division containing the
+  place (`/v1/regions/lookup`), each with `id`, `level`, `name`, `nameSi`
+  and `nameTa`. `null` outside Sri Lanka; a level is `null` where no
+  region of it contains the place.
 - **`weather`:** the point forecast above, cut to 24 hours and 3 days.
   `null` outside the grid or before any run.
 - **`rivers`:** up to three Irrigation Department gauges within 50 km,
@@ -468,10 +485,11 @@ picked. It contains:
   which are authoritative. They are not collected yet, so `status` is
   `"not_available"` and `warnings` is empty. The web app should show this
   slot above derived alerts once it fills.
-- **`unavailable`:** the parts that could not be filled (`weather`, `rivers`,
-  `floodForecast`). The rest of the summary is still returned.
+- **`unavailable`:** the parts that could not be filled (`weather`,
+  `regions`, `rivers`, `floodForecast`). The rest of the summary is still
+  returned.
 
-Example for Colombo (`lat=6.9271&lon=79.8612`): 5.4 KB. The arrays and the
+Example for Colombo (`lat=6.9271&lon=79.8612`): 5.9 KB. The arrays and the
 second and third rivers are cut here.
 
 ```json
@@ -479,6 +497,12 @@ second and third rivers are cut here.
   "data": {
     "location": { "lat": 6.9271, "lon": 79.8612 },
     "generatedAt": "2026-11-02T14:51:02Z",
+    "regions": {
+      "province": { "id": "LK-1", "level": "province", "name": "Western", "nameSi": "බස්නාහිර පළාත", "nameTa": "மேல் மாகாணம்" },
+      "district": { "id": "LK-11", "level": "district", "name": "Colombo", "nameSi": "කොළඹ දිස්ත්‍රික්ක", "nameTa": "கொழும்பு மாவட்டம்" },
+      "ds": { "id": "LK-1103", "level": "ds", "name": "Colombo", "nameSi": "කොළඹ", "nameTa": "கொழும்பு" },
+      "gn": { "id": "LK-1103140", "level": "gn", "name": "Suduwella", "nameSi": "සුදුවැල්ල" }
+    },
     "weather": {
       "location": { "lat": 6.9271, "lon": 79.8612 },
       "current": {
@@ -573,4 +597,12 @@ Measured locally against the collected database, on Apple silicon:
 | `/v1/weather/point` (Kandy) | 8.2 KB | n/a | 1.5 ms | 0.7 ms |
 | `/v1/weather/wind` | 38.9 KB | 16 KB | 11 ms | 0.5 ms |
 | `/v1/floods/forecast` | 6.1 KB | n/a | 30 ms | 5 ms |
-| `/v1/summary` (Colombo) | 5.4 KB | n/a | 29 ms | 6 ms |
+| `/v1/summary` (Colombo) | 5.9 KB | n/a | 27 ms | 6 ms |
+| `/v1/weather/regions?level=province` | 2.2 KB | 0.6 KB | 57 ms (loads the runs) | 0.5 ms |
+| `/v1/weather/regions?level=district` | 5.8 KB | 1.1 KB | 0.6 ms | 0.5 ms |
+| `/v1/weather/regions?level=ds` | 76 KB | 9.2 KB | 0.9 ms | 1 ms |
+| `/v1/weather/regions?level=gn` | 3.2 MB | 270 KB | 18 ms | 12 ms (28 ms gzipped) |
+| `/v1/weather/regions?level=gn&parent=LK-1103` | 8.2 KB | 1 KB | 0.8 ms | 0.4 ms |
+
+The region joins run when the API starts (all four levels in 0.3 s), so
+the first region request only aggregates the run.

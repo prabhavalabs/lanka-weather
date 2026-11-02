@@ -104,9 +104,9 @@ artwork in `brand/`, regenerate the icons with
 | `GET /v1/weather/current` | Current weather on the 0.2° grid over Sri Lanka: one array per variable (gzipped) |
 | `GET /v1/weather/point?lat=&lon=` | Current conditions, a 72-hour hourly and a 7-day daily forecast at a point |
 | `GET /v1/weather/wind?t=` | Wind field (GFS, 10 m) for the particle layer, valid nearest `t` (default now) |
-| `GET /v1/weather/regions?level=province\|district\|ds\|gn` | Weather per administrative region (503 `not_available` until regions are loaded) |
+| `GET /v1/weather/regions?level=province\|district\|ds\|gn&parent=LK-11` | Weather per administrative region, optionally within one parent region |
 | `GET /v1/floods/forecast` | Google flood forecasts for Sri Lanka as GeoJSON: gauges and flood areas |
-| `GET /v1/summary?lat=&lon=` | One place: weather, nearest river and flood gauges, derived alerts |
+| `GET /v1/summary?lat=&lon=` | One place: its regions, weather, nearest river and flood gauges, derived alerts |
 
 Region ids are Department of Census and Statistics codes: `LK-2`
 (province), `LK-21` (district), `LK-2130` (DS division), `LK-2130120`
