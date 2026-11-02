@@ -16,6 +16,22 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: imresamu/postgis:17-3.5
+        env:
+          POSTGRES_USER: lankaweather
+          POSTGRES_PASSWORD: lankaweather
+          POSTGRES_DB: lankaweather_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lankaweather -d lankaweather_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      LANKAWEATHER_TEST_DATABASE_URL: postgres://lankaweather:lankaweather@localhost:5432/lankaweather_test?sslmode=disable
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
