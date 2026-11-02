@@ -14,6 +14,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -39,14 +40,20 @@ type RegionLookup interface {
 	Lookup(ctx context.Context, lon, lat float64) (regions.Lookup, error)
 }
 
+// RiverRiskSource estimates the risk of the rivers near a place.
+type RiverRiskSource interface {
+	Near(ctx context.Context, lon, lat float64) ([]riverrisk.NearbyRiver, error)
+}
+
 // Service builds summaries. Any source may be nil.
 type Service struct {
-	Weather WeatherSource
-	Rivers  RiverSource
-	Floods  FloodSource
-	Regions RegionLookup
-	Logger  *slog.Logger
-	Now     func() time.Time
+	Weather   WeatherSource
+	Rivers    RiverSource
+	Floods    FloodSource
+	Regions   RegionLookup
+	RiverRisk RiverRiskSource
+	Logger    *slog.Logger
+	Now       func() time.Time
 }
 
 const (
@@ -70,16 +77,19 @@ type Summary struct {
 	Regions *Regions `json:"regions"`
 	// Weather is the current conditions, the next 24 hours and three days;
 	// null when the place is outside the grid or nothing is collected.
-	Weather       *weather.Point `json:"weather"`
-	Rivers        []River        `json:"rivers"`
-	FloodForecast FloodForecast  `json:"floodForecast"`
+	Weather *weather.Point `json:"weather"`
+	Rivers  []River        `json:"rivers"`
+	// NearbyRivers are the rivers near the place with the estimated risk of
+	// their nearest stretch.
+	NearbyRivers  []riverrisk.NearbyRiver `json:"nearbyRivers"`
+	FloodForecast FloodForecast           `json:"floodForecast"`
 	// Alerts are derived by lanka-weather and are estimates.
 	Alerts []Alert `json:"alerts"`
 	// Official will hold Department of Meteorology and DMC warnings, which
 	// are authoritative; they are not collected yet.
 	Official Official `json:"official"`
 	// Unavailable lists the parts that could not be filled: weather,
-	// regions, rivers or floodForecast.
+	// regions, rivers, nearbyRivers or floodForecast.
 	Unavailable []string `json:"unavailable"`
 }
 
@@ -143,7 +153,7 @@ type Official struct {
 func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary, error) {
 	summary := &Summary{
 		Location: weather.Location{Lat: lat, Lon: lon}, GeneratedAt: service.now(),
-		Rivers: []River{}, FloodForecast: FloodForecast{Gauges: []FloodGauge{}, Areas: []floods.AreaAt{}},
+		Rivers: []River{}, NearbyRivers: []riverrisk.NearbyRiver{}, FloodForecast: FloodForecast{Gauges: []FloodGauge{}, Areas: []floods.AreaAt{}},
 		Official: Official{Status: "not_available", Warnings: []any{},
 			Note: "Department of Meteorology and Disaster Management Centre warnings are authoritative; they will appear here once collected."},
 		Unavailable: []string{},
@@ -216,6 +226,16 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 		}
 	} else {
 		summary.Unavailable = append(summary.Unavailable, "floodForecast")
+	}
+
+	if service.RiverRisk != nil {
+		nearby, err := service.RiverRisk.Near(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary nearby rivers", err)
+			summary.Unavailable = append(summary.Unavailable, "nearbyRivers")
+		} else {
+			summary.NearbyRivers = nearby
+		}
 	}
 
 	summary.Alerts = Evaluate(inputs)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -113,5 +114,45 @@ func TestSummaryListsUnavailableParts(t *testing.T) {
 	service = &Service{Regions: fakeRegions{err: errors.New("down")}}
 	if summary, _ := service.Summary(context.Background(), 80, 7); summary.Regions != nil || !slices.Contains(summary.Unavailable, "regions") {
 		t.Fatalf("failed lookup = %+v, unavailable %v", summary.Regions, summary.Unavailable)
+	}
+}
+
+type fakeRiverRisk struct {
+	rivers []riverrisk.NearbyRiver
+	err    error
+}
+
+func (fake fakeRiverRisk) Near(context.Context, float64, float64) ([]riverrisk.NearbyRiver, error) {
+	return fake.rivers, fake.err
+}
+
+func TestSummaryListsNearbyRiversWithTheirEstimatedRisk(t *testing.T) {
+	service := &Service{RiverRisk: fakeRiverRisk{rivers: []riverrisk.NearbyRiver{
+		{ID: "kelani-ganga", Name: "Kelani Ganga", Level: riverrisk.LevelWatch, DistanceKm: 2.1, Estimate: true},
+	}}}
+	summary, err := service.Summary(context.Background(), 79.88, 6.95)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.NearbyRivers) != 1 || summary.NearbyRivers[0].ID != "kelani-ganga" || !summary.NearbyRivers[0].Estimate {
+		t.Fatalf("nearby = %+v", summary.NearbyRivers)
+	}
+}
+
+func TestSummarySurvivesARiverRiskFailure(t *testing.T) {
+	service := &Service{RiverRisk: fakeRiverRisk{err: errors.New("database is down")}}
+	summary, err := service.Summary(context.Background(), 79.88, 6.95)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.NearbyRivers == nil || len(summary.NearbyRivers) != 0 {
+		t.Fatalf("nearby = %+v", summary.NearbyRivers)
+	}
+	found := false
+	for _, part := range summary.Unavailable {
+		found = found || part == "nearbyRivers"
+	}
+	if !found {
+		t.Fatalf("unavailable = %v", summary.Unavailable)
 	}
 }

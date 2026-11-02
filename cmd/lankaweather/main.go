@@ -40,6 +40,8 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
+	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
 	"github.com/prabhavalabs/lanka-weather/internal/summary"
@@ -126,7 +128,8 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 	} else {
 		logger.Info("LANKAWEATHER_GOOGLE_API_KEY is not set; Google flood forecasts are not collected")
 	}
-	return list
+	// Derived from the collectors above, so it runs last.
+	return append(list, &rivernet.Collector{Pool: pool, Logger: logger})
 }
 
 // regionSource is the source of administrative regions for
@@ -174,6 +177,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	floodService := &floods.Service{Pool: pool, Configured: os.Getenv("LANKAWEATHER_GOOGLE_API_KEY") != "",
 		StaleAfter: staleAfter("flood-forecast")}
 	regionService := &regions.Service{Pool: pool}
+	riverRiskService := &riverrisk.Service{Pool: pool, Rivers: riverService, Floods: floodService, Weather: weatherService, Logger: logger}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -184,8 +188,9 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Weather: weatherService,
 			Floods:  floodService,
 			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
-				Regions: regionService, Logger: logger},
-			Ready: pool.Ping,
+				Regions: regionService, RiverRisk: riverRiskService, Logger: logger},
+			RiverRisk: riverRiskService,
+			Ready:     pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

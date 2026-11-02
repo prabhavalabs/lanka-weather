@@ -17,6 +17,10 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/store"
 )
 
+// SeedSource marks rows written by the local test seed (package riverseed), so
+// a seeded flood can never pass as a real one.
+const SeedSource = "local-seed"
+
 // Service reads the flood-forecast layer from the database.
 type Service struct {
 	Pool *pgxpool.Pool
@@ -37,6 +41,8 @@ type FeatureCollection struct {
 
 // Meta describes the layer's origin and freshness.
 type Meta struct {
+	// Seeded means local test data is in the tables; never true in production.
+	Seeded      bool       `json:"seeded"`
 	Source      string     `json:"source"`
 	Attribution string     `json:"attribution"`
 	Region      string     `json:"region"`
@@ -77,6 +83,8 @@ type Gauge struct {
 	Thresholds      Thresholds `json:"thresholds"`
 	FetchedAt       time.Time  `json:"fetchedAt"`
 	Stale           bool       `json:"stale"`
+	// Seeded marks local test data.
+	Seeded bool `json:"-"`
 	// Lon and Lat repeat the geometry for callers that do not read GeoJSON.
 	Lon float64 `json:"-"`
 	Lat float64 `json:"-"`
@@ -92,6 +100,8 @@ type Thresholds struct {
 
 // Area is a flood area feature's properties.
 type Area struct {
+	// ID identifies the polygon, for a client to open one it was clicked on.
+	ID         string          `json:"id"`
 	Kind       string          `json:"kind"`
 	GaugeID    *string         `json:"gaugeId"`
 	Severity   string          `json:"severity"`
@@ -120,6 +130,7 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 		return FeatureCollection{}, err
 	}
 	for _, gauge := range gauges {
+		collection.Meta.Seeded = collection.Meta.Seeded || gauge.Seeded
 		geometry, _ := json.Marshal(point{Type: "Point", Coordinates: [2]float64{gauge.Lon, gauge.Lat}})
 		collection.Features = append(collection.Features, Feature{Type: "Feature", ID: gauge.GaugeID, Geometry: geometry, Properties: gauge})
 	}
@@ -133,7 +144,7 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 		}
 		collection.Features = append(collection.Features, Feature{
 			Type: "Feature", ID: area.ID, Geometry: json.RawMessage(area.Geojson),
-			Properties: Area{Kind: area.Kind, GaugeID: area.GaugeID, Severity: area.Severity, IssuedAt: area.IssuedAt,
+			Properties: Area{ID: area.ID, Kind: area.Kind, GaugeID: area.GaugeID, Severity: area.Severity, IssuedAt: area.IssuedAt,
 				ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil, Details: area.Properties, FetchedAt: area.FetchedAt},
 		})
 		collection.Meta.Areas++
@@ -161,7 +172,8 @@ func (service *Service) Gauges(ctx context.Context) ([]Gauge, error) {
 			ForecastStart: row.ForecastStart, ForecastEnd: row.ForecastEnd,
 			Thresholds: Thresholds{Warning: row.WarningLevel, Danger: row.DangerLevel, ExtremeDanger: row.ExtremeDangerLevel, Unit: row.ValueUnit},
 			FetchedAt:  row.FetchedAt, Stale: now.Sub(row.IssuedAt) > service.StaleAfter,
-			Lon: row.Lon, Lat: row.Lat,
+			Seeded: row.Source == SeedSource,
+			Lon:    row.Lon, Lat: row.Lat,
 		})
 	}
 	return gauges, nil

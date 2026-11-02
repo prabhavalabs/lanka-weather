@@ -80,6 +80,8 @@ type Dependencies struct {
 	Weather Weather
 	Floods  Floods
 	Summary Summaries
+	// RiverRisk serves the river network, its risk estimate and flood basins.
+	RiverRisk RiverRisk
 	// Now is the clock for requests without an explicit time; nil is
 	// time.Now.
 	Now func() time.Time
@@ -124,6 +126,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/weather/regions", api.weatherRegions)
 		r.Get("/floods/forecast", api.floodForecast)
 		r.Get("/summary", api.summary)
+		api.riverRoutes(r)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
