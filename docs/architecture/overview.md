@@ -29,7 +29,8 @@ serves it to a map-centred web application.
  Met Dept observations ──┤     │ worker (Go)              │
  NBRO landslide levels ──┼────▶│  connectors → records    │
  Google Flood Forecast ──┤     │  scheduler, jobs         │
- NOAA GFS (wind, rain) ──┤     └────────────┬─────────────┘
+ NOAA GFS (wind)       ──┤     └────────────┬─────────────┘
+ Open-Meteo (grid)     ──┤                  │
  GDACS / JTWC cyclones ──┤                  ▼
  USGS earthquakes      ──┤     ┌──────────────────────────┐
  NASA GIBS imagery     ──┘     │ PostgreSQL + PostGIS     │
@@ -62,17 +63,23 @@ pattern used in TerraGuard:
 | `migrate` | Database migrations (goose) |
 | `collect` | Run every collector once and exit |
 
-Internal packages (planned):
+Internal packages:
 
 | Package | Responsibility |
 |---|---|
 | `internal/layers` | Catalogue of map layers: identifier, kind, source, refresh cadence, staleness limit, attribution |
-| `internal/source` | Contract every connector implements. Decoding is pure: no network or database, so recorded payloads can be replayed in tests |
-| `internal/connectors/<name>` | One package per source (irrigation, dmc, meteo, nbro, googleflood, gfs, gdacs, usgs) |
-| `internal/ingest` | Scheduler, leader election, retries, fetch log |
+| `internal/source` | Contract every connector implements, and the HTTP client: identifying User-Agent, back-off after HTTP 429. Decoding is pure: no network or database, so recorded payloads can be replayed in tests |
+| `internal/connectors/<name>` | One package per source: `irrigation`, `openmeteo`, `gfs` and `googleflood` today; dmc, meteo, nbro, gdacs and usgs planned |
+| `internal/ingest` | Scheduler, leader election, fetch log, hourly retention pruning |
 | `internal/store` | Database access (pgx, sqlc) |
-| `internal/httpapi` | Routes, request validation, response envelopes, caching headers |
-| `internal/weather`, `internal/grib2` | GFS wind fields, decoded on demand and cached in memory |
+| `internal/httpapi` | Routes, request validation, response envelopes, caching headers, gzip for grids |
+| `internal/grid` | The 0.2° weather grid over Sri Lanka, its land mask and bilinear interpolation |
+| `internal/meteo` | Derived quantities: dew point, day or night, heat index, wind components |
+| `internal/grib2` | GRIB2 decoder for GFS messages (from TerraGuard) |
+| `internal/weather` | Weather read side: the newest runs held in memory, the current grid, point forecasts, region aggregates, wind fields |
+| `internal/floods` | Google flood-forecast layer and flood areas at a point |
+| `internal/rivers` | River-levels layer: status and trend per gauge |
+| `internal/summary` | Location summary and derived alerts |
 
 ### `apps/web` (TypeScript)
 
@@ -108,6 +115,38 @@ divisions are under a landslide warning) and bounding-box queries.
 5. The web app renders the stations, colours them by status and shows
    the age of each reading.
 
+## Data flow: weather, wind and flood forecasts
+
+ADR 0007 records the decisions behind this flow.
+
+1. **Open-Meteo, current conditions.** Every hour the worker asks
+   Open-Meteo for current conditions at the 214 nodes of the 0.2° grid,
+   50 nodes a request. Each run is stored as one `weather_runs` row, with
+   one `weather_fields` row (`real[]`) per variable.
+2. **Open-Meteo, forecast.** Every three hours the worker fetches a nine-day
+   hourly forecast at the same nodes. It derives a seven-day daily summary
+   for local days (UTC+05:30) from the hours.
+3. **NOAA GFS, wind.** Every 30 minutes the worker looks for the newest GFS
+   run whose 72-hour file is published. It reads only the 10 m U and V
+   messages of each three-hourly file by byte range, crops them to
+   70–92° E, 2° S–18° N, and stores them as int16 tenths of m/s
+   (`wind_fields`).
+4. **Google Flood Forecasting.** Every hour the worker reads the latest
+   status of Sri Lanka's gauges (`regionCode` LK) and their thresholds. It
+   also reads the flash floods and significant events affecting Sri Lanka,
+   with their polygons, and replaces `flood_gauges` and `flood_areas`.
+   Nothing older than a day is kept, as Google's terms require.
+5. **Serving.** The API keeps the newest weather runs decoded in memory and
+   serves the following without calling any source:
+   - `/v1/weather/current`: a compact grid, gzipped once per run;
+   - `/v1/weather/point`: bilinear interpolation at a point;
+   - `/v1/weather/regions`: aggregates over administrative regions;
+   - `/v1/weather/wind`: TerraGuard's wind-field format;
+   - `/v1/floods/forecast`: GeoJSON;
+   - `/v1/summary`: one place, with derived alerts labelled as estimates.
+
+   The contract is in [the API document](../api/weather-and-floods.md).
+
 ## Geography and identifiers
 
 Administrative regions come from `nuuuwan/lk_admin_regions` and the
@@ -127,3 +166,4 @@ division.
 
 - [Data-source catalogue](../data-sources.md)
 - [Architecture decision records](../decisions/)
+- [Weather and flood API contract](../api/weather-and-floods.md)
