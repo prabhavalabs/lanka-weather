@@ -94,7 +94,7 @@ export function RainGaugePanel({
       }
     >
       {detail.isPending && <Skeleton className="h-24 w-full rounded-xl" />}
-      {detail.error && !gauge && (
+      {Boolean(detail.error) && !gauge && (
         <p role="alert" className="text-sm text-foreground">
           This rain gauge could not be read just now.
         </p>

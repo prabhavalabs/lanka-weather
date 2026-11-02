@@ -4,13 +4,45 @@
   "source": "http://pub.curwsl.org/",
   "licence": "Data (c) CUrW / SLLDC, shown with attribution. Not an official warning.",
   "generatedAt": "2026-11-02T19:39:42.543Z",
-  "sea": {"level_m": 0.141, "trend": "steady", "observedAt": "2026-11-02T19:15:00.000Z"},
+  "sea": { "level_m": 0.141, "trend": "steady", "observedAt": "2026-11-02T19:15:00.000Z" },
   "gauges": [
-    {"name": "Test Bridge", "group": "North Canal", "state": "normal", "level_m": 0.414, "observedAt": "2026-11-02T19:15:00.000Z", "change3h_m": -0.042,
-     "last24h": [{"t": "2026-11-01T20:00:00.000Z", "level_m": 0.472}, {"t": "2026-11-01T21:00:00.000Z", "level_m": null}]},
-    {"name": "Test Rising N", "group": "Kelani River", "state": "higher", "level_m": 8.745, "observedAt": "2026-11-02T19:15:00.000Z", "change3h_m": 0.2, "last24h": []},
-    {"name": "Test Silent", "group": "", "state": "offline", "level_m": null, "observedAt": null, "change3h_m": null, "last24h": []},
-    {"name": " ", "group": "", "state": "normal"}
+    {
+      "name": "Test Bridge",
+      "group": "North Canal",
+      "state": "normal",
+      "level_m": 0.414,
+      "observedAt": "2026-11-02T19:15:00.000Z",
+      "change3h_m": -0.042,
+      "last24h": [
+        { "t": "2026-11-01T20:00:00.000Z", "level_m": 0.472 },
+        { "t": "2026-11-01T21:00:00.000Z", "level_m": null }
+      ]
+    },
+    {
+      "name": "Test Rising N",
+      "group": "Kelani River",
+      "state": "higher",
+      "level_m": 8.745,
+      "observedAt": "2026-11-02T19:15:00.000Z",
+      "change3h_m": 0.2,
+      "last24h": []
+    },
+    {
+      "name": "Test Silent",
+      "group": "",
+      "state": "offline",
+      "level_m": null,
+      "observedAt": null,
+      "change3h_m": null,
+      "last24h": []
+    },
+    { "name": " ", "group": "", "state": "normal" }
   ],
-  "predictedTide": {"note": "Predicted from harmonics.", "next48h": [{"kind": "high", "at": "2026-11-03T01:23:00.000Z"}, {"kind": "low", "at": "bad"}]}
+  "predictedTide": {
+    "note": "Predicted from harmonics.",
+    "next48h": [
+      { "kind": "high", "at": "2026-11-03T01:23:00.000Z" },
+      { "kind": "low", "at": "bad" }
+    ]
+  }
 }

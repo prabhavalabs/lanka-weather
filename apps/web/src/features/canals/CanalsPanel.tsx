@@ -104,7 +104,7 @@ export function CanalsPanel({ onClose, className }: { onClose: () => void; class
         Context, not a flood warning. In an emergency call 117.
       </p>
       {canals.isPending && <Skeleton className="h-48 w-full rounded-xl" />}
-      {canals.error && !data && (
+      {Boolean(canals.error) && !data && (
         <p role="alert" className="text-sm text-foreground">
           The canal levels could not be read just now.
         </p>

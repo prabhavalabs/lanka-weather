@@ -136,7 +136,7 @@ function radius(extra = 0): ExpressionSpecification {
     at(7),
     12,
     at(8.5),
-  ] as ExpressionSpecification
+  ] as unknown as ExpressionSpecification
 }
 
 function glyphText(): ExpressionSpecification {
