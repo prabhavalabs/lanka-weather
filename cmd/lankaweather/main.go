@@ -1,8 +1,8 @@
-// Command openweather runs the open-weather service.
+// Command lankaweather runs the lanka-weather service.
 //
 // Usage:
 //
-//	openweather serve    run the HTTP API
+//	lankaweather serve    run the HTTP API
 //
 // The worker and migrate sub-commands are added with the first collector
 // and the first database migration (see docs/architecture/overview.md).
@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prabhavalabs/open-weather/internal/httpapi"
+	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 
 func run(args []string, logger *slog.Logger) error {
 	if len(args) == 0 {
-		return errors.New("usage: openweather serve")
+		return errors.New("usage: lankaweather serve")
 	}
 	switch args[0] {
 	case "serve":
@@ -43,7 +43,7 @@ func run(args []string, logger *slog.Logger) error {
 }
 
 func serve(logger *slog.Logger) error {
-	addr := os.Getenv("OPENWEATHER_ADDR")
+	addr := os.Getenv("LANKAWEATHER_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}

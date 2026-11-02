@@ -1,12 +1,12 @@
 {
-  "name": "open-weather",
+  "name": "lanka-weather",
   "private": true,
   "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm --filter @open-weather/web dev",
+    "dev": "pnpm --filter @lanka-weather/web dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",

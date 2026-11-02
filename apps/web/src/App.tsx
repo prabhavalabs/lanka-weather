@@ -3,7 +3,7 @@ import { MapView } from "./features/map/MapView"
 import { useLocalStorage } from "./lib/useLocalStorage"
 
 export function App() {
-  const [enabled, setEnabled] = useLocalStorage<string[]>("open-weather:enabled-layers", [])
+  const [enabled, setEnabled] = useLocalStorage<string[]>("lanka-weather:enabled-layers", [])
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
 
   const toggle = (id: string) =>

@@ -1,6 +1,6 @@
 # Architecture overview
 
-open-weather collects weather, hydrological and hazard data about Sri
+lanka-weather collects weather, hydrological and hazard data about Sri
 Lanka from public sources, normalises it, stores it with provenance, and
 serves it to a map-centred web application.
 
@@ -22,8 +22,8 @@ serves it to a map-centred web application.
 ## System context
 
 ```
- Public sources                      open-weather                         People
- ─────────────                       ────────────                         ──────
+ Public sources                      lanka-weather                        People
+ ─────────────                       ─────────────                        ──────
  Irrigation Dept gauges ─┐
  DMC bulletins / PDFs  ──┤     ┌──────────────────────────┐
  Met Dept observations ──┤     │ worker (Go)              │
@@ -50,7 +50,7 @@ source is reached only by the worker.
 
 ## Components
 
-### `cmd/openweather` (Go)
+### `cmd/lankaweather` (Go)
 
 A single binary with sub-commands, following the modular-monolith
 pattern used in TerraGuard:

@@ -1,4 +1,4 @@
-// Package httpapi exposes open-weather's read API.
+// Package httpapi exposes lanka-weather's read API.
 package httpapi
 
 import (
@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/prabhavalabs/open-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/layers"
 )
 
 // Envelope is the shape of every JSON response.

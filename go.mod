@@ -1,4 +1,4 @@
-module github.com/prabhavalabs/open-weather
+module github.com/prabhavalabs/lanka-weather
 
 go 1.25.6
 
