@@ -58,7 +58,7 @@ type Weather interface {
 	CurrentGridJSON(ctx context.Context) (plain, gzipped []byte, err error)
 	Point(ctx context.Context, lon, lat float64, hours, days int) (*weather.Point, error)
 	WindJSON(ctx context.Context, at time.Time) (plain, gzipped []byte, err error)
-	RegionWeather(ctx context.Context, level string) (*weather.RegionsResponse, error)
+	RegionWeather(ctx context.Context, level, parent string) (*weather.RegionsResponse, error)
 }
 
 // Floods serves the Google flood-forecast layer.

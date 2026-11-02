@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
@@ -78,7 +79,8 @@ func (api *api) weatherWind(w http.ResponseWriter, r *http.Request) {
 }
 
 // weatherRegions returns current weather aggregated per administrative
-// region of a level.
+// region of a level, optionally within a parent region:
+// GET /v1/weather/regions?level=gn&parent=LK-1103.
 func (api *api) weatherRegions(w http.ResponseWriter, r *http.Request) {
 	if api.deps.Weather == nil {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "weather is not configured")
@@ -89,7 +91,16 @@ func (api *api) weatherRegions(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_level", "level must be one of province, district, ds or gn")
 		return
 	}
-	regions, err := api.deps.Weather.RegionWeather(r.Context(), level)
+	parent := ""
+	if raw := r.URL.Query().Get("parent"); raw != "" {
+		id, parentLevel, ok := regions.ParseID(raw)
+		if !ok || parentLevel.Rank() >= regions.Level(level).Rank() {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent must be the code of a region above the requested level")
+			return
+		}
+		parent = id
+	}
+	response, err := api.deps.Weather.RegionWeather(r.Context(), level, parent)
 	if errors.Is(err, weather.ErrRegionsUnavailable) {
 		writeError(w, http.StatusServiceUnavailable, "not_available", "administrative regions are not loaded yet")
 		return
@@ -98,7 +109,7 @@ func (api *api) weatherRegions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	writeJSON(w, http.StatusOK, Envelope{Data: regions})
+	writeJSON(w, http.StatusOK, Envelope{Data: response})
 }
 
 // floodForecast returns Google's flood forecast for Sri Lanka as GeoJSON,

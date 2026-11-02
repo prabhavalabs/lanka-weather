@@ -123,16 +123,20 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 }
 
 // regionSource is the source of administrative regions for
-// /v1/weather/regions. Until the regions table is merged it is a stub that
-// answers 503 not_available; LANKAWEATHER_WEATHER_REGIONS=postgis reads the
-// relation named by LANKAWEATHER_WEATHER_REGIONS_RELATION (default
-// admin_regions). See docs/api/weather-and-floods.md.
+// /v1/weather/regions: the admin_regions view over the regions table
+// (migration 00004), or the relation named by
+// LANKAWEATHER_WEATHER_REGIONS_RELATION. Until the regions collector has
+// loaded a level, requests for it answer 503 not_available.
+// LANKAWEATHER_WEATHER_REGIONS=none switches region weather off.
 func regionSource(pool *pgxpool.Pool, logger *slog.Logger) weather.RegionSource {
-	if os.Getenv("LANKAWEATHER_WEATHER_REGIONS") != "postgis" {
+	if os.Getenv("LANKAWEATHER_WEATHER_REGIONS") == "none" {
+		logger.Info("weather regions are switched off")
 		return weather.UnavailableRegions{}
 	}
 	relation := os.Getenv("LANKAWEATHER_WEATHER_REGIONS_RELATION")
-	logger.Info("weather regions read from PostGIS", "relation", relation)
+	if relation == "" {
+		relation = weather.DefaultRegionsRelation
+	}
 	return &weather.PostGISRegions{Pool: pool, Relation: relation, Grid: grid.SriLanka()}
 }
 
@@ -146,16 +150,29 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 		return time.Duration(layer.StaleAfterSeconds) * time.Second
 	}
 	riverService := &rivers.Service{Pool: pool, StaleAfter: staleAfter("river-levels")}
-	weatherService := &weather.Service{Pool: pool, Regions: regionSource(pool, logger),
+	weatherRegions := regionSource(pool, logger)
+	weatherService := &weather.Service{Pool: pool, Regions: weatherRegions,
 		CurrentStaleAfter: staleAfter("temperature"), ForecastStaleAfter: 12 * time.Hour}
+	if warmer, ok := weatherRegions.(interface{ Warm(context.Context) error }); ok {
+		// Join regions to grid cells now rather than in the first requests.
+		go func() {
+			started := time.Now()
+			if err := warmer.Warm(ctx); err != nil {
+				logger.Warn("weather regions warm-up failed", "error", err)
+				return
+			}
+			logger.Info("weather regions ready", "duration_ms", time.Since(started).Milliseconds())
+		}()
+	}
 	floodService := &floods.Service{Pool: pool, Configured: os.Getenv("LANKAWEATHER_GOOGLE_API_KEY") != "",
 		StaleAfter: staleAfter("flood-forecast")}
+	regionService := &regions.Service{Pool: pool}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
 			Logger:  logger,
 			Rivers:  riverService,
-			Regions: &regions.Service{Pool: pool},
+			Regions: regionService,
 			Places:  &places.Service{Pool: pool},
 			Weather: weatherService,
 			Floods:  floodService,

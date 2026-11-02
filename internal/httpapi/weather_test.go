@@ -17,11 +17,13 @@ import (
 )
 
 type fakeWeather struct {
-	noData      bool
-	windAt      time.Time
-	regionsErr  error
-	pointCalled [2]float64
-	hours, days int
+	noData     bool
+	windAt     time.Time
+	regionsErr error
+	// regionsParent is the parent the last regions request asked for.
+	regionsParent string
+	pointCalled   [2]float64
+	hours, days   int
 }
 
 func (fake *fakeWeather) CurrentGridJSON(context.Context) ([]byte, []byte, error) {
@@ -52,11 +54,12 @@ func (fake *fakeWeather) WindJSON(_ context.Context, at time.Time) ([]byte, []by
 	return []byte(`{"u":"AAA="}`), nil, nil
 }
 
-func (fake *fakeWeather) RegionWeather(_ context.Context, level string) (*weather.RegionsResponse, error) {
+func (fake *fakeWeather) RegionWeather(_ context.Context, level, parent string) (*weather.RegionsResponse, error) {
+	fake.regionsParent = parent
 	if fake.regionsErr != nil {
 		return nil, fake.regionsErr
 	}
-	return &weather.RegionsResponse{Level: level}, nil
+	return &weather.RegionsResponse{Level: level, Parent: parent}, nil
 }
 
 type fakeFloods struct{}
@@ -160,6 +163,17 @@ func TestWeatherRegions(t *testing.T) {
 	resp, body := get(t, server, "/v1/weather/regions?level=village")
 	if resp.StatusCode != http.StatusBadRequest || errorCode(t, body) != "invalid_level" {
 		t.Fatalf("bad level = %d %s", resp.StatusCode, body)
+	}
+	fake := &fakeWeather{}
+	server = newServer(t, Dependencies{Weather: fake})
+	if resp, body := get(t, server, "/v1/weather/regions?level=gn&parent=lk1103"); resp.StatusCode != http.StatusOK || fake.regionsParent != "LK-1103" {
+		t.Fatalf("gn within a DS division = %d %s, parent %q", resp.StatusCode, body, fake.regionsParent)
+	}
+	for _, path := range []string{"/v1/weather/regions?level=district&parent=LK-11", "/v1/weather/regions?level=ds&parent=nowhere"} {
+		resp, body := get(t, server, path)
+		if resp.StatusCode != http.StatusBadRequest || errorCode(t, body) != "invalid_parent" {
+			t.Fatalf("%s = %d %s", path, resp.StatusCode, body)
+		}
 	}
 	stub := newServer(t, Dependencies{Weather: &fakeWeather{regionsErr: weather.ErrRegionsUnavailable}})
 	resp, body = get(t, stub, "/v1/weather/regions?level=gn")

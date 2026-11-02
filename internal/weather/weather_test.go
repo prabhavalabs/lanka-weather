@@ -3,6 +3,7 @@ package weather
 import (
 	"encoding/json"
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -190,6 +191,36 @@ func TestAggregateRegions(t *testing.T) {
 	}
 	if response.ValidAt == nil || response.ForecastFetchedAt == nil {
 		t.Fatal("times missing")
+	}
+}
+
+func TestWithinParent(t *testing.T) {
+	snapshot := testSnapshot(testNow)
+	regions := []Region{
+		{ID: "LK-1103005", Name: "Fort", ProvinceID: "LK-1", DistrictID: "LK-11", DSID: "LK-1103", Lon: 79.85, Lat: 6.93},
+		{ID: "LK-1106010", Name: "Kotte", ProvinceID: "LK-1", DistrictID: "LK-11", DSID: "LK-1106", Lon: 79.9, Lat: 6.89},
+		{ID: "LK-2103001", Name: "Kandy", ProvinceID: "LK-2", DistrictID: "LK-21", DSID: "LK-2103", Lon: 80.63, Lat: 7.29},
+	}
+	all := AggregateRegions(snapshot, "gn", regions, testNow)
+	cases := map[string][]string{
+		"LK-1":    {"LK-1103005", "LK-1106010"},
+		"LK-11":   {"LK-1103005", "LK-1106010"},
+		"LK-1103": {"LK-1103005"},
+		"LK-21":   {"LK-2103001"},
+		"LK-3":    {},
+	}
+	for parent, want := range cases {
+		limited := WithinParent(all, parent)
+		got := []string{}
+		for _, region := range limited.Regions {
+			got = append(got, region.ID)
+		}
+		if limited.Parent != parent || !slices.Equal(got, want) {
+			t.Errorf("within %s = %v (parent %q), want %v", parent, got, limited.Parent, want)
+		}
+	}
+	if len(all.Regions) != 3 || all.Parent != "" {
+		t.Fatal("limiting must not change the cached aggregate")
 	}
 }
 
