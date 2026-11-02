@@ -14,6 +14,8 @@ import {
   formatLevel,
   formatRate,
   headroom,
+  levelNumber,
+  nextHourLine,
   statusColors,
   statusLabels,
   trendArrows,
@@ -42,9 +44,10 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
     (threshold): threshold is { label: string; value: number; color: string } =>
       threshold.value !== null,
   )
-  const level =
-    station.waterLevel === null ? "–" : station.waterLevel.toFixed(station.unit === "ft" ? 1 : 2)
+  const level = station.waterLevel === null ? "–" : levelNumber(station.waterLevel, station.unit)
+  const unit = station.unit === "unknown" ? undefined : station.unit
   const rising = station.trend === "rising"
+  const nextHour = nextHourLine(station.nextHour)
 
   return (
     <Panel
@@ -59,8 +62,21 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
       }
       footer={
         <p>
-          Source: Irrigation Department of Sri Lanka. Official flood warnings come from the
-          Irrigation Department and the DMC.
+          Source: {station.attribution}.{" "}
+          {station.sourceUrl && (
+            <>
+              <a
+                href={station.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                This gauge at the source
+              </a>
+              .{" "}
+            </>
+          )}
+          Official flood warnings come from the Irrigation Department and the DMC.
         </p>
       }
     >
@@ -76,7 +92,7 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
         <StatValue
           label="Water level"
           value={level}
-          unit={station.unit}
+          unit={unit}
           delta={
             station.ratePerHour !== null
               ? `${trendArrows[station.trend]} ${formatRate(station.ratePerHour, station.unit)}`
@@ -88,9 +104,13 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
           caption={
             room
               ? `${formatLevel(room.remaining, station.unit)} below ${room.next} level`
-              : thresholds.length === 0
-                ? "This station publishes no flood thresholds."
-                : "Above major flood level"
+              : station.waterLevel === null
+                ? "This gauge has no reading at the moment."
+                : station.unit === "unknown"
+                  ? "No unit or flood thresholds are published for this gauge, so there is no flood verdict."
+                  : thresholds.length === 0
+                    ? "This station publishes no flood thresholds."
+                    : "Above major flood level"
           }
           aside={room ? `${Math.round(room.fraction * 100)}%` : undefined}
         />
@@ -102,6 +122,14 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
           />
         )}
       </div>
+
+      {nextHour && (
+        <p className="rounded-xl border border-border bg-inset px-3 py-2 text-xs text-muted-foreground">
+          Next hour (experimental, by Sri Lanka Water Levels):{" "}
+          <span className="numeric whitespace-nowrap text-foreground">{nextHour.value}</span>,{" "}
+          {nextHour.issued}
+        </p>
+      )}
 
       <LabeledRows>
         <LabeledRow
@@ -148,7 +176,7 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
           <LevelChart
             readings={history.data.readings}
             thresholds={thresholds}
-            unit={station.unit}
+            unit={unit ?? "(no unit)"}
             hours={historyHours}
           />
         )}

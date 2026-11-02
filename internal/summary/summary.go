@@ -15,6 +15,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/stations"
@@ -65,14 +66,20 @@ type EnvironmentSource interface {
 	SeaAt(ctx context.Context, lon, lat float64) (*environment.SeaPoint, error)
 }
 
+// ReservoirSource serves the reservoirs layer.
+type ReservoirSource interface {
+	Layer(ctx context.Context) (reservoirs.FeatureCollection, error)
+}
+
 // Service builds summaries. Any source may be nil.
 type Service struct {
-	Weather   WeatherSource
-	Rivers    RiverSource
-	Floods    FloodSource
-	Regions   RegionLookup
-	RiverRisk RiverRiskSource
-	Official  OfficialSource
+	Weather    WeatherSource
+	Rivers     RiverSource
+	Floods     FloodSource
+	Regions    RegionLookup
+	RiverRisk  RiverRiskSource
+	Official   OfficialSource
+	Reservoirs ReservoirSource
 	// Stations and Environment add observed readings, air quality and the
 	// sea state; without them those parts are simply null.
 	Stations    StationSource
@@ -91,6 +98,10 @@ const (
 	nearbyFloods  = 3
 	riverSearchKm = 50.0
 	floodSearchKm = 75.0
+	// nearbyReservoirs bounds the reservoirs spilling or releasing listed,
+	// within reservoirSearchKm.
+	nearbyReservoirs  = 5
+	reservoirSearchKm = 50.0
 )
 
 // Summary is GET /v1/summary.
@@ -108,6 +119,9 @@ type Summary struct {
 	// their nearest stretch.
 	NearbyRivers  []riverrisk.NearbyRiver `json:"nearbyRivers"`
 	FloodForecast FloodForecast           `json:"floodForecast"`
+	// Reservoirs are mapped reservoirs near the place that are spilling or
+	// releasing on a current reading; never an official warning.
+	Reservoirs []Reservoir `json:"reservoirs"`
 	// Alerts are derived by lanka-weather and are estimates.
 	Alerts []Alert `json:"alerts"`
 	// Observed is the nearest station's latest reading, measured rather than
@@ -122,7 +136,7 @@ type Summary struct {
 	// bulletins naming its district and the latest general bulletins.
 	Official *warnings.OfficialAt `json:"official"`
 	// Unavailable lists the parts that could not be filled: weather, regions,
-	// rivers, nearbyRivers, floodForecast, official, observed, airQuality or sea.
+	// rivers, nearbyRivers, floodForecast, official, observed, airQuality, sea or reservoirs.
 	Unavailable []string `json:"unavailable"`
 }
 
@@ -152,6 +166,22 @@ type River struct {
 	Stale           bool       `json:"stale"`
 	Lon             float64    `json:"lon"`
 	Lat             float64    `json:"lat"`
+	// Source and Attribution say who the reading comes from.
+	Source      string `json:"source"`
+	Attribution string `json:"attribution"`
+}
+
+// Reservoir is a reservoir near the place that is spilling or releasing.
+type Reservoir struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	DistanceKm     float64          `json:"distanceKm"`
+	Status         string           `json:"status"`
+	StoragePercent *float64         `json:"storagePercent"`
+	Flow           *reservoirs.Flow `json:"flow"`
+	ReadingDay     *string          `json:"readingDay"`
+	Lon            float64          `json:"lon"`
+	Lat            float64          `json:"lat"`
 }
 
 // FloodForecast is the Google flood forecast near the place.
@@ -186,7 +216,7 @@ func officialUnavailable() *warnings.OfficialAt {
 func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary, error) {
 	summary := &Summary{
 		Location: weather.Location{Lat: lat, Lon: lon}, GeneratedAt: service.now(),
-		Rivers: []River{}, NearbyRivers: []riverrisk.NearbyRiver{}, FloodForecast: FloodForecast{Gauges: []FloodGauge{}, Areas: []floods.AreaAt{}},
+		Rivers: []River{}, NearbyRivers: []riverrisk.NearbyRiver{}, FloodForecast: FloodForecast{Gauges: []FloodGauge{}, Areas: []floods.AreaAt{}}, Reservoirs: []Reservoir{},
 		Official:    officialUnavailable(),
 		Unavailable: []string{},
 	}
@@ -229,7 +259,7 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 		} else {
 			summary.Rivers = nearestRivers(layer, lon, lat)
 			for _, river := range summary.Rivers {
-				inputs.Rivers = append(inputs.Rivers, NearbyRiver{Name: river.Name, DistanceKm: river.DistanceKm, Status: river.Status, Stale: river.Stale})
+				inputs.Rivers = append(inputs.Rivers, NearbyRiver{Name: river.Name, DistanceKm: river.DistanceKm, Status: river.Status, Stale: river.Stale, Source: river.Source, Attribution: river.Attribution})
 			}
 		}
 	} else {
@@ -312,6 +342,15 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 			summary.Sea = sea
 		}
 	}
+	if service.Reservoirs != nil {
+		layer, err := service.Reservoirs.Layer(ctx)
+		if err != nil {
+			service.warn("summary reservoirs", err)
+			summary.Unavailable = append(summary.Unavailable, "reservoirs")
+		} else {
+			summary.Reservoirs = activeReservoirs(layer, lon, lat)
+		}
+	}
 
 	summary.Alerts = Evaluate(inputs)
 	return summary, nil
@@ -381,6 +420,7 @@ func nearestRivers(layer rivers.FeatureCollection, lon, lat float64) []River {
 			Unit: properties.Unit, AlertLevel: properties.AlertLevel, MinorFloodLevel: properties.MinorFloodLevel,
 			MajorFloodLevel: properties.MajorFloodLevel, ObservedAt: properties.ObservedAt, Stale: properties.Stale,
 			Lon: feature.Geometry.Coordinates[0], Lat: feature.Geometry.Coordinates[1],
+			Source: properties.Source, Attribution: properties.Attribution,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
@@ -389,6 +429,32 @@ func nearestRivers(layer rivers.FeatureCollection, lon, lat float64) []River {
 	}
 	if out == nil {
 		out = []River{}
+	}
+	return out
+}
+
+// activeReservoirs lists the nearest mapped reservoirs spilling or releasing,
+// nearest first. A stale reading is left out: it says nothing about today.
+func activeReservoirs(layer reservoirs.FeatureCollection, lon, lat float64) []Reservoir {
+	out := []Reservoir{}
+	for _, feature := range layer.Features {
+		properties := feature.Properties
+		if feature.Geometry == nil || !properties.Active() {
+			continue
+		}
+		distance := DistanceKm(lon, lat, feature.Geometry.Coordinates[0], feature.Geometry.Coordinates[1])
+		if distance > reservoirSearchKm {
+			continue
+		}
+		out = append(out, Reservoir{
+			ID: properties.ID, Name: properties.Name, DistanceKm: round1(distance), Status: properties.Status,
+			StoragePercent: properties.StoragePercent, Flow: properties.Flow, ReadingDay: properties.ReadingDay,
+			Lon: feature.Geometry.Coordinates[0], Lat: feature.Geometry.Coordinates[1],
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
+	if len(out) > nearbyReservoirs {
+		out = out[:nearbyReservoirs]
 	}
 	return out
 }

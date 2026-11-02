@@ -72,7 +72,7 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
       type: "geojson",
       data: data as unknown as FeatureCollection,
       promoteId: "id",
-      attribution: "River levels: Irrigation Department of Sri Lanka",
+      attribution: "River levels: Irrigation Dept; RiverNet (DMC) via waterlevels.lk",
     })
   }
   if (!map.getLayer(HALO)) {

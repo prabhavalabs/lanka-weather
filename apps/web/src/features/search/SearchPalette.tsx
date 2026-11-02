@@ -10,9 +10,11 @@ import { apiGet } from "@/lib/api"
 import { useDebouncedValue } from "@/lib/useDebouncedValue"
 import { useLocalStorage } from "@/lib/useLocalStorage"
 import type { RiverRisk } from "../river-risk/types"
+import type { ReservoirsCollection } from "../reservoirs/types"
 import type { RiverLevelsCollection } from "../rivers/types"
 import {
   addRecent,
+  reservoirEntries,
   riverEntries,
   searchEntry,
   stationEntries,
@@ -29,6 +31,8 @@ export interface SearchPaletteProps {
   rivers?: RiverLevelsCollection
   /** Rivers themselves, when loaded, to search by name. */
   riverNetwork?: RiverRisk[]
+  /** Reservoirs, when loaded, to search by name. */
+  reservoirs?: ReservoirsCollection
 }
 
 const recentKey = "lanka-weather:recent-searches"
@@ -39,6 +43,7 @@ export default function SearchPalette({
   onChoose,
   rivers,
   riverNetwork,
+  reservoirs,
 }: SearchPaletteProps) {
   const [query, setQuery] = useState("")
   const [storedRecent, setRecent] = useLocalStorage<unknown>(recentKey, [])
@@ -64,8 +69,9 @@ export default function SearchPalette({
     const places = (search.data?.results ?? []).map(searchEntry)
     const stations = rivers ? stationEntries(rivers.features, term) : []
     const named = riverNetwork ? riverEntries(riverNetwork, term) : []
-    return [...named, ...places, ...stations]
-  }, [search.data, rivers, riverNetwork, term])
+    const dams = reservoirs ? reservoirEntries(reservoirs.features, term) : []
+    return [...named, ...places, ...stations, ...dams]
+  }, [search.data, rivers, riverNetwork, reservoirs, term])
 
   const byId = useMemo(() => {
     const map = new Map<string, SearchEntry>()
@@ -100,7 +106,7 @@ export default function SearchPalette({
       footer={
         <>
           Places © OpenStreetMap contributors (ODbL). Regions: Survey Department and Department of
-          Census and Statistics.
+          Census and Statistics. Reservoirs: Sri Lanka Water Levels (waterlevels.lk).
         </>
       }
     />

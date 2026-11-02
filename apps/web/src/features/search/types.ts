@@ -54,3 +54,5 @@ export type SearchChoice =
       lon: number
       bbox: [number, number, number, number]
     }
+  /** A reservoir may have no position: it opens its panel without moving the map. */
+  | { type: "reservoir"; id: string; name: string; lat: number | null; lon: number | null }

@@ -325,6 +325,48 @@ type RegionStaging struct {
 	SimpleWkb      []byte  `json:"simple_wkb"`
 }
 
+type Reservoir struct {
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	District      *string    `json:"district"`
+	River         *string    `json:"river"`
+	Kind          string     `json:"kind"`
+	Source        string     `json:"source"`
+	SourceUrl     *string    `json:"source_url"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	Lon           *float64   `json:"lon"`
+	Lat           *float64   `json:"lat"`
+	Area          []byte     `json:"area"`
+	OsmID         *string    `json:"osm_id"`
+	OsmName       *string    `json:"osm_name"`
+	OsmKind       *string    `json:"osm_kind"`
+	MapSource     *string    `json:"map_source"`
+	MapSourceTime *time.Time `json:"map_source_time"`
+	MapFetchedAt  *time.Time `json:"map_fetched_at"`
+}
+
+type ReservoirCandidateStaging struct {
+	OsmID string `json:"osm_id"`
+	Lines string `json:"lines"`
+}
+
+type ReservoirReading struct {
+	ReservoirID    string      `json:"reservoir_id"`
+	SnapshotDay    pgtype.Date `json:"snapshot_day"`
+	ReadingDay     pgtype.Date `json:"reading_day"`
+	Status         string      `json:"status"`
+	StoragePercent *float64    `json:"storage_percent"`
+	StorageFresh   *bool       `json:"storage_fresh"`
+	FlowKind       *string     `json:"flow_kind"`
+	FlowCusecs     *float64    `json:"flow_cusecs"`
+	FlowAgency     *string     `json:"flow_agency"`
+	FlowDay        pgtype.Date `json:"flow_day"`
+	Agency         *string     `json:"agency"`
+	Source         string      `json:"source"`
+	SourceTime     time.Time   `json:"source_time"`
+	FetchedAt      time.Time   `json:"fetched_at"`
+}
+
 type River struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -353,6 +395,20 @@ type RiverGaugeMatch struct {
 	DistanceM float64   `json:"distance_m"`
 	Method    string    `json:"method"`
 	MatchedAt time.Time `json:"matched_at"`
+}
+
+type RiverNextHour struct {
+	StationID string    `json:"station_id"`
+	IssuedAt  time.Time `json:"issued_at"`
+	LevelFt   float64   `json:"level_ft"`
+	LowFt     *float64  `json:"low_ft"`
+	HighFt    *float64  `json:"high_ft"`
+	ChangeFt  *float64  `json:"change_ft"`
+	Direction *string   `json:"direction"`
+	Crossing  *string   `json:"crossing"`
+	Method    *string   `json:"method"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
 }
 
 type RiverReach struct {
@@ -452,6 +508,8 @@ type RiverStation struct {
 	MajorFloodLevel *float64    `json:"major_flood_level"`
 	Source          string      `json:"source"`
 	UpdatedAt       time.Time   `json:"updated_at"`
+	SourceUrl       *string     `json:"source_url"`
+	Upstream        *string     `json:"upstream"`
 }
 
 type RiverSubbasin struct {

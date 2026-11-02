@@ -123,7 +123,7 @@ export interface AdminArea {
   parentName?: string
 }
 
-export type SearchResultKind = "place" | "station" | "area" | "river"
+export type SearchResultKind = "place" | "station" | "reservoir" | "area" | "river"
 
 export interface SearchResult {
   id: string

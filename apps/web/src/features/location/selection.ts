@@ -17,6 +17,8 @@
  * - `?warnings=all`, `?warnings=water_level`, optionally with `&district=LK-21`:
  *   the official warnings, of one type or in one district.
  * - `?met=colombo`: a Department of Meteorology station.
+ * - `?reservoir=minneriya`: a reservoir;
+ * - `?reservoirs=active`: the list of reservoirs spilling or releasing.
  */
 export type Selection =
   | { kind: "point"; lat: number; lon: number; name?: string }
@@ -32,6 +34,8 @@ export type Selection =
   | { kind: "cyclone"; id: string }
   | { kind: "warnings"; type?: string; district?: string }
   | { kind: "met"; id: string }
+  | { kind: "reservoir"; id: string }
+  | { kind: "reservoirs" }
 
 /** The area the API answers for (`/v1/summary`, `/v1/regions/lookup`). */
 export const pointBounds = { south: 5.5, north: 10.5, west: 79, east: 82.5 }
@@ -42,6 +46,8 @@ const selectionKeys = [
   "region",
   "station",
   "gauge",
+  "reservoir",
+  "reservoirs",
   "met",
   "river",
   "reach",
@@ -161,6 +167,10 @@ export function parseSelection(search: string): Selection | null {
   }
   const met = safeId(params.get("met"))
   if (met) return { kind: "met", id: met }
+  const reservoir = safeId(params.get("reservoir"))
+  if (reservoir) return { kind: "reservoir", id: reservoir }
+
+  if (params.has("reservoirs")) return { kind: "reservoirs" }
 
   return null
 }
@@ -204,6 +214,10 @@ export function selectionSearch(selection: Selection | null, current = ""): stri
     if (selection.district) params.set("district", selection.district)
   } else if (selection?.kind === "met") {
     params.set("met", selection.id)
+  } else if (selection?.kind === "reservoir") {
+    params.set("reservoir", selection.id)
+  } else if (selection?.kind === "reservoirs") {
+    params.set("reservoirs", "active")
   }
   const text = params.toString().replace(/%2C/g, ",")
   return text ? `?${text}` : ""
@@ -224,5 +238,6 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
   if (a.kind === "warnings" && b.kind === "warnings") {
     return a.type === b.type && a.district === b.district
   }
+  if (a.kind === "reservoirs") return true
   return "id" in a && "id" in b && a.id === b.id
 }

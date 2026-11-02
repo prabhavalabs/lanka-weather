@@ -19,6 +19,7 @@ import {
   gaugeName,
 } from "../floods/present"
 import { riskBadge, riskLabels } from "../river-risk/present"
+import { flowShort, reservoirStatusLabels } from "../reservoirs/present"
 import { formatLevel, statusLabels, trendArrows } from "../rivers/present"
 import { useRegionAggregate, useRegionDetail } from "../regions/queries"
 import { RegionAggregate } from "../regions/RegionAggregate"
@@ -43,6 +44,7 @@ export interface LocationPanelProps {
   onSelectGauge: (id: string) => void
   onSelectRiver?: (id: string) => void
   onSelectMetStation: (id: string) => void
+  onSelectReservoir: (id: string) => void
 }
 
 function unavailableText(error: unknown, outside: boolean) {
@@ -62,6 +64,7 @@ export default function LocationPanel({
   onSelectGauge,
   onSelectRiver,
   onSelectMetStation,
+  onSelectReservoir,
 }: LocationPanelProps) {
   const regionId = selection.kind === "region" ? selection.id : null
   const region = useRegionDetail(regionId)
@@ -150,6 +153,20 @@ export default function LocationPanel({
     }),
   )
 
+  const reservoirs: GaugeListItem[] = (summary.data?.reservoirs ?? []).map((reservoir) => ({
+    id: reservoir.id,
+    title: reservoir.name,
+    subtitle: (
+      <>
+        <span className="numeric">{reservoir.distanceKm.toFixed(1)} km</span>
+        {reservoir.flow && ` · ${flowShort(reservoir.flow)}`}
+      </>
+    ),
+    value: reservoir.storagePercent !== null ? `${reservoir.storagePercent}%` : undefined,
+    badge: { variant: reservoir.status, label: reservoirStatusLabels[reservoir.status] },
+    onSelect: () => onSelectReservoir(reservoir.id),
+  }))
+
   const meta = point.data?.meta
   const weatherAge = meta?.currentFetchedAt ?? current?.observedAt ?? null
   const riversShown = rivers.length > 0
@@ -185,7 +202,18 @@ export default function LocationPanel({
         </li>
       )}
       {summary.data?.sea && <li>Sea: Open-Meteo.com (CC BY 4.0)</li>}
-      {riversShown && <li>River levels: Irrigation Department of Sri Lanka</li>}
+      {riversShown && (
+        <li>
+          River levels:{" "}
+          {[...new Set((summary.data?.rivers ?? []).map((river) => river.attribution))].join("; ")}
+        </li>
+      )}
+      {reservoirs.length > 0 && (
+        <li>
+          Reservoirs: Irrigation Department and Mahaweli Authority via Sri Lanka Water Levels
+          (waterlevels.lk). Not an official warning.
+        </li>
+      )}
       {floodsShown && <li>Flood forecasts: Google Flood Hub (Flood Forecasting API)</li>}
       {summary.data?.official.fetchedAt && (
         <li className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -251,6 +279,7 @@ export default function LocationPanel({
       <GaugeList title="River gauges nearby" items={rivers} />
       <GaugeList title="Flood forecast gauges nearby" items={floodGauges} />
       <GaugeList title="Flood areas here" items={floodAreas} />
+      <GaugeList title="Reservoirs spilling or releasing nearby" items={reservoirs} />
     </LocationWeatherPanel>
   )
 }

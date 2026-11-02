@@ -105,6 +105,8 @@ type Dependencies struct {
 	Warnings Warnings
 	Hazards  Hazards
 
+	// Reservoirs serves the reservoirs layer.
+	Reservoirs Reservoirs
 	// Now is the clock for requests without an explicit time; nil is
 	// time.Now.
 	Now func() time.Time
@@ -162,6 +164,9 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/rain/tiles/{time}/{z}/{x}/{y}.png", api.rainTile)
 		r.Get("/air/current", api.airCurrent)
 		r.Get("/sea/current", api.seaCurrent)
+		r.Get("/reservoirs", api.reservoirLayer)
+		r.Get("/reservoirs/areas", api.reservoirAreas)
+		r.Get("/reservoirs/{id}/readings", api.reservoirReadings)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {

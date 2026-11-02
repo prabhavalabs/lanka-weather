@@ -1,6 +1,7 @@
 /** Mirrors the location endpoints of the Go service (docs/api/weather-and-floods.md). */
 import type { NearbyRiverRisk } from "../river-risk/types"
-import type { RiverStatus, RiverTrend } from "../rivers/types"
+import type { ReservoirFlow, ReservoirStatus } from "../reservoirs/types"
+import type { LevelUnit, RiverStatus, RiverTrend } from "../rivers/types"
 import type { OfficialAt } from "../warnings/types"
 
 export type RegionLevel = "province" | "district" | "ds" | "gn"
@@ -100,12 +101,27 @@ export interface NearbyRiver {
   status: RiverStatus
   trend: RiverTrend
   waterLevel: number | null
-  unit: "m" | "ft"
+  unit: LevelUnit
   alertLevel: number | null
   minorFloodLevel: number | null
   majorFloodLevel: number | null
   observedAt: string | null
   stale: boolean
+  lon: number
+  lat: number
+  source: string
+  attribution: string
+}
+
+/** A mapped reservoir near the place, spilling or releasing on a current reading. */
+export interface NearbyReservoir {
+  id: string
+  name: string
+  distanceKm: number
+  status: ReservoirStatus
+  storagePercent: number | null
+  flow: ReservoirFlow | null
+  readingDay: string | null
   lon: number
   lat: number
 }
@@ -178,6 +194,7 @@ export interface Summary {
   /** Rivers near the place, with the estimated risk of their nearest stretch. */
   nearbyRivers?: NearbyRiverRisk[] | null
   floodForecast: { gauges: NearbyFloodGauge[]; areas: NearbyFloodArea[] } | null
+  reservoirs: NearbyReservoir[] | null
   alerts: DerivedAlert[]
   official: OfficialAt
   /** The nearest station's latest reading: measured, not modelled. */

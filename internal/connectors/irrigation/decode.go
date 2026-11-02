@@ -58,6 +58,12 @@ type Page struct {
 // flood 7 ft).
 var feetStations = map[string]bool{"nagalagam-street": true}
 
+// unknownUnitStations lists gauges for which neither the department nor any
+// source we have checked states a unit. Ampara on the Gal Oya has read exactly
+// 0 at every observation since we began collecting, and has no thresholds, so
+// calling it metres would state something nobody has published (ADR 0013).
+var unknownUnitStations = map[string]bool{"ampara": true}
+
 type response struct {
 	Error *struct {
 		Code    int    `json:"code"`
@@ -118,8 +124,11 @@ func Decode(payload []byte) (Page, error) {
 			continue
 		}
 		unit := "m"
-		if feetStations[id] {
+		switch {
+		case feetStations[id]:
 			unit = "ft"
+		case unknownUnitStations[id]:
+			unit = "unknown"
 		}
 		station := Station{
 			ID: id, Name: name, Basin: strings.TrimSpace(attributes.Basin),

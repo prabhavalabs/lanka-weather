@@ -1,5 +1,5 @@
 import * as React from "react"
-import { MapPinIcon, RadioTowerIcon, ShapesIcon, WavesIcon } from "lucide-react"
+import { ContainerIcon, MapPinIcon, RadioTowerIcon, ShapesIcon, WavesIcon } from "lucide-react"
 
 import {
   Command,
@@ -21,6 +21,7 @@ const groups: { kind: SearchResultKind; heading: string; Icon: typeof MapPinIcon
   { kind: "river", heading: "Rivers", Icon: WavesIcon },
   { kind: "place", heading: "Places", Icon: MapPinIcon },
   { kind: "station", heading: "River gauges", Icon: RadioTowerIcon },
+  { kind: "reservoir", heading: "Reservoirs", Icon: ContainerIcon },
   { kind: "area", heading: "Administrative areas", Icon: ShapesIcon },
 ]
 

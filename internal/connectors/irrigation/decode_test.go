@@ -47,6 +47,9 @@ func TestDecodeRecordedPage(t *testing.T) {
 	if ampara := stations["ampara"]; ampara.AlertLevel != nil {
 		t.Fatal("ampara publishes no thresholds; they must decode as missing")
 	}
+	if ampara := stations["ampara"]; ampara.Unit != "unknown" {
+		t.Fatalf("ampara unit = %q: no source states one", ampara.Unit)
+	}
 	if ratnapura := stations["rathnapura"]; ratnapura.Unit != "m" {
 		t.Fatalf("rathnapura unit = %q, want m", ratnapura.Unit)
 	}

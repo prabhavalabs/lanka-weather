@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
 	"github.com/prabhavalabs/lanka-weather/internal/meteo"
 )
 
@@ -120,6 +121,9 @@ type NearbyRiver struct {
 	// Status is normal, alert, minor_flood, major_flood or unknown.
 	Status string
 	Stale  bool
+	// Source is the collector the gauge comes from and Attribution who to
+	// credit, for the alert's basis.
+	Source, Attribution string
 }
 
 // NearbyFloodGauge is a Google flood-forecast gauge near the place.
@@ -288,6 +292,15 @@ func heat(inputs Inputs) (Alert, bool) {
 
 var riverLevels = map[string]Level{"alert": LevelYellow, "minor_flood": LevelOrange, "major_flood": LevelRed}
 
+// riverBasis names who measured the gauge. Gauges outside the Irrigation
+// Department's own feed are credited to whoever does read them.
+func riverBasis(river NearbyRiver) string {
+	if river.Source == "" || river.Source == irrigation.SourceName || river.Attribution == "" {
+		return basisRivers
+	}
+	return river.Attribution + " gauge reading and the station's published thresholds"
+}
+
 func riverAlerts(rivers []NearbyRiver) []Alert {
 	var alerts []Alert
 	for _, river := range rivers {
@@ -300,7 +313,7 @@ func riverAlerts(rivers []NearbyRiver) []Alert {
 		alerts = append(alerts, Alert{
 			Type: "river_level", Level: level, Title: "River " + words[level],
 			Detail: fmt.Sprintf("The %s gauge, %.0f km away, is %s.", river.Name, distance, words[level]),
-			Value:  &distance, Unit: "km", Estimate: true, Basis: basisRivers,
+			Value:  &distance, Unit: "km", Estimate: true, Basis: riverBasis(river),
 		})
 	}
 	return alerts

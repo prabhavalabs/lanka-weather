@@ -1,4 +1,5 @@
-import type { RiverStatus, RiverTrend, StationProperties } from "./types"
+import { formatClock } from "@/lib/format"
+import type { LevelUnit, NextHour, RiverStatus, RiverTrend, StationProperties } from "./types"
 
 export { formatAge } from "@/lib/format"
 
@@ -56,17 +57,47 @@ export const trendArrows: Record<RiverTrend, string> = {
   unknown: "",
 }
 
-/** A level with its unit, to two decimals for metres and one for feet. */
-export function formatLevel(value: number | null, unit: "m" | "ft"): string {
+/** A level alone, to two decimals for metres and one for feet. */
+export function levelNumber(value: number, unit: LevelUnit): string {
+  return value.toFixed(unit === "ft" ? 1 : 2)
+}
+
+/** A level with its unit, or with none when the agency publishes none. */
+export function formatLevel(value: number | null, unit: LevelUnit): string {
   if (value === null) return "–"
-  return `${value.toFixed(unit === "ft" ? 1 : 2)} ${unit}`
+  const number = levelNumber(value, unit)
+  return unit === "unknown" ? number : `${number} ${unit}`
 }
 
 /** A rate of change per hour with an explicit sign. */
-export function formatRate(value: number | null, unit: "m" | "ft"): string {
+export function formatRate(value: number | null, unit: LevelUnit): string {
   if (value === null) return "–"
   const sign = value > 0 ? "+" : value < 0 ? "−" : "±"
-  return `${sign}${Math.abs(value).toFixed(2)} ${unit}/h`
+  const number = `${sign}${Math.abs(value).toFixed(2)}`
+  return unit === "unknown" ? `${number}/h` : `${number} ${unit}/h`
+}
+
+/** How old a next-hour forecast may be and still be shown. */
+export const nextHourMaxAgeMs = 2 * 60 * 60 * 1000
+
+/**
+ * The experimental next-hour forecast as one line, or null when there is none
+ * or it is too old, for example from a page left open or a persisted cache.
+ * Worded so it cannot be read as the station's official status.
+ */
+export function nextHourLine(
+  forecast: NextHour | null,
+  now: Date = new Date(),
+): { value: string; issued: string } | null {
+  if (!forecast) return null
+  const age = now.getTime() - new Date(forecast.issuedAt).getTime()
+  if (!Number.isFinite(age) || age > nextHourMaxAgeMs) return null
+  const level = formatLevel(forecast.level, forecast.unit)
+  const range =
+    forecast.low !== null && forecast.high !== null
+      ? `, range ${levelNumber(forecast.low, forecast.unit)}–${levelNumber(forecast.high, forecast.unit)}`
+      : ""
+  return { value: `${level}${range}`, issued: `issued ${formatClock(forecast.issuedAt)}` }
 }
 
 /**

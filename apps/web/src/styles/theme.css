@@ -94,6 +94,15 @@
   --basin-outline: #4c6b80;
   /* Past flood extents: violet, because no live forecast uses it */
   --past-flood: #6b46a8;
+  /* Reservoir status: spilling draws the eye, holding is quiet */
+  --reservoir-spilling: #c026d3;
+  --reservoir-spilling-foreground: #ffffff;
+  --reservoir-releasing: #0f9d9a;
+  --reservoir-releasing-foreground: #0a0a0a;
+  --reservoir-holding: #6b8cae;
+  --reservoir-holding-foreground: #0a0a0a;
+  --reservoir-nodata: #7d7d7a;
+  --reservoir-nodata-foreground: #0a0a0a;
 
   /* Air temperature, cool to hot (<=18, 21, 24, 27, 30, 33, >=36 °C) */
   --temp-1: #5b6cf0;
@@ -233,6 +242,14 @@
   --river-label: #8fd0fa;
   --basin-outline: #8aa9bd;
   --past-flood: #b89bee;
+  --reservoir-spilling: #e879f9;
+  --reservoir-spilling-foreground: #0a0a0a;
+  --reservoir-releasing: #2dd4bf;
+  --reservoir-releasing-foreground: #0a0a0a;
+  --reservoir-holding: #8fb0d0;
+  --reservoir-holding-foreground: #0a0a0a;
+  --reservoir-nodata: #8c8c8c;
+  --reservoir-nodata-foreground: #0a0a0a;
 
   --temp-1: #6f7ff5;
   --temp-2: #4aa9e8;

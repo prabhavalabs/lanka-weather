@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+const deleteNextHourBefore = `-- name: DeleteNextHourBefore :exec
+DELETE FROM river_next_hour WHERE issued_at < $1
+`
+
+func (q *Queries) DeleteNextHourBefore(ctx context.Context, issuedAt time.Time) error {
+	_, err := q.db.Exec(ctx, deleteNextHourBefore, issuedAt)
+	return err
+}
+
 const deleteRiverReadingsBefore = `-- name: DeleteRiverReadingsBefore :exec
 DELETE FROM river_readings WHERE observed_at < $1
 `
@@ -20,7 +29,8 @@ func (q *Queries) DeleteRiverReadingsBefore(ctx context.Context, observedAt time
 }
 
 const getRiverStation = `-- name: GetRiverStation :one
-SELECT id, name, basin, lon, lat, unit, alert_level, minor_flood_level, major_flood_level, updated_at
+SELECT id, name, basin, lon, lat, unit, alert_level, minor_flood_level, major_flood_level, updated_at,
+       source, source_url, upstream
 FROM river_stations
 WHERE id = $1
 `
@@ -36,6 +46,9 @@ type GetRiverStationRow struct {
 	MinorFloodLevel *float64  `json:"minor_flood_level"`
 	MajorFloodLevel *float64  `json:"major_flood_level"`
 	UpdatedAt       time.Time `json:"updated_at"`
+	Source          string    `json:"source"`
+	SourceUrl       *string   `json:"source_url"`
+	Upstream        *string   `json:"upstream"`
 }
 
 func (q *Queries) GetRiverStation(ctx context.Context, id string) (GetRiverStationRow, error) {
@@ -52,23 +65,75 @@ func (q *Queries) GetRiverStation(ctx context.Context, id string) (GetRiverStati
 		&i.MinorFloodLevel,
 		&i.MajorFloodLevel,
 		&i.UpdatedAt,
+		&i.Source,
+		&i.SourceUrl,
+		&i.Upstream,
 	)
 	return i, err
 }
 
-const latestRiverObservation = `-- name: LatestRiverObservation :one
-SELECT observed_at FROM river_readings ORDER BY observed_at DESC LIMIT 1
+const latestNextHour = `-- name: LatestNextHour :many
+SELECT DISTINCT ON (station_id) station_id, issued_at, level_ft, low_ft, high_ft, change_ft,
+       direction, crossing, method, source, fetched_at
+FROM river_next_hour
+WHERE issued_at >= $1
+ORDER BY station_id, issued_at DESC
 `
 
-func (q *Queries) LatestRiverObservation(ctx context.Context) (time.Time, error) {
-	row := q.db.QueryRow(ctx, latestRiverObservation)
+// Each station's newest forecast issued since a time.
+func (q *Queries) LatestNextHour(ctx context.Context, issuedAt time.Time) ([]RiverNextHour, error) {
+	rows, err := q.db.Query(ctx, latestNextHour, issuedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RiverNextHour{}
+	for rows.Next() {
+		var i RiverNextHour
+		if err := rows.Scan(
+			&i.StationID,
+			&i.IssuedAt,
+			&i.LevelFt,
+			&i.LowFt,
+			&i.HighFt,
+			&i.ChangeFt,
+			&i.Direction,
+			&i.Crossing,
+			&i.Method,
+			&i.Source,
+			&i.FetchedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const latestRiverObservation = `-- name: LatestRiverObservation :one
+SELECT r.observed_at
+FROM river_readings r
+JOIN river_stations s ON s.id = r.station_id
+WHERE s.source = $1
+ORDER BY r.observed_at DESC
+LIMIT 1
+`
+
+// The newest reading of one collector's stations: stations from another
+// collector must not move the point a collector resumes from.
+func (q *Queries) LatestRiverObservation(ctx context.Context, source string) (time.Time, error) {
+	row := q.db.QueryRow(ctx, latestRiverObservation, source)
 	var observed_at time.Time
 	err := row.Scan(&observed_at)
 	return observed_at, err
 }
 
 const listRiverStations = `-- name: ListRiverStations :many
-SELECT id, name, basin, lon, lat, unit, alert_level, minor_flood_level, major_flood_level, updated_at
+SELECT id, name, basin, lon, lat, unit, alert_level, minor_flood_level, major_flood_level, updated_at,
+       source, source_url, upstream
 FROM river_stations
 ORDER BY basin, name
 `
@@ -84,6 +149,9 @@ type ListRiverStationsRow struct {
 	MinorFloodLevel *float64  `json:"minor_flood_level"`
 	MajorFloodLevel *float64  `json:"major_flood_level"`
 	UpdatedAt       time.Time `json:"updated_at"`
+	Source          string    `json:"source"`
+	SourceUrl       *string   `json:"source_url"`
+	Upstream        *string   `json:"upstream"`
 }
 
 func (q *Queries) ListRiverStations(ctx context.Context) ([]ListRiverStationsRow, error) {
@@ -106,6 +174,9 @@ func (q *Queries) ListRiverStations(ctx context.Context) ([]ListRiverStationsRow
 			&i.MinorFloodLevel,
 			&i.MajorFloodLevel,
 			&i.UpdatedAt,
+			&i.Source,
+			&i.SourceUrl,
+			&i.Upstream,
 		); err != nil {
 			return nil, err
 		}
@@ -158,6 +229,45 @@ func (q *Queries) RecentRiverReadings(ctx context.Context, observedAt time.Time)
 	return items, nil
 }
 
+const riverStationSources = `-- name: RiverStationSources :many
+SELECT id, name, source, lon, lat FROM river_stations
+`
+
+type RiverStationSourcesRow struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Source string  `json:"source"`
+	Lon    float64 `json:"lon"`
+	Lat    float64 `json:"lat"`
+}
+
+// Who owns each station, and where it is, to tell which reports are new gauges.
+func (q *Queries) RiverStationSources(ctx context.Context) ([]RiverStationSourcesRow, error) {
+	rows, err := q.db.Query(ctx, riverStationSources)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RiverStationSourcesRow{}
+	for rows.Next() {
+		var i RiverStationSourcesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Source,
+			&i.Lon,
+			&i.Lat,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const stationRiverReadings = `-- name: StationRiverReadings :many
 SELECT observed_at, water_level, rainfall_mm
 FROM river_readings
@@ -196,6 +306,63 @@ func (q *Queries) StationRiverReadings(ctx context.Context, arg StationRiverRead
 	return items, nil
 }
 
+const upsertExtraRiverStation = `-- name: UpsertExtraRiverStation :exec
+INSERT INTO river_stations (id, name, basin, lon, lat, unit, alert_level, minor_flood_level,
+                            major_flood_level, source, source_url, upstream, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name,
+    basin = EXCLUDED.basin,
+    lon = EXCLUDED.lon,
+    lat = EXCLUDED.lat,
+    unit = CASE WHEN EXCLUDED.unit = 'unknown' THEN river_stations.unit ELSE EXCLUDED.unit END,
+    alert_level = CASE WHEN EXCLUDED.unit = 'unknown' THEN river_stations.alert_level ELSE EXCLUDED.alert_level END,
+    minor_flood_level = CASE WHEN EXCLUDED.unit = 'unknown' THEN river_stations.minor_flood_level ELSE EXCLUDED.minor_flood_level END,
+    major_flood_level = CASE WHEN EXCLUDED.unit = 'unknown' THEN river_stations.major_flood_level ELSE EXCLUDED.major_flood_level END,
+    source_url = EXCLUDED.source_url,
+    upstream = EXCLUDED.upstream,
+    updated_at = EXCLUDED.updated_at
+WHERE river_stations.source = EXCLUDED.source
+`
+
+type UpsertExtraRiverStationParams struct {
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	Basin           string    `json:"basin"`
+	Lon             float64   `json:"lon"`
+	Lat             float64   `json:"lat"`
+	Unit            string    `json:"unit"`
+	AlertLevel      *float64  `json:"alert_level"`
+	MinorFloodLevel *float64  `json:"minor_flood_level"`
+	MajorFloodLevel *float64  `json:"major_flood_level"`
+	Source          string    `json:"source"`
+	SourceUrl       *string   `json:"source_url"`
+	Upstream        *string   `json:"upstream"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// A station from a secondary collector. It never takes over a station of
+// another source, and a report without a reading keeps the last known unit and
+// thresholds, because a quiet gauge publishes neither.
+func (q *Queries) UpsertExtraRiverStation(ctx context.Context, arg UpsertExtraRiverStationParams) error {
+	_, err := q.db.Exec(ctx, upsertExtraRiverStation,
+		arg.ID,
+		arg.Name,
+		arg.Basin,
+		arg.Lon,
+		arg.Lat,
+		arg.Unit,
+		arg.AlertLevel,
+		arg.MinorFloodLevel,
+		arg.MajorFloodLevel,
+		arg.Source,
+		arg.SourceUrl,
+		arg.Upstream,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const upsertRiverStation = `-- name: UpsertRiverStation :exec
 INSERT INTO river_stations (id, name, basin, lon, lat, unit, alert_level, minor_flood_level,
                             major_flood_level, source, updated_at)
@@ -210,6 +377,8 @@ SET name = EXCLUDED.name,
     minor_flood_level = EXCLUDED.minor_flood_level,
     major_flood_level = EXCLUDED.major_flood_level,
     source = EXCLUDED.source,
+    source_url = NULL,
+    upstream = NULL,
     updated_at = EXCLUDED.updated_at
 `
 

@@ -37,7 +37,9 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/metstations"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/openmeteo"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmreservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/usgs"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/waterlevels"
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/grid"
@@ -49,6 +51,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
 	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
@@ -125,6 +128,9 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 		&irrigation.Collector{Pool: pool, Fetcher: client},
 		&adminregions.Collector{Pool: pool, Fetcher: client},
 		&osmplaces.Collector{Pool: pool, Fetcher: client},
+		&waterlevels.GaugeCollector{Pool: pool, Fetcher: client, Logger: logger},
+		&waterlevels.ReservoirCollector{Pool: pool, Fetcher: client},
+		&osmreservoirs.Collector{Pool: pool, Fetcher: client, Logger: logger},
 		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindCurrent, Logger: logger},
 		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindForecast, Logger: logger},
 		&gfs.Collector{Pool: pool, Client: client, Logger: logger},
@@ -202,6 +208,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 		BulletinStaleAfter: staleAfter("official-warnings")}
 	stationService := &stations.Service{Pool: pool, StaleAfter: staleAfter("weather-stations")}
 	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
+	reservoirService := &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -213,7 +220,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Floods:  floodService,
 			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
 				Regions: regionService, RiverRisk: riverRiskService, Official: warningService,
-				Stations: stationService, Environment: environmentService, Logger: logger},
+				Stations: stationService, Environment: environmentService, Reservoirs: reservoirService, Logger: logger},
 			RiverRisk: riverRiskService,
 			Warnings:  warningService,
 			Hazards: &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"),
@@ -221,6 +228,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Stations:    stationService,
 			Rain:        &rainfall.Service{Pool: pool, StaleAfter: staleAfter("rainfall")},
 			Environment: environmentService,
+			Reservoirs:  reservoirService,
 			Ready:       pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
