@@ -139,21 +139,25 @@ func (q *Queries) DeleteRiverSubbasins(ctx context.Context) error {
 }
 
 const floodAreasInBasins = `-- name: FloodAreasInBasins :many
-SELECT b.fid AS basin_fid, a.id, a.kind, a.severity
+SELECT b.fid AS basin_fid, a.id, a.kind, a.severity,
+       (a.gauge_id IS NOT NULL AND g.quality_verified IS NOT TRUE)::bool AS lower_confidence
 FROM flood_areas a
 JOIN official_basins b ON ST_Intersects(b.geom, a.geom)
+LEFT JOIN flood_gauges g ON g.gauge_id = a.gauge_id
 WHERE a.fetched_at >= $1
 ORDER BY b.fid, a.id
 `
 
 type FloodAreasInBasinsRow struct {
-	BasinFid int64  `json:"basin_fid"`
-	ID       string `json:"id"`
-	Kind     string `json:"kind"`
-	Severity string `json:"severity"`
+	BasinFid        int64  `json:"basin_fid"`
+	ID              string `json:"id"`
+	Kind            string `json:"kind"`
+	Severity        string `json:"severity"`
+	LowerConfidence bool   `json:"lower_confidence"`
 }
 
-// Google's flood areas touching each official basin, within its retention.
+// Google's flood areas touching each official basin, within its retention, and
+// whether each belongs to a gauge Google has not verified.
 func (q *Queries) FloodAreasInBasins(ctx context.Context, since time.Time) ([]FloodAreasInBasinsRow, error) {
 	rows, err := q.db.Query(ctx, floodAreasInBasins, since)
 	if err != nil {
@@ -168,6 +172,7 @@ func (q *Queries) FloodAreasInBasins(ctx context.Context, since time.Time) ([]Fl
 			&i.ID,
 			&i.Kind,
 			&i.Severity,
+			&i.LowerConfidence,
 		); err != nil {
 			return nil, err
 		}

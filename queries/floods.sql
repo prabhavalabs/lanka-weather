@@ -31,12 +31,15 @@ FROM flood_areas
 ORDER BY kind, id;
 
 -- name: FloodAreasAt :many
--- Flood areas fetched since a time that contain a point.
-SELECT id, kind, gauge_id, severity, valid_from, valid_until
-FROM flood_areas
-WHERE ST_Intersects(geom, ST_SetSRID(ST_MakePoint(@lon::float8, @lat::float8), 4326))
-  AND fetched_at >= @since
-ORDER BY kind, id;
+-- Flood areas fetched since a time that contain a point, leaving out those of
+-- gauges Google has not verified.
+SELECT a.id, a.kind, a.gauge_id, a.severity, a.valid_from, a.valid_until
+FROM flood_areas a
+LEFT JOIN flood_gauges g ON g.gauge_id = a.gauge_id
+WHERE ST_Intersects(a.geom, ST_SetSRID(ST_MakePoint(@lon::float8, @lat::float8), 4326))
+  AND a.fetched_at >= @since
+  AND (a.gauge_id IS NULL OR g.quality_verified IS TRUE)
+ORDER BY a.kind, a.id;
 
 -- name: DeleteFloodGaugesFetchedBefore :exec
 DELETE FROM flood_gauges WHERE fetched_at < $1;

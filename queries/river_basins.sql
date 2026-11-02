@@ -89,10 +89,13 @@ FROM (
 ORDER BY p.position;
 
 -- name: FloodAreasInBasins :many
--- Google's flood areas touching each official basin, within its retention.
-SELECT b.fid AS basin_fid, a.id, a.kind, a.severity
+-- Google's flood areas touching each official basin, within its retention, and
+-- whether each belongs to a gauge Google has not verified.
+SELECT b.fid AS basin_fid, a.id, a.kind, a.severity,
+       (a.gauge_id IS NOT NULL AND g.quality_verified IS NOT TRUE)::bool AS lower_confidence
 FROM flood_areas a
 JOIN official_basins b ON ST_Intersects(b.geom, a.geom)
+LEFT JOIN flood_gauges g ON g.gauge_id = a.gauge_id
 WHERE a.fetched_at >= @since
 ORDER BY b.fid, a.id;
 

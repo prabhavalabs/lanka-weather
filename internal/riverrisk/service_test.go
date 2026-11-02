@@ -236,6 +236,23 @@ func TestSettleBasin(t *testing.T) {
 			if basin.State != c.state || basin.OnlyUnverified != c.unverified {
 				t.Fatalf("state %s, unverified %v", basin.State, basin.OnlyUnverified)
 			}
+			if !c.unverified && basin.VerifiedState != basin.State {
+				t.Fatalf("verified state %s differs from %s with nothing unverified", basin.VerifiedState, basin.State)
+			}
 		})
+	}
+}
+
+func TestAreaOfALowerConfidenceGaugeDoesNotCountAsVerified(t *testing.T) {
+	basin := BasinStatus{
+		Gauges: []BasinGauge{{State: BasinNoFlooding, Verified: true}},
+		Areas:  []BasinArea{{State: BasinSevere, LowerConfidence: true}},
+	}
+	settleBasin(&basin)
+	if basin.State != BasinSevere || !basin.OnlyUnverified {
+		t.Fatalf("state %s, unverified %v", basin.State, basin.OnlyUnverified)
+	}
+	if basin.VerifiedState != BasinNoFlooding {
+		t.Fatalf("with extended coverage off this basin reads %s", basin.VerifiedState)
 	}
 }

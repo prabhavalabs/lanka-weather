@@ -47,11 +47,13 @@ func (q *Queries) DeleteFloodGaugesFetchedBefore(ctx context.Context, fetchedAt 
 }
 
 const floodAreasAt = `-- name: FloodAreasAt :many
-SELECT id, kind, gauge_id, severity, valid_from, valid_until
-FROM flood_areas
-WHERE ST_Intersects(geom, ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326))
-  AND fetched_at >= $3
-ORDER BY kind, id
+SELECT a.id, a.kind, a.gauge_id, a.severity, a.valid_from, a.valid_until
+FROM flood_areas a
+LEFT JOIN flood_gauges g ON g.gauge_id = a.gauge_id
+WHERE ST_Intersects(a.geom, ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326))
+  AND a.fetched_at >= $3
+  AND (a.gauge_id IS NULL OR g.quality_verified IS TRUE)
+ORDER BY a.kind, a.id
 `
 
 type FloodAreasAtParams struct {
@@ -69,7 +71,8 @@ type FloodAreasAtRow struct {
 	ValidUntil *time.Time `json:"valid_until"`
 }
 
-// Flood areas fetched since a time that contain a point.
+// Flood areas fetched since a time that contain a point, leaving out those of
+// gauges Google has not verified.
 func (q *Queries) FloodAreasAt(ctx context.Context, arg FloodAreasAtParams) ([]FloodAreasAtRow, error) {
 	rows, err := q.db.Query(ctx, floodAreasAt, arg.Lon, arg.Lat, arg.Since)
 	if err != nil {

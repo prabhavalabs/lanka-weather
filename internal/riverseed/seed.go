@@ -15,6 +15,7 @@ package riverseed
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -23,7 +24,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/googleflood"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/store"
 )
 
 // Source marks seeded rows.
@@ -147,6 +150,66 @@ func Apply(ctx context.Context, pool *pgxpool.Pool, now time.Time) error {
 		}
 		return nil
 	})
+}
+
+// Polygon is a real serialized polygon to draw as if it were Sri Lanka's, from a
+// local manifest. Real Google polygons are never committed: Google's terms limit
+// how long they are kept, so a manifest is fetched for the test and thrown away.
+type Polygon struct {
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Severity string `json:"severity"`
+	// Raw is the response of serializedPolygons/{id}.
+	Raw json.RawMessage `json:"raw"`
+	// ShiftLon and ShiftLat move the polygon, to see it over Sri Lanka.
+	ShiftLon float64 `json:"shiftLon"`
+	ShiftLat float64 `json:"shiftLat"`
+}
+
+// Polygons writes polygons through the decoder production uses, so they are drawn
+// exactly as they would be. It keeps whatever else is seeded.
+func Polygons(ctx context.Context, pool *pgxpool.Pool, polygons []Polygon, now time.Time) error {
+	if err := guard(ctx, pool); err != nil {
+		return err
+	}
+	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+		queries := store.New(tx)
+		for _, polygon := range polygons {
+			shape, err := googleflood.ParsePolygon(polygon.Raw)
+			if err != nil {
+				return fmt.Errorf("polygon %s: %w", polygon.ID, err)
+			}
+			if shape, err = shifted(shape, polygon.ShiftLon, polygon.ShiftLat); err != nil {
+				return fmt.Errorf("polygon %s: %w", polygon.ID, err)
+			}
+			until := now.Add(24 * time.Hour)
+			if err := queries.InsertFloodArea(ctx, store.InsertFloodAreaParams{ID: "seed-" + polygon.ID, Kind: polygon.Kind, Source: Source,
+				Severity: polygon.Severity, IssuedAt: &now, ValidFrom: &now, ValidUntil: &until,
+				Properties: []byte(`{"seed":true,"forecastPeriodHours":24}`), Geojson: string(shape), FetchedAt: now}); err != nil {
+				return fmt.Errorf("store polygon %s: %w", polygon.ID, err)
+			}
+		}
+		return nil
+	})
+}
+
+func shifted(shape []byte, lon, lat float64) ([]byte, error) {
+	var geometry struct {
+		Type        string           `json:"type"`
+		Coordinates [][][][2]float64 `json:"coordinates"`
+	}
+	if err := json.Unmarshal(shape, &geometry); err != nil {
+		return nil, err
+	}
+	for _, polygon := range geometry.Coordinates {
+		for _, ring := range polygon {
+			for index := range ring {
+				ring[index][0] += lon
+				ring[index][1] += lat
+			}
+		}
+	}
+	return json.Marshal(geometry)
 }
 
 // Clear removes what Apply wrote. Raised Google gauges go back to "no flooding"

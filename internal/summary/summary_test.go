@@ -52,7 +52,7 @@ func (fakeRivers) Layer(context.Context) (rivers.FeatureCollection, error) {
 type fakeFloods struct{ err error }
 
 func (fake fakeFloods) Gauges(context.Context) ([]floods.Gauge, error) {
-	return []floods.Gauge{{GaugeID: "hybas_near", Severity: "no_flooding", Lon: 80.0, Lat: 7.0}, {GaugeID: "hybas_far", Severity: "extreme", Lon: 81.3, Lat: 7.9}}, fake.err
+	return []floods.Gauge{{QualityVerified: true, GaugeID: "hybas_near", Severity: "no_flooding", Lon: 80.0, Lat: 7.0}, {GaugeID: "hybas_far", Severity: "extreme", Lon: 81.3, Lat: 7.9}}, fake.err
 }
 
 func (fake fakeFloods) AreasAt(context.Context, float64, float64) ([]floods.AreaAt, error) {
@@ -294,4 +294,15 @@ type fakeReservoirs struct {
 
 func (fake fakeReservoirs) Layer(context.Context) (reservoirs.FeatureCollection, error) {
 	return fake.layer, fake.err
+}
+
+func TestLowerConfidenceGaugesRaiseNoAlertAndAreNotListed(t *testing.T) {
+	near := []floods.Gauge{
+		{GaugeID: "hybas_unverified", Severity: "extreme", QualityVerified: false, Lon: 79.87, Lat: 6.93},
+		{GaugeID: "hybas_verified", Severity: "no_flooding", QualityVerified: true, Lon: 79.9, Lat: 6.95},
+	}
+	listed := nearestFloods(near, 79.87, 6.93)
+	if len(listed) != 1 || listed[0].GaugeID != "hybas_verified" {
+		t.Fatalf("nearest = %+v", listed)
+	}
 }

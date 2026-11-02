@@ -6,6 +6,7 @@
 //	lankaweather serve     run the HTTP API
 //	lankaweather worker    run the scheduler that collects data sources
 //	lankaweather collect   run every collector once and exit
+//	lankaweather collect NAME...   run the named collectors once and exit
 //
 // Configuration comes from the environment; see .env.example.
 package main
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 
@@ -63,7 +65,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
-const usage = "usage: lankaweather migrate|serve|worker|collect"
+const usage = "usage: lankaweather migrate|serve|worker|collect [NAME...]"
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -77,7 +79,7 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, logger *slog.Logger) error {
-	if len(args) != 1 {
+	if len(args) == 0 || (len(args) > 1 && args[0] != "collect") {
 		return errors.New(usage)
 	}
 	databaseURL := os.Getenv("LANKAWEATHER_DATABASE_URL")
@@ -106,7 +108,11 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		defer pool.Close()
 		scheduler := &ingest.Scheduler{Pool: pool, Collectors: collectors(pool, logger), Logger: logger}
 		if args[0] == "collect" {
-			for _, collector := range scheduler.Collectors {
+			chosen, err := chooseCollectors(scheduler.Collectors, args[1:])
+			if err != nil {
+				return err
+			}
+			for _, collector := range chosen {
 				scheduler.RunOne(ctx, collector)
 			}
 			scheduler.Prune(ctx)
@@ -118,6 +124,24 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	default:
 		return fmt.Errorf("unknown command %q; %s", args[0], usage)
 	}
+}
+
+// chooseCollectors picks collectors by name, or all of them with no names. Naming
+// them spends one source's requests rather than every source's: a full run costs
+// about 470 of Open-Meteo's weighted calls (ADR 0007).
+func chooseCollectors(all []source.Collector, names []string) ([]source.Collector, error) {
+	if len(names) == 0 {
+		return all, nil
+	}
+	chosen := make([]source.Collector, 0, len(names))
+	for _, name := range names {
+		index := slices.IndexFunc(all, func(collector source.Collector) bool { return collector.Name() == name })
+		if index < 0 {
+			return nil, fmt.Errorf("no collector named %q", name)
+		}
+		chosen = append(chosen, all[index])
+	}
+	return chosen, nil
 }
 
 // collectors lists every data source the worker collects.

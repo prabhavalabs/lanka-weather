@@ -51,6 +51,13 @@ type Meta struct {
 	GeneratedAt time.Time  `json:"generatedAt"`
 	Gauges      int        `json:"gauges"`
 	Areas       int        `json:"areas"`
+	// VerifiedGauges and LowerConfidenceGauges split Gauges by whether Google
+	// has quality-verified the gauge's model (Flood Hub's Extended coverage).
+	VerifiedGauges        int `json:"verifiedGauges"`
+	LowerConfidenceGauges int `json:"lowerConfidenceGauges"`
+	// FlashAreas counts flash-flood polygons, for "no flash-flood areas" to be
+	// a statement about data that was read.
+	FlashAreas int `json:"flashAreas"`
 }
 
 // Feature is a gauge (Point) or a flood area (MultiPolygon).
@@ -110,6 +117,9 @@ type Area struct {
 	ValidUntil *time.Time      `json:"validUntil"`
 	Details    json.RawMessage `json:"details"`
 	FetchedAt  time.Time       `json:"fetchedAt"`
+	// LowerConfidence marks the area of a gauge Google has not verified, shown
+	// only with Extended coverage.
+	LowerConfidence bool `json:"lowerConfidence"`
 }
 
 // Layer returns every gauge and flood area fetched within the last day.
@@ -129,7 +139,14 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 	if err != nil {
 		return FeatureCollection{}, err
 	}
+	verified := make(map[string]bool, len(gauges))
 	for _, gauge := range gauges {
+		verified[gauge.GaugeID] = gauge.QualityVerified
+		if gauge.QualityVerified {
+			collection.Meta.VerifiedGauges++
+		} else {
+			collection.Meta.LowerConfidenceGauges++
+		}
 		collection.Meta.Seeded = collection.Meta.Seeded || gauge.Seeded
 		geometry, _ := json.Marshal(point{Type: "Point", Coordinates: [2]float64{gauge.Lon, gauge.Lat}})
 		collection.Features = append(collection.Features, Feature{Type: "Feature", ID: gauge.GaugeID, Geometry: geometry, Properties: gauge})
@@ -142,12 +159,19 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 		if now.Sub(area.FetchedAt) > googleflood.Retention {
 			continue
 		}
+		// A seeded polygon must raise the test-data banner by itself.
+		collection.Meta.Seeded = collection.Meta.Seeded || area.Source == SeedSource
+		lower := area.GaugeID != nil && !verified[*area.GaugeID]
 		collection.Features = append(collection.Features, Feature{
 			Type: "Feature", ID: area.ID, Geometry: json.RawMessage(area.Geojson),
 			Properties: Area{ID: area.ID, Kind: area.Kind, GaugeID: area.GaugeID, Severity: area.Severity, IssuedAt: area.IssuedAt,
-				ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil, Details: area.Properties, FetchedAt: area.FetchedAt},
+				ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil, Details: area.Properties, FetchedAt: area.FetchedAt,
+				LowerConfidence: lower},
 		})
 		collection.Meta.Areas++
+		if area.Kind == googleflood.KindFlashLikely || area.Kind == googleflood.KindFlashHighly {
+			collection.Meta.FlashAreas++
+		}
 	}
 	collection.Meta.Gauges = len(gauges)
 	return collection, nil
@@ -189,7 +213,8 @@ type AreaAt struct {
 	ValidUntil *time.Time `json:"validUntil"`
 }
 
-// AreasAt returns the flood areas containing a point.
+// AreasAt returns the flood areas containing a point. An area of a gauge Google
+// has not verified is left out, so it cannot raise a place's alerts.
 func (service *Service) AreasAt(ctx context.Context, lon, lat float64) ([]AreaAt, error) {
 	rows, err := store.New(service.Pool).FloodAreasAt(ctx, store.FloodAreasAtParams{
 		Lon: lon, Lat: lat, Since: service.now().Add(-googleflood.Retention),

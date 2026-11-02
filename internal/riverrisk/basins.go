@@ -61,8 +61,9 @@ type BasinGauge struct {
 	Unit       string     `json:"unit,omitempty"`
 	ObservedAt *time.Time `json:"observedAt"`
 	Stale      bool       `json:"stale"`
-	// Verified is false for a Google gauge it has not quality-verified. They
-	// are read only with LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED=true.
+	// Verified is false for a Google gauge it has not quality-verified: Flood
+	// Hub's Extended coverage, read unless LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED
+	// is false.
 	Verified bool `json:"verified"`
 }
 
@@ -71,6 +72,8 @@ type BasinArea struct {
 	ID    string     `json:"id"`
 	Kind  string     `json:"kind"`
 	State BasinState `json:"state"`
+	// LowerConfidence marks an area of a gauge Google has not verified.
+	LowerConfidence bool `json:"lowerConfidence"`
 }
 
 // BasinStatus is one official river basin's state.
@@ -90,6 +93,9 @@ type BasinStatus struct {
 	// OnlyUnverified says its state comes only from gauges Google has not
 	// verified, and must be shown as such.
 	OnlyUnverified bool `json:"onlyUnverified"`
+	// VerifiedState is what verified evidence alone says: the state to draw
+	// while Extended coverage is off.
+	VerifiedState BasinState `json:"verifiedState"`
 	// ObservedAt is its newest reading or forecast.
 	ObservedAt *time.Time `json:"observedAt"`
 }
@@ -100,6 +106,8 @@ type SubbasinStatus struct {
 	FID            int64      `json:"fid"`
 	State          BasinState `json:"state"`
 	OnlyUnverified bool       `json:"onlyUnverified"`
+	// VerifiedState is what verified gauges alone say.
+	VerifiedState BasinState `json:"verifiedState"`
 }
 
 // BasinsDocument is GET /v1/floods/basins.
@@ -300,7 +308,7 @@ func (service *Service) buildBasins(ctx context.Context, queries *store.Queries,
 		}
 		for _, area := range areas {
 			if basin := statusByFID[area.BasinFid]; basin != nil {
-				basin.Areas = append(basin.Areas, BasinArea{ID: area.ID, Kind: area.Kind, State: AreaState(area.Kind, area.Severity)})
+				basin.Areas = append(basin.Areas, BasinArea{ID: area.ID, Kind: area.Kind, State: AreaState(area.Kind, area.Severity), LowerConfidence: area.LowerConfidence})
 			}
 		}
 	}
@@ -318,9 +326,13 @@ func (service *Service) buildBasins(ctx context.Context, queries *store.Queries,
 		other, otherKnown := unverified[sub.HybasID]
 		switch {
 		case known && (!otherKnown || state.Rank() >= other.Rank()):
-			document.Subbasins = append(document.Subbasins, SubbasinStatus{FID: sub.HybasID, State: state})
+			document.Subbasins = append(document.Subbasins, SubbasinStatus{FID: sub.HybasID, State: state, VerifiedState: state})
 		case otherKnown:
-			document.Subbasins = append(document.Subbasins, SubbasinStatus{FID: sub.HybasID, State: other, OnlyUnverified: true})
+			fallback := BasinNoForecast
+			if known {
+				fallback = state
+			}
+			document.Subbasins = append(document.Subbasins, SubbasinStatus{FID: sub.HybasID, State: other, OnlyUnverified: true, VerifiedState: fallback})
 		}
 	}
 	return document, nil
@@ -344,11 +356,15 @@ func settleBasin(basin *BasinStatus) {
 		}
 	}
 	for _, area := range basin.Areas {
-		if area.State.Rank() > verified.Rank() {
+		if area.LowerConfidence {
+			if area.State.Rank() > unverified.Rank() {
+				unverified = area.State
+			}
+		} else if area.State.Rank() > verified.Rank() {
 			verified = area.State
 		}
 	}
-	basin.State = verified
+	basin.State, basin.VerifiedState = verified, verified
 	if unverified.Rank() > verified.Rank() {
 		basin.State, basin.OnlyUnverified = unverified, true
 	}

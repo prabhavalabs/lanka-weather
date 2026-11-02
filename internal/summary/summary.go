@@ -459,9 +459,15 @@ func activeReservoirs(layer reservoirs.FeatureCollection, lon, lat float64) []Re
 	return out
 }
 
+// nearestFloods lists the nearest verified gauges. Lower-confidence gauges are
+// not offered here: there are about thirty for every verified one, so they would
+// crowd the verified ones out, and their forecast must not raise a place's alerts.
 func nearestFloods(gauges []floods.Gauge, lon, lat float64) []FloodGauge {
 	var out []FloodGauge
 	for _, gauge := range gauges {
+		if !gauge.QualityVerified {
+			continue
+		}
 		distance := DistanceKm(lon, lat, gauge.Lon, gauge.Lat)
 		if distance > floodSearchKm {
 			continue

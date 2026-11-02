@@ -5,10 +5,15 @@
 //
 //	LANKAWEATHER_ALLOW_SEED=true riverseed apply
 //	LANKAWEATHER_ALLOW_SEED=true riverseed clear
+//	LANKAWEATHER_ALLOW_SEED=true riverseed polygons manifest.json
+//
+// The manifest lists real serialized polygons (see riverseed.Polygon). Keep it
+// out of the repository: Google's terms limit how long they may be kept.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,8 +32,9 @@ func main() {
 }
 
 func run(args []string) error {
-	if len(args) != 1 || (args[0] != "apply" && args[0] != "clear") {
-		return fmt.Errorf("usage: riverseed apply|clear")
+	polygons := len(args) == 2 && args[0] == "polygons"
+	if !polygons && (len(args) != 1 || (args[0] != "apply" && args[0] != "clear")) {
+		return fmt.Errorf("usage: riverseed apply|clear|polygons manifest.json")
 	}
 	if os.Getenv("LANKAWEATHER_ALLOW_SEED") != "true" {
 		return fmt.Errorf("riverseed writes pretend floods; set LANKAWEATHER_ALLOW_SEED=true on a local database")
@@ -40,6 +46,21 @@ func run(args []string) error {
 	}
 	defer pool.Close()
 	now := time.Now().UTC()
+	if polygons {
+		payload, err := os.ReadFile(args[1])
+		if err != nil {
+			return err
+		}
+		var list []riverseed.Polygon
+		if err := json.Unmarshal(payload, &list); err != nil {
+			return fmt.Errorf("read the manifest: %w", err)
+		}
+		if err := riverseed.Polygons(ctx, pool, list, now); err != nil {
+			return err
+		}
+		fmt.Printf("%d real polygons written; the API reports seeded while they are in place\n", len(list))
+		return nil
+	}
 	if args[0] == "apply" {
 		err = riverseed.Apply(ctx, pool, now)
 	} else {
