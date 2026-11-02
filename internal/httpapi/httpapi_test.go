@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/prabhavalabs/open-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/layers"
 )
 
 func get(t *testing.T, path string) (*http.Response, []byte) {

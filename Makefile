@@ -8,7 +8,7 @@ bootstrap:
 
 # Run the API and the web dev server in two terminals.
 dev-api:
-	go run ./cmd/openweather serve
+	go run ./cmd/lankaweather serve
 
 dev-web:
 	pnpm dev
@@ -25,7 +25,7 @@ test:
 	pnpm test
 
 build:
-	go build -o bin/openweather ./cmd/openweather
+	go build -o bin/lankaweather ./cmd/lankaweather
 	pnpm build
 
 # Everything CI checks on a pull request.

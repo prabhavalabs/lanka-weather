@@ -13,7 +13,7 @@ export function LayerPanel({ enabled, onToggle }: LayerPanelProps) {
   return (
     <aside className="pointer-events-auto flex max-h-full w-72 flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950/85 text-slate-100 shadow-xl backdrop-blur">
       <header className="border-b border-white/10 px-4 py-3">
-        <h1 className="text-base font-semibold">open-weather</h1>
+        <h1 className="text-base font-semibold">Lanka Weather</h1>
         <p className="text-xs text-slate-400">Weather and hazard map of Sri Lanka</p>
       </header>
 

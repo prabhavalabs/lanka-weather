@@ -2,7 +2,7 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
-const apiTarget = process.env.OPENWEATHER_API_URL ?? "http://localhost:8080"
+const apiTarget = process.env.LANKAWEATHER_API_URL ?? "http://localhost:8080"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

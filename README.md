@@ -1,4 +1,4 @@
-# open-weather
+# lanka-weather
 
 A weather and disaster early-warning portal for Sri Lanka. It gathers
 forecasts, observations and hazard data from public sources into one
@@ -33,7 +33,7 @@ Planned data layers include:
 
 | Path | Contents |
 |---|---|
-| `cmd/openweather/` | Go entry point: `serve` (HTTP API); `worker` and `migrate` follow |
+| `cmd/lankaweather/` | Go entry point: `serve` (HTTP API); `worker` and `migrate` follow |
 | `internal/` | Go packages: layer catalogue, HTTP API, and later connectors, ingest and store |
 | `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre |
 | `packages/` | Shared TypeScript packages, when needed |
@@ -64,7 +64,7 @@ make dev-web     # terminal 2: web app on http://localhost:5173
 ```
 
 The Vite dev server proxies `/v1` and `/healthz` to the API. Set
-`OPENWEATHER_API_URL` to point it elsewhere, and `OPENWEATHER_ADDR` to
+`LANKAWEATHER_API_URL` to point it elsewhere, and `LANKAWEATHER_ADDR` to
 change the API's listen address.
 
 Before opening a pull request, run everything CI runs:

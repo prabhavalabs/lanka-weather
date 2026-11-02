@@ -23,7 +23,7 @@ export const queryClient = new QueryClient({
 
 /** Persists the query cache to IndexedDB, which has a far larger quota than localStorage. */
 const persister = createAsyncStoragePersister({
-  key: "open-weather:query-cache",
+  key: "lanka-weather:query-cache",
   storage: {
     getItem: (key) => get<string>(key).then((value) => value ?? null),
     setItem: (key, value) => set(key, value),

@@ -1,4 +1,4 @@
-// Package layers is the catalogue of map layers open-weather serves.
+// Package layers is the catalogue of map layers lanka-weather serves.
 //
 // The catalogue is the single place where a layer's refresh cadence and
 // staleness limit are defined. The API returns it from GET /v1/layers and

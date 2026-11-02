@@ -1,4 +1,4 @@
-/** Error returned by the open-weather API. */
+/** Error returned by the lanka-weather API. */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
