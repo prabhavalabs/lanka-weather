@@ -98,3 +98,48 @@ func (r iteratorForStageRegions) Err() error {
 func (q *Queries) StageRegions(ctx context.Context, arg []StageRegionsParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"region_staging"}, []string{"id", "fid", "level", "name", "name_si", "name_ta", "parent_id", "province_id", "district_id", "ds_id", "iso_code", "gn_number", "area_km2", "population", "population_year", "center_lon", "center_lat", "geom_wkb", "simple_wkb"}, &iteratorForStageRegions{rows: arg})
 }
+
+// iteratorForStageRiverSegments implements pgx.CopyFromSource.
+type iteratorForStageRiverSegments struct {
+	rows                 []StageRiverSegmentsParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForStageRiverSegments) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForStageRiverSegments) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].HyrivID,
+		r.rows[0].NextDown,
+		r.rows[0].MainRiv,
+		r.rows[0].LengthKm,
+		r.rows[0].DistDnKm,
+		r.rows[0].DistUpKm,
+		r.rows[0].CatchKm2,
+		r.rows[0].UplandKm2,
+		r.rows[0].DischargeCms,
+		r.rows[0].OrdStra,
+		r.rows[0].OrdClas,
+		r.rows[0].OrdFlow,
+		r.rows[0].HybasL12,
+		r.rows[0].Wkb,
+	}, nil
+}
+
+func (r iteratorForStageRiverSegments) Err() error {
+	return nil
+}
+
+func (q *Queries) StageRiverSegments(ctx context.Context, arg []StageRiverSegmentsParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"river_segment_staging"}, []string{"hyriv_id", "next_down", "main_riv", "length_km", "dist_dn_km", "dist_up_km", "catch_km2", "upland_km2", "discharge_cms", "ord_stra", "ord_clas", "ord_flow", "hybas_l12", "wkb"}, &iteratorForStageRiverSegments{rows: arg})
+}
