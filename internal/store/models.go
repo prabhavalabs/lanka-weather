@@ -93,27 +93,32 @@ type OfficialStreamName struct {
 }
 
 type PastFloodEvent struct {
-	Fid        int64       `json:"fid"`
-	ID         string      `json:"id"`
-	Name       string      `json:"name"`
-	SourceName string      `json:"source_name"`
-	River      string      `json:"river"`
-	Year       int32       `json:"year"`
-	EventDate  pgtype.Date `json:"event_date"`
-	Magnitude  *string     `json:"magnitude"`
-	AreaKm2    float64     `json:"area_km2"`
-	Districts  []string    `json:"districts"`
-	West       float64     `json:"west"`
-	South      float64     `json:"south"`
-	East       float64     `json:"east"`
-	North      float64     `json:"north"`
-	Geom       []byte      `json:"geom"`
-	Geom3857   []byte      `json:"geom_3857"`
-	Service    string      `json:"service"`
-	Source     string      `json:"source"`
-	Version    string      `json:"version"`
-	SourceTime time.Time   `json:"source_time"`
-	FetchedAt  time.Time   `json:"fetched_at"`
+	Fid            int64       `json:"fid"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	SourceName     string      `json:"source_name"`
+	River          string      `json:"river"`
+	Year           int32       `json:"year"`
+	EventDate      pgtype.Date `json:"event_date"`
+	Magnitude      *string     `json:"magnitude"`
+	AreaKm2        float64     `json:"area_km2"`
+	Districts      []string    `json:"districts"`
+	West           float64     `json:"west"`
+	South          float64     `json:"south"`
+	East           float64     `json:"east"`
+	North          float64     `json:"north"`
+	Geom           []byte      `json:"geom"`
+	GeomSimple3857 []byte      `json:"geom_simple_3857"`
+	Service        string      `json:"service"`
+	Source         string      `json:"source"`
+	Version        string      `json:"version"`
+	SourceTime     time.Time   `json:"source_time"`
+	FetchedAt      time.Time   `json:"fetched_at"`
+}
+
+type PastFloodPart struct {
+	Fid      int64  `json:"fid"`
+	Geom3857 []byte `json:"geom_3857"`
 }
 
 type Place struct {

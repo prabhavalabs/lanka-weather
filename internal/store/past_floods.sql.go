@@ -12,6 +12,45 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const buildPastFloodDetail = `-- name: BuildPastFloodDetail :exec
+WITH parts AS (
+    INSERT INTO past_flood_parts (fid, geom_3857)
+    SELECT e.fid, ST_Transform(ST_Subdivide(e.geom, 512), 3857)
+    FROM past_flood_events e
+    WHERE e.fid = $1
+    RETURNING geom_3857
+),
+pieces AS (
+    SELECT ST_Transform(geom_3857, 4326) AS p FROM parts
+),
+touching AS (
+    SELECT d.name
+    FROM regions d
+    JOIN pieces q ON d.level = 'district' AND d.geom_simple && q.p AND ST_Intersects(d.geom_simple, q.p)
+    GROUP BY d.name
+    HAVING sum(ST_Area(ST_Intersection(d.geom_simple, q.p)::geography)) > 10000
+),
+kept AS (
+    SELECT ST_Collect(d.geom) AS g
+    FROM past_flood_events e, ST_Dump(ST_Transform(e.geom, 3857)) d
+    WHERE e.fid = $1 AND ST_Area(d.geom) > 5000
+)
+UPDATE past_flood_events e
+SET districts = coalesce((SELECT array_agg(o.name ORDER BY o.name) FROM touching o), ARRAY[]::text[]),
+    geom_simple_3857 = coalesce(
+        (SELECT ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(k.g, 20), 'method=structure'), 3)) FROM kept k),
+        e.geom_simple_3857)
+WHERE e.fid = $1
+`
+
+// Cuts an extent into pieces for tiles, simplifies it for low zooms (dropping
+// polygons under half a hectare, too small to see there) and finds the districts
+// it overlaps by more than a hectare, so a boundary brushing past does not count.
+func (q *Queries) BuildPastFloodDetail(ctx context.Context, fid int64) error {
+	_, err := q.db.Exec(ctx, buildPastFloodDetail, fid)
+	return err
+}
+
 const countPastFloodEvents = `-- name: CountPastFloodEvents :one
 SELECT count(*)::int FROM past_flood_events
 `
@@ -34,17 +73,13 @@ func (q *Queries) DeletePastFloodEvents(ctx context.Context) error {
 
 const insertPastFloodEvent = `-- name: InsertPastFloodEvent :exec
 WITH shape AS (
-    SELECT ST_Multi(ST_CollectionExtract(ST_UnaryUnion(ST_MakeValid(ST_SetSRID(ST_GeomFromWKB($14::bytea), 4326))), 3)) AS g
+    SELECT ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SetSRID(ST_GeomFromWKB($14::bytea), 4326), 'method=structure'), 3)) AS g
 )
 INSERT INTO past_flood_events (fid, id, name, source_name, river, year, event_date, magnitude, area_km2, districts,
-                               west, south, east, north, geom, geom_3857, service, source, version, source_time,
+                               west, south, east, north, geom, geom_simple_3857, service, source, version, source_time,
                                fetched_at)
-SELECT $1, $2, $3, $4, $5, $6, $7, $8, ST_Area(g::geography) / 1e6,
-       coalesce((SELECT array_agg(d.name ORDER BY d.name)
-                 FROM regions d
-                 WHERE d.level = 'district' AND ST_Intersects(d.geom, g)
-                   AND ST_Area(ST_Intersection(d.geom, g)::geography) > 10000), ARRAY[]::text[]),
-       ST_XMin(g), ST_YMin(g), ST_XMax(g), ST_YMax(g), g, ST_Transform(g, 3857), $9, $10, $11,
+SELECT $1, $2, $3, $4, $5, $6, $7, $8, ST_Area(g::geography) / 1e6, ARRAY[]::text[],
+       ST_XMin(g), ST_YMin(g), ST_XMax(g), ST_YMax(g), g, ST_Multi(ST_Transform(g, 3857)), $9, $10, $11,
        $12, $13
 FROM shape
 `
@@ -66,9 +101,9 @@ type InsertPastFloodEventParams struct {
 	Wkb        []byte      `json:"wkb"`
 }
 
-// A heavily fragmented extent (the Puttalam map is 31,985 raster cells) is
-// dissolved here. Districts are those the extent overlaps by more than a
-// hectare, so a boundary brushing past does not count.
+// The source's extents are traced from rasters, with tens of thousands of rings
+// that touch and overlap. The structure method of ST_MakeValid unions outer
+// rings; on the largest extent it takes 18 s where the default takes over 5 min.
 func (q *Queries) InsertPastFloodEvent(ctx context.Context, arg InsertPastFloodEventParams) error {
 	_, err := q.db.Exec(ctx, insertPastFloodEvent,
 		arg.Fid,
@@ -163,12 +198,23 @@ WITH bounds AS (
     SELECT ST_TileEnvelope($1::int, $2::int, $3::int) AS tile,
            ST_TileEnvelope($1::int, $2::int, $3::int, margin => 64.0 / 4096) AS area
 ),
+near AS (
+    SELECT p.fid, ST_Union(p.geom_3857) AS g
+    FROM past_flood_parts p, bounds
+    WHERE $4::bool AND p.geom_3857 && bounds.area
+    GROUP BY p.fid
+),
+far AS (
+    SELECT e.fid,
+           CASE WHEN $5::float8 > 0 THEN ST_SimplifyPreserveTopology(e.geom_simple_3857, $5::float8) ELSE e.geom_simple_3857 END AS g
+    FROM past_flood_events e, bounds
+    WHERE NOT $4::bool AND e.geom_simple_3857 && bounds.area
+),
 events AS (
     SELECT e.fid, e.id, e.name, e.year,
-           ST_AsMVTGeom(CASE WHEN $4::float8 > 0 THEN ST_SimplifyPreserveTopology(e.geom_3857, $4::float8) ELSE e.geom_3857 END,
-                        bounds.tile, 4096, 64, true) AS geom
-    FROM past_flood_events e, bounds
-    WHERE e.geom_3857 && bounds.area
+           ST_AsMVTGeom(q.g, bounds.tile, 4096, 64, true) AS geom
+    FROM (SELECT fid, g FROM near UNION ALL SELECT fid, g FROM far) q
+    JOIN past_flood_events e ON e.fid = q.fid, bounds
 )
 SELECT coalesce((SELECT ST_AsMVT(f, 'events', 4096, 'geom', 'fid') FROM (SELECT fid, id, name, year, geom FROM events WHERE geom IS NOT NULL) f), ''::bytea)::bytea AS tile
 `
@@ -177,15 +223,18 @@ type PastFloodTileParams struct {
 	Z         int32   `json:"z"`
 	X         int32   `json:"x"`
 	Y         int32   `json:"y"`
+	UseParts  bool    `json:"use_parts"`
 	Tolerance float64 `json:"tolerance"`
 }
 
-// One Mapbox Vector Tile of past flood extents.
+// One Mapbox Vector Tile of past flood extents: simplified shapes at low zooms,
+// the full ones joined back from their pieces close up.
 func (q *Queries) PastFloodTile(ctx context.Context, arg PastFloodTileParams) ([]byte, error) {
 	row := q.db.QueryRow(ctx, pastFloodTile,
 		arg.Z,
 		arg.X,
 		arg.Y,
+		arg.UseParts,
 		arg.Tolerance,
 	)
 	var tile []byte

@@ -432,6 +432,9 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 			if err := queries.InsertPastFloodEvent(ctx, row); err != nil {
 				return fmt.Errorf("store %s: %w", event.ID, err)
 			}
+			if err := queries.BuildPastFloodDetail(ctx, event.FID); err != nil {
+				return fmt.Errorf("detail of %s: %w", event.ID, err)
+			}
 		}
 		return queries.PutSourceVersion(ctx, store.PutSourceVersionParams{
 			Source: PastFloodsSource, Version: version, SourceTime: sourceTime, FetchedAt: now, Records: int32(len(order)),

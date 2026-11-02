@@ -215,16 +215,26 @@ CREATE TABLE past_flood_events (
     east           double precision NOT NULL,
     north          double precision NOT NULL,
     geom           geometry(MultiPolygon, 4326) NOT NULL,
-    geom_3857      geometry(MultiPolygon, 3857) NOT NULL,
+    geom_simple_3857 geometry(MultiPolygon, 3857) NOT NULL,
     service        text             NOT NULL,
     source         text             NOT NULL,
     version        text             NOT NULL,
     source_time    timestamptz      NOT NULL,
     fetched_at     timestamptz      NOT NULL
 );
-CREATE INDEX past_flood_events_geom_3857_idx ON past_flood_events USING gist (geom_3857);
+CREATE INDEX past_flood_events_simple_idx ON past_flood_events USING gist (geom_simple_3857);
+
+-- Extents are traced from rasters: one holds 55,000 polygons and 400,000
+-- vertices. Close-up tiles read them cut into small pieces, so a tile touches
+-- only what lies inside it.
+CREATE TABLE past_flood_parts (
+    fid       bigint NOT NULL REFERENCES past_flood_events (fid) ON DELETE CASCADE,
+    geom_3857 geometry(Polygon, 3857) NOT NULL
+);
+CREATE INDEX past_flood_parts_geom_idx ON past_flood_parts USING gist (geom_3857);
 
 -- +goose Down
+DROP TABLE past_flood_parts;
 DROP TABLE past_flood_events;
 DROP TABLE river_gauge_matches;
 DROP TABLE river_reach_parts;

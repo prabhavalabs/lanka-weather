@@ -60,9 +60,9 @@ SET basin_fid = (
 );
 
 -- name: ListOfficialBasins :many
-SELECT b.fid, b.id, b.name, b.named, b.area_km2, ST_X(b.label_point)::float8 AS label_lon,
+SELECT b.fid, b.id, b.name, b.named, b.area_km2, b.source_time, ST_X(b.label_point)::float8 AS label_lon,
        ST_Y(b.label_point)::float8 AS label_lat, ST_XMin(b.geom)::float8 AS west, ST_YMin(b.geom)::float8 AS south,
-       ST_XMax(b.geom)::float8 AS east, ST_YMax(b.geom)::float8 AS north, b.version, b.source_time, b.fetched_at
+       ST_XMax(b.geom)::float8 AS east, ST_YMax(b.geom)::float8 AS north, b.version, b.fetched_at
 FROM official_basins b
 ORDER BY b.area_km2 DESC, b.fid;
 
@@ -87,6 +87,20 @@ FROM (
                  unnest(@lats::float8[]) AS lat) u
 ) p
 ORDER BY p.position;
+
+-- name: FloodAreasInBasins :many
+-- Google's flood areas touching each official basin, within its retention.
+SELECT b.fid AS basin_fid, a.id, a.kind, a.severity
+FROM flood_areas a
+JOIN official_basins b ON ST_Intersects(b.geom, a.geom)
+WHERE a.fetched_at >= @since
+ORDER BY b.fid, a.id;
+
+-- name: SeedActive :one
+-- Whether local test data is present in the live tables.
+SELECT (EXISTS (SELECT 1 FROM flood_gauges WHERE source = @source::text)
+     OR EXISTS (SELECT 1 FROM flood_areas WHERE source = @source::text)
+     OR EXISTS (SELECT 1 FROM river_stations WHERE source = @source::text))::bool AS active;
 
 -- name: BasinTile :one
 -- One Mapbox Vector Tile with the official basins and, from a zoom, the

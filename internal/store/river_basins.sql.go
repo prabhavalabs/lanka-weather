@@ -138,6 +138,47 @@ func (q *Queries) DeleteRiverSubbasins(ctx context.Context) error {
 	return err
 }
 
+const floodAreasInBasins = `-- name: FloodAreasInBasins :many
+SELECT b.fid AS basin_fid, a.id, a.kind, a.severity
+FROM flood_areas a
+JOIN official_basins b ON ST_Intersects(b.geom, a.geom)
+WHERE a.fetched_at >= $1
+ORDER BY b.fid, a.id
+`
+
+type FloodAreasInBasinsRow struct {
+	BasinFid int64  `json:"basin_fid"`
+	ID       string `json:"id"`
+	Kind     string `json:"kind"`
+	Severity string `json:"severity"`
+}
+
+// Google's flood areas touching each official basin, within its retention.
+func (q *Queries) FloodAreasInBasins(ctx context.Context, since time.Time) ([]FloodAreasInBasinsRow, error) {
+	rows, err := q.db.Query(ctx, floodAreasInBasins, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FloodAreasInBasinsRow{}
+	for rows.Next() {
+		var i FloodAreasInBasinsRow
+		if err := rows.Scan(
+			&i.BasinFid,
+			&i.ID,
+			&i.Kind,
+			&i.Severity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const gaugeBasinsAtPoints = `-- name: GaugeBasinsAtPoints :many
 SELECT p.position::int AS position,
        coalesce((SELECT b.fid FROM official_basins b WHERE ST_Intersects(b.geom, p.pt) ORDER BY b.named DESC, b.area_km2 DESC LIMIT 1),
@@ -323,9 +364,9 @@ func (q *Queries) InsertRiverSubbasin(ctx context.Context, arg InsertRiverSubbas
 }
 
 const listOfficialBasins = `-- name: ListOfficialBasins :many
-SELECT b.fid, b.id, b.name, b.named, b.area_km2, ST_X(b.label_point)::float8 AS label_lon,
+SELECT b.fid, b.id, b.name, b.named, b.area_km2, b.source_time, ST_X(b.label_point)::float8 AS label_lon,
        ST_Y(b.label_point)::float8 AS label_lat, ST_XMin(b.geom)::float8 AS west, ST_YMin(b.geom)::float8 AS south,
-       ST_XMax(b.geom)::float8 AS east, ST_YMax(b.geom)::float8 AS north, b.version, b.source_time, b.fetched_at
+       ST_XMax(b.geom)::float8 AS east, ST_YMax(b.geom)::float8 AS north, b.version, b.fetched_at
 FROM official_basins b
 ORDER BY b.area_km2 DESC, b.fid
 `
@@ -336,6 +377,7 @@ type ListOfficialBasinsRow struct {
 	Name       string    `json:"name"`
 	Named      bool      `json:"named"`
 	AreaKm2    float64   `json:"area_km2"`
+	SourceTime time.Time `json:"source_time"`
 	LabelLon   float64   `json:"label_lon"`
 	LabelLat   float64   `json:"label_lat"`
 	West       float64   `json:"west"`
@@ -343,7 +385,6 @@ type ListOfficialBasinsRow struct {
 	East       float64   `json:"east"`
 	North      float64   `json:"north"`
 	Version    string    `json:"version"`
-	SourceTime time.Time `json:"source_time"`
 	FetchedAt  time.Time `json:"fetched_at"`
 }
 
@@ -362,6 +403,7 @@ func (q *Queries) ListOfficialBasins(ctx context.Context) ([]ListOfficialBasinsR
 			&i.Name,
 			&i.Named,
 			&i.AreaKm2,
+			&i.SourceTime,
 			&i.LabelLon,
 			&i.LabelLat,
 			&i.West,
@@ -369,7 +411,6 @@ func (q *Queries) ListOfficialBasins(ctx context.Context) ([]ListOfficialBasinsR
 			&i.East,
 			&i.North,
 			&i.Version,
-			&i.SourceTime,
 			&i.FetchedAt,
 		); err != nil {
 			return nil, err
@@ -420,4 +461,18 @@ func (q *Queries) ListSubbasins(ctx context.Context) ([]ListSubbasinsRow, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const seedActive = `-- name: SeedActive :one
+SELECT (EXISTS (SELECT 1 FROM flood_gauges WHERE source = $1::text)
+     OR EXISTS (SELECT 1 FROM flood_areas WHERE source = $1::text)
+     OR EXISTS (SELECT 1 FROM river_stations WHERE source = $1::text))::bool AS active
+`
+
+// Whether local test data is present in the live tables.
+func (q *Queries) SeedActive(ctx context.Context, source string) (bool, error) {
+	row := q.db.QueryRow(ctx, seedActive, source)
+	var active bool
+	err := row.Scan(&active)
+	return active, err
 }
