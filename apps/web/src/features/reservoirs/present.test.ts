@@ -94,6 +94,9 @@ describe("flows", () => {
     expect(flowNote({ kind: "downstream", cusecs: 690, agency: "Mahaweli Authority" })).toContain(
       "power-station",
     )
+    expect(flowNote({ kind: "outlets", cusecs: 1400, agency: "x" })).toContain(
+      "not count as spilling",
+    )
     expect(flowNote({ kind: "spill", cusecs: 1, agency: "x" })).toBeNull()
   })
 })

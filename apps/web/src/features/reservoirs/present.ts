@@ -37,7 +37,7 @@ export const reservoirStatusLabels: Record<ReservoirStatus, string> = {
 export const reservoirStatusMeanings: Record<ReservoirStatus, string> = {
   spilling: "Over the spillway.",
   releasing: "Through gates or outlets.",
-  holding: "Not spilling or releasing.",
+  holding: "The source lists this reservoir as holding its water.",
   nodata: "The source has no spill or release status for this reservoir today.",
 }
 
@@ -130,12 +130,18 @@ export function flowShort(flow: ReservoirFlow): string {
 
 /**
  * A caution for flows that are easy to misread. A Mahaweli Authority downstream
- * flow can include water through a power station: it is not a flood release.
+ * flow can include water through a power station, and outlets run while the
+ * source still calls a reservoir holding.
  */
 export function flowNote(flow: ReservoirFlow): string | null {
-  return flow.kind === "downstream"
-    ? "Can include power-station flow, so this is not necessarily a flood release."
-    : null
+  switch (flow.kind) {
+    case "downstream":
+      return "Can include power-station flow, so this is not necessarily a flood release."
+    case "outlets":
+      return "Flow through outlets, which the source does not count as spilling."
+    default:
+      return null
+  }
 }
 
 /** The storage figure as it should be read, without ever turning unknown into 0%. */
