@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,6 +36,10 @@ type Scheduler struct {
 	// Tick is how often due collectors are checked.
 	Tick time.Duration
 	Now  func() time.Time
+
+	// running holds the long-running collectors in flight.
+	runningMu sync.Mutex
+	running   map[string]bool
 }
 
 // Run schedules until ctx is cancelled.
@@ -126,8 +131,34 @@ func (scheduler *Scheduler) RunDue(ctx context.Context) {
 		if err == nil && scheduler.now().Sub(last.StartedAt) < DueAfter(collector, last.Status) {
 			continue
 		}
+		if _, long := collector.(source.LongRunner); long {
+			scheduler.startLong(ctx, collector)
+			continue
+		}
 		scheduler.RunOne(ctx, collector)
 	}
+}
+
+// startLong runs a long-running collector beside the others, one run at a
+// time, so its download does not hold up the collectors after it.
+func (scheduler *Scheduler) startLong(ctx context.Context, collector source.Collector) {
+	scheduler.runningMu.Lock()
+	defer scheduler.runningMu.Unlock()
+	if scheduler.running[collector.Name()] {
+		return
+	}
+	if scheduler.running == nil {
+		scheduler.running = map[string]bool{}
+	}
+	scheduler.running[collector.Name()] = true
+	go func() {
+		defer func() {
+			scheduler.runningMu.Lock()
+			defer scheduler.runningMu.Unlock()
+			delete(scheduler.running, collector.Name())
+		}()
+		scheduler.RunOne(ctx, collector)
+	}()
 }
 
 // DefaultRetryAfter is how soon a collector whose last run failed is tried
@@ -161,7 +192,11 @@ func (scheduler *Scheduler) RunOne(ctx context.Context, collector source.Collect
 		return
 	}
 
-	runCtx, cancel := context.WithTimeout(ctx, runTimeout)
+	timeout := runTimeout
+	if long, ok := collector.(source.LongRunner); ok && long.LongRunTimeout() > 0 {
+		timeout = long.LongRunTimeout()
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	records, collectErr := collector.Collect(runCtx, started)
 	cancel()
 
