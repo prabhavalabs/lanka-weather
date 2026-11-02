@@ -14,11 +14,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/summary"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
@@ -71,6 +73,19 @@ type Summaries interface {
 	Summary(ctx context.Context, lon, lat float64) (*summary.Summary, error)
 }
 
+// Warnings serves official warnings: landslide levels and DMC bulletins.
+type Warnings interface {
+	Landslides(ctx context.Context) (warnings.LandslideLayer, error)
+	Division(ctx context.Context, id string) (*warnings.Division, error)
+	Overview(ctx context.Context, filter warnings.Filter) (*warnings.Overview, error)
+}
+
+// Hazards serves the earthquake and cyclone layers.
+type Hazards interface {
+	Earthquakes(ctx context.Context) (hazards.EarthquakeLayer, error)
+	Cyclones(ctx context.Context) (hazards.CycloneLayer, error)
+}
+
 // Dependencies are the services the API reads from.
 type Dependencies struct {
 	Logger  *slog.Logger
@@ -80,6 +95,11 @@ type Dependencies struct {
 	Weather Weather
 	Floods  Floods
 	Summary Summaries
+
+	// Warnings and Hazards serve official warnings and the hazard layers.
+	Warnings Warnings
+	Hazards  Hazards
+
 	// Now is the clock for requests without an explicit time; nil is
 	// time.Now.
 	Now func() time.Time
@@ -124,6 +144,11 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/weather/regions", api.weatherRegions)
 		r.Get("/floods/forecast", api.floodForecast)
 		r.Get("/summary", api.summary)
+		r.Get("/warnings", api.warningsOverview)
+		r.Get("/warnings/landslides", api.landslideWarnings)
+		r.Get("/warnings/landslides/{id}", api.landslideDivision)
+		r.Get("/hazards/earthquakes", api.earthquakes)
+		r.Get("/hazards/cyclones", api.cyclones)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
