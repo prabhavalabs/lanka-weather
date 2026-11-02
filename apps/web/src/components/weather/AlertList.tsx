@@ -1,23 +1,36 @@
-import { CheckIcon } from "lucide-react"
+import { CheckIcon, InfoIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { formatDayTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-import { severityBadge, severityColors, severityLabels } from "./severity"
+import { estimateLabels, severityBadge, severityColors, severityLabels } from "./severity"
 import type { WeatherAlert } from "./types"
 
 interface AlertListProps {
   alerts: WeatherAlert[]
   /** Shown when there are no alerts. */
   emptyText?: string
+  /** Accessible name of the list. */
+  label?: string
+  /** The empty state's icon: a tick for "none in force", or "info" for a note. */
+  emptyIcon?: "check" | "info"
   className?: string
 }
 
-/** Official alerts, most severe first, each with its issuer, area and validity. */
+const order = ["emergency", "warning", "watch", "advisory"]
+
+/**
+ * Alerts, most severe first, each with its issuer, area and validity.
+ * Estimates (alerts lanka-weather derives itself) carry an "Estimate" badge
+ * and the data they come from, so they are never mistaken for official
+ * warnings.
+ */
 export function AlertList({
   alerts,
   emptyText = "No warnings in force for this area.",
+  label = "Warnings",
+  emptyIcon = "check",
   className,
 }: AlertListProps) {
   if (alerts.length === 0) {
@@ -28,17 +41,20 @@ export function AlertList({
           className,
         )}
       >
-        <CheckIcon className="size-4" aria-hidden="true" />
+        {emptyIcon === "info" ? (
+          <InfoIcon className="size-4 shrink-0" aria-hidden="true" />
+        ) : (
+          <CheckIcon className="size-4 shrink-0" aria-hidden="true" />
+        )}
         {emptyText}
       </p>
     )
   }
 
-  const order = ["emergency", "warning", "watch", "advisory"]
   const sorted = [...alerts].sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity))
 
   return (
-    <ul className={cn("flex flex-col gap-2", className)} aria-label="Warnings">
+    <ul className={cn("flex flex-col gap-2", className)} aria-label={label}>
       {sorted.map((alert) => (
         <li
           key={alert.id}
@@ -51,14 +67,24 @@ export function AlertList({
           />
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm leading-snug font-medium text-foreground">{alert.title}</p>
-            <Badge variant={severityBadge[alert.severity]} className="mt-px">
-              {severityLabels[alert.severity]}
-            </Badge>
+            <div className="mt-px flex shrink-0 items-center gap-1.5">
+              {alert.estimate && (
+                <Badge variant="outline" title="Derived by Lanka Weather, not an official warning">
+                  Estimate
+                </Badge>
+              )}
+              <Badge variant={severityBadge[alert.severity]}>
+                {alert.estimate ? estimateLabels[alert.severity] : severityLabels[alert.severity]}
+              </Badge>
+            </div>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {alert.issuer} · {alert.area}
           </p>
           {alert.summary && <p className="mt-2 text-sm text-foreground/90">{alert.summary}</p>}
+          {alert.basis && (
+            <p className="mt-1.5 text-xs text-muted-foreground">Derived from: {alert.basis}</p>
+          )}
           <p className="numeric mt-2 text-[0.6875rem] text-muted-foreground">
             <time dateTime={alert.issuedAt}>{formatDayTime(alert.issuedAt)}</time>
             {alert.validUntil && (

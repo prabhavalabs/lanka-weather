@@ -5,6 +5,7 @@
 import type {
   AdminArea,
   CurrentConditions,
+  ForecastDay,
   ForecastHour,
   Place,
   SearchResult,
@@ -15,7 +16,8 @@ import type {
 
 export const samplePlace: Place = {
   name: "Ratnapura",
-  area: "Ratnapura District · Sabaragamuwa Province",
+  localName: "රත්නපුර",
+  area: "Ratnapura Town › Ratnapura › Ratnapura District › Sabaragamuwa",
   latitude: 6.6828,
   longitude: 80.3992,
 }
@@ -26,8 +28,13 @@ export const sampleCurrent: CurrentConditions = {
   temperatureC: 28.8,
   feelsLikeC: 33.6,
   humidityPercent: 84,
-  rainfall24hMm: 86.5,
+  rainfallMm: 0.4,
+  rainNext24hMm: 86.5,
+  rainChancePercent: 62,
+  cloudCoverPercent: 71,
   pressureHpa: 1008,
+  uvIndex: 7,
+  dewPointC: 25.8,
   observedAt: "2026-11-03T08:30:00Z",
 }
 
@@ -59,8 +66,33 @@ export const sampleForecast: ForecastHour[] = Array.from({ length: 48 }, (_, ind
     temperatureC: Math.round(temperatureC * 10) / 10,
     rainfallMm: Math.round(rainfallMm * 10) / 10,
     rainChancePercent: storm ? 80 + (hour % 3) * 5 : rainfallMm > 0 ? 40 : 10,
+    windSpeedKmh: storm ? 28 : 12,
+    gustKmh: storm ? 52 : 22,
+    windFromDegrees: storm ? 250 : 225,
   }
 })
+
+/** Seven days from 3 November: the south-west monsoon easing. */
+export const sampleDaily: ForecastDay[] = [
+  [23.4, 31.2, 86.5, 96, 95, "thunderstorm", "Thunderstorm"],
+  [23.1, 30.4, 54.2, 92, 82, "heavy-rain", "Violent showers"],
+  [22.8, 30.9, 21.7, 81, 81, "rain", "Showers"],
+  [22.6, 31.5, 8.4, 64, 80, "rain", "Light showers"],
+  [22.9, 32.1, 2.1, 38, 2, "partly-cloudy", "Partly cloudy"],
+  [23.2, 32.6, 0, 12, 1, "clear", "Mainly clear"],
+  [23.5, 31.8, 4.6, 45, 80, "rain", "Light showers"],
+].map(([minC, maxC, rainMm, rainChancePercent, , condition, summary], index) => ({
+  date: `2026-11-${String(3 + index).padStart(2, "0")}`,
+  condition: condition as WeatherCondition,
+  summary: summary as string,
+  minC: minC as number,
+  maxC: maxC as number,
+  rainMm: rainMm as number,
+  rainChancePercent: rainChancePercent as number,
+  windMaxKmh: 18 + index,
+  gustMaxKmh: 40 - index,
+  uvMax: 9,
+}))
 
 export const sampleAlerts: WeatherAlert[] = [
   {
@@ -82,6 +114,22 @@ export const sampleAlerts: WeatherAlert[] = [
     area: "Sabaragamuwa, Western and Southern provinces",
     issuedAt: "2026-11-03T04:30:00Z",
     validUntil: "2026-11-03T22:30:00Z",
+  },
+]
+
+/** Alerts lanka-weather derives from forecasts and gauges: estimates, labelled as such. */
+export const sampleEstimates: WeatherAlert[] = [
+  {
+    id: "estimate-heavy_rain",
+    title: "Heavy rain likely",
+    severity: "warning",
+    estimate: true,
+    issuer: "Lanka Weather estimate",
+    area: "Ratnapura",
+    issuedAt: "2026-11-03T08:00:00Z",
+    validUntil: "2026-11-04T08:00:00Z",
+    summary: "About 117 mm of rain is forecast in the next 24 hours (threshold 100 mm).",
+    basis: "Open-Meteo forecast, interpolated from the weather grid",
   },
 ]
 

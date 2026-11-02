@@ -8,8 +8,15 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  thumbLabel,
+  thumbValueText,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
+}: React.ComponentProps<typeof SliderPrimitive.Root> & {
+  /** Accessible name of the thumb (the element with the slider role). */
+  thumbLabel?: string
+  /** Spoken value of the thumb, e.g. a date rather than a step number. */
+  thumbValueText?: string
+}) {
   const _values = React.useMemo(
     () => (Array.isArray(value) ? value : Array.isArray(defaultValue) ? defaultValue : [min, max]),
     [value, defaultValue, min, max],
@@ -41,6 +48,8 @@ function Slider({
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
+          aria-label={thumbLabel}
+          aria-valuetext={thumbValueText}
           className="relative block size-[1.125rem] shrink-0 rounded-full border-[5px] border-white bg-brand shadow-[0_0_0_1px_rgb(0_0_0/0.25),0_1px_3px_rgb(0_0_0/0.3)] transition-[box-shadow] select-none after:absolute after:-inset-2.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
         />
       ))}

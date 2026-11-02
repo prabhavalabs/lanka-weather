@@ -8,13 +8,15 @@ interface StepLegendProps {
   scale: ScaleStep[]
   /** Optional words under some steps, keyed by step index. */
   names?: Record<number, string>
+  /** Without the card, e.g. inside the layer list. */
+  bare?: boolean
   className?: string
 }
 
 /** Discrete colour steps with their lower bounds, as small squares. */
-export function StepLegend({ title, unit, scale, names = {}, className }: StepLegendProps) {
+export function StepLegend({ title, unit, scale, names = {}, bare, className }: StepLegendProps) {
   return (
-    <MapLegend title={title} unit={unit} className={className}>
+    <MapLegend title={title} unit={unit} bare={bare} className={className}>
       <ol className="grid gap-1" style={{ gridTemplateColumns: `repeat(${scale.length}, 1fr)` }}>
         {scale.map((step, index) => {
           const next = scale[index + 1]?.from

@@ -1,7 +1,6 @@
 import * as React from "react"
-import { MapPinIcon, RadioTowerIcon, SearchIcon, ShapesIcon } from "lucide-react"
+import { MapPinIcon, RadioTowerIcon, ShapesIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import {
   Command,
   CommandDialog,
@@ -12,54 +11,17 @@ import {
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command"
-import { Kbd } from "@/components/ui/kbd"
-import { cn } from "@/lib/utils"
 
 import type { SearchResult, SearchResultKind } from "./types"
+
+// The trigger lives apart so the page can show it without loading the palette.
+export { SearchTrigger } from "./SearchTrigger"
 
 const groups: { kind: SearchResultKind; heading: string; Icon: typeof MapPinIcon }[] = [
   { kind: "place", heading: "Places", Icon: MapPinIcon },
   { kind: "station", heading: "River gauges", Icon: RadioTowerIcon },
   { kind: "area", heading: "Administrative areas", Icon: ShapesIcon },
 ]
-
-const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
-
-interface SearchTriggerProps extends React.ComponentProps<"button"> {
-  /** Shows only the icon, e.g. in a narrow header. */
-  compact?: boolean
-}
-
-/** The search box that opens the palette; shows the keyboard shortcut. */
-export function SearchTrigger({ compact = false, className, ...props }: SearchTriggerProps) {
-  if (compact) {
-    return (
-      <Button
-        variant="outline"
-        size="icon"
-        aria-label="Search places, rivers and areas"
-        className={className}
-        {...props}
-      >
-        <SearchIcon />
-      </Button>
-    )
-  }
-  return (
-    <button
-      type="button"
-      className={cn(
-        "flex h-10 w-full items-center gap-2.5 rounded-full border border-border bg-card pr-2 pl-3.5 text-left text-sm text-muted-foreground shadow-panel transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-        className,
-      )}
-      {...props}
-    >
-      <SearchIcon className="size-4 shrink-0" aria-hidden="true" />
-      <span className="flex-1 truncate">Search places, rivers, areas</span>
-      <Kbd aria-hidden="true">{isMac ? "⌘K" : "Ctrl K"}</Kbd>
-    </button>
-  )
-}
 
 interface SearchCommandProps {
   open: boolean
@@ -76,6 +38,8 @@ interface SearchCommandProps {
   loading?: boolean
   /** Opens the palette with ⌘K or Ctrl+K. */
   shortcut?: boolean
+  /** Under the results, e.g. the data's attribution. */
+  footer?: React.ReactNode
 }
 
 /**
@@ -92,6 +56,7 @@ export function SearchCommand({
   onSelect,
   loading = false,
   shortcut = true,
+  footer,
 }: SearchCommandProps) {
   React.useEffect(() => {
     if (!shortcut) return
@@ -148,7 +113,14 @@ export function SearchCommand({
                         <Icon />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate">{result.title}</span>
+                        <span className="block truncate">
+                          {result.title}
+                          {result.localName && (
+                            <span className="ml-2 text-muted-foreground" lang="si">
+                              {result.localName}
+                            </span>
+                          )}
+                        </span>
                         {result.subtitle && (
                           <span className="block truncate text-xs text-muted-foreground">
                             {result.subtitle}
@@ -166,6 +138,11 @@ export function SearchCommand({
               )
             })}
         </CommandList>
+        {footer && (
+          <div className="border-t border-border px-4 py-2.5 text-[0.6875rem] text-muted-foreground">
+            {footer}
+          </div>
+        )}
       </Command>
     </CommandDialog>
   )

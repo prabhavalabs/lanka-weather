@@ -21,3 +21,14 @@ export const severityBadge = {
   warning: "minor_flood",
   emergency: "major_flood",
 } as const satisfies Record<AlertSeverity, string>
+
+/**
+ * Words for the level of an estimate: lanka-weather's own reading of the
+ * forecast, so it says what to do rather than borrowing an official word.
+ */
+export const estimateLabels: Record<AlertSeverity, string> = {
+  advisory: "Be aware",
+  watch: "Be aware",
+  warning: "Be prepared",
+  emergency: "Take action",
+}

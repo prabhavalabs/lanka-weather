@@ -17,7 +17,9 @@ export type WeatherCondition =
 
 export interface Place {
   name: string
-  /** Administrative context, e.g. "Ratnapura District · Sabaragamuwa Province". */
+  /** The name in Sinhala (or Tamil), shown under the English name. */
+  localName?: string
+  /** Administrative context, smallest first, e.g. "Mahanuwara › Gangawata Korale › Kandy › Central". */
   area: string
   latitude: number
   longitude: number
@@ -28,11 +30,18 @@ export interface CurrentConditions {
   /** Words for the condition, e.g. "Heavy showers". */
   summary: string
   temperatureC: number
-  feelsLikeC: number
-  humidityPercent: number
-  /** Rainfall in the last 24 hours. */
-  rainfall24hMm: number
-  pressureHpa: number
+  feelsLikeC: number | null
+  humidityPercent: number | null
+  /** Rain in the current hour. */
+  rainfallMm: number | null
+  /** Rain expected over the next 24 hours, when a forecast is available. */
+  rainNext24hMm?: number | null
+  /** Chance of rain in the current hour, 0 to 100. */
+  rainChancePercent?: number | null
+  cloudCoverPercent?: number | null
+  pressureHpa: number | null
+  uvIndex?: number | null
+  dewPointC?: number | null
   /** When the conditions were observed or modelled (ISO 8601). */
   observedAt: string
 }
@@ -46,6 +55,25 @@ export interface ForecastHour {
   rainfallMm: number
   /** Chance of measurable rain, 0 to 100. */
   rainChancePercent: number
+  windSpeedKmh?: number | null
+  gustKmh?: number | null
+  /** Direction the wind blows from, degrees clockwise from north. */
+  windFromDegrees?: number | null
+}
+
+/** One local day of the forecast. */
+export interface ForecastDay {
+  /** Local date, YYYY-MM-DD (Sri Lanka time). */
+  date: string
+  condition: WeatherCondition
+  summary: string
+  minC: number | null
+  maxC: number | null
+  rainMm: number | null
+  rainChancePercent: number | null
+  windMaxKmh: number | null
+  gustMaxKmh: number | null
+  uvMax: number | null
 }
 
 export interface WindReading {
@@ -62,6 +90,13 @@ export interface WeatherAlert {
   id: string
   title: string
   severity: AlertSeverity
+  /**
+   * True for an alert lanka-weather derived from forecasts and gauges: it is
+   * an estimate, never an official warning, and is labelled so.
+   */
+  estimate?: boolean
+  /** For estimates, the data it was derived from. */
+  basis?: string
   /** Who issued it, e.g. "Department of Meteorology". */
   issuer: string
   /** Where it applies, e.g. "Ratnapura, Kegalle and Kalutara districts". */
@@ -88,6 +123,8 @@ export interface SearchResult {
   id: string
   kind: SearchResultKind
   title: string
+  /** The name in Sinhala or Tamil, shown after the title. */
+  localName?: string
   /** Second line, e.g. "Kalu Ganga · river gauge". */
   subtitle?: string
   /** Short value on the right, e.g. a level or a temperature. */

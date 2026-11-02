@@ -6,14 +6,25 @@ interface MapLegendProps extends Omit<React.ComponentProps<"section">, "title"> 
   title: React.ReactNode
   /** Unit or note after the title, e.g. "°C" or "km/h". */
   unit?: React.ReactNode
+  /** Without the card, e.g. inside the layer list. */
+  bare?: boolean
 }
 
 /** The small card a map legend sits in, over the map. */
-export function MapLegend({ title, unit, className, children, ...props }: MapLegendProps) {
+export function MapLegend({
+  title,
+  unit,
+  bare = false,
+  className,
+  children,
+  ...props
+}: MapLegendProps) {
   return (
     <section
       className={cn(
-        "pointer-events-auto w-64 rounded-2xl border border-border bg-card/95 px-3.5 py-3 text-card-foreground shadow-panel backdrop-blur-md",
+        bare
+          ? "w-full text-card-foreground"
+          : "pointer-events-auto w-64 rounded-2xl border border-border bg-card/95 px-3.5 py-3 text-card-foreground shadow-panel backdrop-blur-md",
         className,
       )}
       {...props}

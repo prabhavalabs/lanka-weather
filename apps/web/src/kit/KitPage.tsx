@@ -65,19 +65,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Toaster } from "@/components/ui/sonner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { AdminAreaPicker } from "@/components/weather/AdminAreaPicker"
 import { AdminLevelSelector } from "@/components/weather/AdminLevelSelector"
 import { AlertList } from "@/components/weather/AlertList"
 import {
   sampleAlerts,
   sampleCurrent,
+  sampleDaily,
   sampleDistricts,
+  sampleEstimates,
   sampleForecast,
   samplePlace,
   sampleProvinces,
   sampleSearchResults,
   sampleWind,
 } from "@/components/weather/fixtures"
+import { DailyForecast } from "@/components/weather/DailyForecast"
 import { ForecastStrip } from "@/components/weather/ForecastStrip"
+import { GaugeList } from "@/components/weather/GaugeList"
 import { LocationWeatherPanel } from "@/components/weather/LocationWeatherPanel"
 import { RainfallLegend } from "@/components/weather/RainfallLegend"
 import { SearchCommand, SearchTrigger } from "@/components/weather/SearchCommand"
@@ -466,14 +471,19 @@ export default function KitPage() {
             <div className="flex flex-wrap items-center gap-4">
               <SearchTrigger className="max-w-sm" onClick={() => setSearchOpen(true)} />
               <SearchTrigger compact onClick={() => setSearchOpen(true)} />
-              <AdminLevelSelector
-                level={level}
-                onLevelChange={setLevel}
-                areas={level === "province" ? sampleProvinces : sampleDistricts}
-                selectedAreaId={area}
-                onAreaChange={setArea}
-                disabledLevels={["gn"]}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminLevelSelector
+                  level={level}
+                  onLevelChange={setLevel}
+                  disabledLevels={["gn"]}
+                />
+                <AdminAreaPicker
+                  level={level}
+                  areas={level === "province" ? sampleProvinces : sampleDistricts}
+                  selectedAreaId={area}
+                  onAreaChange={setArea}
+                />
+              </div>
             </div>
             <SearchCommand
               open={searchOpen}
@@ -492,14 +502,34 @@ export default function KitPage() {
                 place={samplePlace}
                 current={sampleCurrent}
                 forecast={sampleForecast}
+                daily={sampleDaily}
+                today="2026-11-03"
                 wind={sampleWind}
-                alerts={sampleAlerts}
-                source="Placeholder data"
+                alerts={sampleEstimates}
+                officialAlerts={sampleAlerts}
+                sources="Placeholder data"
                 onClose={() => toast("Closed")}
-              />
+              >
+                <GaugeList
+                  title="River gauges nearby"
+                  items={[
+                    {
+                      id: "ratnapura",
+                      title: "Ratnapura",
+                      subtitle: "Kalu Ganga · 2.1 km",
+                      value: "7.82 m ↑",
+                      badge: { variant: "minor_flood", label: "Minor flood" },
+                      onSelect: () => toast("Station"),
+                    },
+                  ]}
+                />
+              </LocationWeatherPanel>
               <div className="flex flex-col gap-6">
                 <Panel icon={<CloudRainIcon />} title="Next 48 hours" subtitle="Ratnapura">
                   <ForecastStrip hours={sampleForecast} />
+                </Panel>
+                <Panel icon={<CloudRainIcon />} title="7 days" subtitle="Ratnapura">
+                  <DailyForecast days={sampleDaily} today="2026-11-03" />
                 </Panel>
                 <div className="flex flex-wrap items-start gap-6">
                   <Panel icon={<WindIcon />} title="Wind" subtitle="From the south-west">
@@ -507,6 +537,7 @@ export default function KitPage() {
                   </Panel>
                   <div className="flex min-w-72 flex-1 flex-col gap-3">
                     <AlertList alerts={sampleAlerts} />
+                    <AlertList alerts={sampleEstimates} label="Estimates" />
                     <AlertList alerts={[]} />
                   </div>
                 </div>
