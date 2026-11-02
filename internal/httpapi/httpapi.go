@@ -88,13 +88,16 @@ type Hazards interface {
 
 // Dependencies are the services the API reads from.
 type Dependencies struct {
-	Logger  *slog.Logger
-	Rivers  Rivers
-	Regions Regions
-	Places  Places
-	Weather Weather
-	Floods  Floods
-	Summary Summaries
+	Logger      *slog.Logger
+	Rivers      Rivers
+	Regions     Regions
+	Places      Places
+	Weather     Weather
+	Floods      Floods
+	Summary     Summaries
+	Stations    Stations
+	Rain        Rain
+	Environment Environment
 	// RiverRisk serves the river network, its risk estimate and flood basins.
 	RiverRisk RiverRisk
 
@@ -152,6 +155,13 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/warnings/landslides/{id}", api.landslideDivision)
 		r.Get("/hazards/earthquakes", api.earthquakes)
 		r.Get("/hazards/cyclones", api.cyclones)
+		r.Get("/stations", api.stationLayer)
+		r.Get("/stations/{id}", api.stationDetail)
+		r.Get("/rain/steps", api.rainSteps)
+		r.Get("/rain/observed", api.rainObserved)
+		r.Get("/rain/tiles/{time}/{z}/{x}/{y}.png", api.rainTile)
+		r.Get("/air/current", api.airCurrent)
+		r.Get("/sea/current", api.seaCurrent)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {

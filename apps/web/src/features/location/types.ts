@@ -180,5 +180,61 @@ export interface Summary {
   floodForecast: { gauges: NearbyFloodGauge[]; areas: NearbyFloodArea[] } | null
   alerts: DerivedAlert[]
   official: OfficialAt
+  /** The nearest station's latest reading: measured, not modelled. */
+  observed?: NearbyObservation | null
+  /** Model estimate here; null outside its grid. */
+  airQuality?: AirQualityPoint | null
+  /** Model sea state on the water or at a coast; null inland. */
+  sea?: SeaPoint | null
   unavailable: string[]
+}
+
+export interface NearbyObservation {
+  id: string
+  name: string
+  reading: "3h" | "daily" | "none"
+  observedAt: string | null
+  temperatureC: number | null
+  humidityPct: number | null
+  rainMm: number | null
+  rainHours: number
+  rain24hMm: number | null
+  tempMinC: number | null
+  tempMaxC: number | null
+  stale: boolean
+  distanceKm: number
+  lon: number
+  lat: number
+  attribution: string
+}
+
+export type AqiCategory =
+  "good" | "moderate" | "unhealthy_sensitive" | "unhealthy" | "very_unhealthy" | "hazardous"
+
+export interface AirQualityPoint {
+  usAqi: number
+  category: AqiCategory
+  pm25: number | null
+  validAt: string
+  fetchedAt: string
+  stale: boolean
+  estimate: boolean
+  attribution: string
+}
+
+export interface SeaPoint {
+  waveHeightM: number
+  wavePeriodS: number | null
+  waveDirectionDeg: number | null
+  swellHeightM: number | null
+  swellPeriodS: number | null
+  swellDirectionDeg: number | null
+  state: string
+  distanceKm: number
+  validAt: string
+  fetchedAt: string
+  stale: boolean
+  estimate: boolean
+  attribution: string
+  note: string
 }

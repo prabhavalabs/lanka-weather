@@ -1,0 +1,76 @@
+e_ut": 1792693800.0,
+    "rain_mm": 69.2,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Vogan",
+    "time_ut": 1792693800.0,
+    "rain_mm": 85.6,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Gampaha",
+    "time_ut": 1792693800.0,
+    "rain_mm": 69.0,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Port Authority",
+    "time_ut": 1792693800.0,
+    "rain_mm": 84.9,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Vakanari Wawa",
+    "time_ut": 1792693800.0,
+    "rain_mm": 67.9,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Melkopiwatta",
+    "time_ut": 1792693800.0,
+    "rain_mm": 79.0,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Negombo",
+    "time_ut": 1792693800.0,
+    "rain_mm": 67.0,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Marawila",
+    "time_ut": 1792693800.0,
+    "rain_mm": 78.7,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Eladuwa Estate",
+    "time_ut": 1792693800.0,
+    "rain_mm": 64.5,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Colombo Fort",
+    "time_ut": 1792693800.0,
+    "rain_mm": 77.3,
+    "temp_min_c": null,
+    "temp_max_c": null
+  },
+  {
+    "id": "Ayyiththimalai",
+    "time_ut": 1792693800.0,
+    "rain_mm": 63.5,
+    "temp_min_c": null,
+    "temp_max_c": null
+  }
+]

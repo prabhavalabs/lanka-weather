@@ -16,6 +16,7 @@
  * - `?cyclone=1001346`: a tropical cyclone;
  * - `?warnings=all`, `?warnings=water_level`, optionally with `&district=LK-21`:
  *   the official warnings, of one type or in one district.
+ * - `?met=colombo`: a Department of Meteorology station.
  */
 export type Selection =
   | { kind: "point"; lat: number; lon: number; name?: string }
@@ -30,6 +31,7 @@ export type Selection =
   | { kind: "quake"; id: string }
   | { kind: "cyclone"; id: string }
   | { kind: "warnings"; type?: string; district?: string }
+  | { kind: "met"; id: string }
 
 /** The area the API answers for (`/v1/summary`, `/v1/regions/lookup`). */
 export const pointBounds = { south: 5.5, north: 10.5, west: 79, east: 82.5 }
@@ -40,6 +42,7 @@ const selectionKeys = [
   "region",
   "station",
   "gauge",
+  "met",
   "river",
   "reach",
   "basin",
@@ -156,6 +159,8 @@ export function parseSelection(search: string): Selection | null {
       ...(district ? { district } : {}),
     }
   }
+  const met = safeId(params.get("met"))
+  if (met) return { kind: "met", id: met }
 
   return null
 }
@@ -197,6 +202,8 @@ export function selectionSearch(selection: Selection | null, current = ""): stri
   } else if (selection?.kind === "warnings") {
     params.set("warnings", selection.type ?? "all")
     if (selection.district) params.set("district", selection.district)
+  } else if (selection?.kind === "met") {
+    params.set("met", selection.id)
   }
   const text = params.toString().replace(/%2C/g, ",")
   return text ? `?${text}` : ""

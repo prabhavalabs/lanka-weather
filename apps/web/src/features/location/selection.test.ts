@@ -173,3 +173,13 @@ describe("hazard selections", () => {
     ).toBe(false)
   })
 })
+
+describe("met station selection", () => {
+  it("round-trips through the URL", () => {
+    const selection = parseSelection("?met=nuwara-eliya")
+    expect(selection).toEqual({ kind: "met", id: "nuwara-eliya" })
+    expect(selectionSearch(selection, "?gauge=x")).toBe("?met=nuwara-eliya")
+    expect(sameSelection(selection, { kind: "met", id: "nuwara-eliya" })).toBe(true)
+    expect(sameSelection(selection, { kind: "station", id: "nuwara-eliya" })).toBe(false)
+  })
+})

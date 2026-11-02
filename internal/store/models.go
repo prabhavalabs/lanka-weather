@@ -114,6 +114,40 @@ type LandslideReport struct {
 	FetchedAt  time.Time   `json:"fetched_at"`
 }
 
+type MetReadings3h struct {
+	StationID   string    `json:"station_id"`
+	ObservedAt  time.Time `json:"observed_at"`
+	RainMm      *float64  `json:"rain_mm"`
+	TempC       *float64  `json:"temp_c"`
+	HumidityPct *float64  `json:"humidity_pct"`
+	Source      string    `json:"source"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+type MetReadingsDaily struct {
+	StationID  string      `json:"station_id"`
+	ReportDate pgtype.Date `json:"report_date"`
+	ObservedAt time.Time   `json:"observed_at"`
+	RainMm     *float64    `json:"rain_mm"`
+	TempMinC   *float64    `json:"temp_min_c"`
+	TempMaxC   *float64    `json:"temp_max_c"`
+	Source     string      `json:"source"`
+	FetchedAt  time.Time   `json:"fetched_at"`
+}
+
+type MetStation struct {
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	WmoID          *string     `json:"wmo_id"`
+	Lon            float64     `json:"lon"`
+	Lat            float64     `json:"lat"`
+	ElevationM     *float64    `json:"elevation_m"`
+	PositionSource string      `json:"position_source"`
+	Geom           interface{} `json:"geom"`
+	Source         string      `json:"source"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
 type OfficialBasin struct {
 	Fid        int64     `json:"fid"`
 	ID         string    `json:"id"`
@@ -225,6 +259,16 @@ type PlaceStaging struct {
 	Population *int32   `json:"population"`
 	Lon        float64  `json:"lon"`
 	Lat        float64  `json:"lat"`
+}
+
+type RainTile struct {
+	ValidAt   time.Time `json:"valid_at"`
+	Z         int32     `json:"z"`
+	X         int32     `json:"x"`
+	Y         int32     `json:"y"`
+	Png       []byte    `json:"png"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
 }
 
 type Region struct {

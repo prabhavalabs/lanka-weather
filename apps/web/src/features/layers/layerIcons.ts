@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  CloudFogIcon,
   CloudRainIcon,
   CloudSunIcon,
   ContainerIcon,
@@ -8,6 +9,7 @@ import {
   MountainIcon,
   RadioTowerIcon,
   SplineIcon,
+  ShipIcon,
   ThermometerIcon,
   TornadoIcon,
   TriangleAlertIcon,
@@ -27,6 +29,8 @@ const byId: Record<string, LucideIcon> = {
   temperature: ThermometerIcon,
   rainfall: CloudRainIcon,
   "weather-stations": RadioTowerIcon,
+  "air-quality": CloudFogIcon,
+  "sea-conditions": ShipIcon,
   cyclones: TornadoIcon,
   "landslide-warnings": MountainIcon,
   "official-warnings": TriangleAlertIcon,

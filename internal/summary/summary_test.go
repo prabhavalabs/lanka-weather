@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/stations"
 	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -180,6 +182,61 @@ func TestSummarySurvivesARiverRiskFailure(t *testing.T) {
 		found = found || part == "nearbyRivers"
 	}
 	if !found {
+		t.Fatalf("unavailable = %v", summary.Unavailable)
+	}
+}
+
+type fakeStations struct{ err error }
+
+func (fake fakeStations) Nearest(context.Context, float64, float64) (*stations.Nearby, error) {
+	if fake.err != nil {
+		return nil, fake.err
+	}
+	return &stations.Nearby{Properties: stations.Properties{ID: "colombo", Stale: true}, DistanceKm: 3}, nil
+}
+
+type fakeEnvironment struct{ err error }
+
+func (fake fakeEnvironment) AirAt(context.Context, float64, float64) (*environment.AirPoint, error) {
+	if fake.err != nil {
+		return nil, fake.err
+	}
+	return &environment.AirPoint{USAQI: 60, Category: environment.AQIModerate, Estimate: true}, nil
+}
+
+func (fake fakeEnvironment) SeaAt(_ context.Context, lon, _ float64) (*environment.SeaPoint, error) {
+	if lon > 80.5 {
+		return nil, nil
+	}
+	return &environment.SeaPoint{WaveHeightM: 1.2, State: "slight", Estimate: true}, nil
+}
+
+func TestSummaryAddsObservedAirAndSea(t *testing.T) {
+	service := &Service{Stations: fakeStations{}, Environment: fakeEnvironment{}, Now: func() time.Time { return start }}
+	summary, _ := service.Summary(context.Background(), 79.86, 6.92)
+	if summary.Observed == nil || summary.Observed.ID != "colombo" || !summary.Observed.Stale {
+		t.Fatalf("observed = %+v", summary.Observed)
+	}
+	if summary.AirQuality == nil || summary.Sea == nil || summary.Sea.State != "slight" {
+		t.Fatalf("air = %+v, sea = %+v", summary.AirQuality, summary.Sea)
+	}
+	inland, _ := service.Summary(context.Background(), 80.77, 7.0)
+	if inland.Sea != nil {
+		t.Fatalf("no sea inland: %+v", inland.Sea)
+	}
+	if slices.Contains(inland.Unavailable, "sea") {
+		t.Fatal("being inland is not a failure")
+	}
+}
+
+func TestSummaryListsFailedObservedAndAirParts(t *testing.T) {
+	failure := errors.New("down")
+	service := &Service{Stations: fakeStations{err: failure}, Environment: fakeEnvironment{err: failure}}
+	summary, err := service.Summary(context.Background(), 79.86, 6.92)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(summary.Unavailable, "observed") || !slices.Contains(summary.Unavailable, "airQuality") {
 		t.Fatalf("unavailable = %v", summary.Unavailable)
 	}
 }

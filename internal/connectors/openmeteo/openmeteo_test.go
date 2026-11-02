@@ -255,3 +255,93 @@ func TestLocalDayStart(t *testing.T) {
 		}
 	}
 }
+
+func TestEnvironmentBudgetStaysWellInsideTheFreeTier(t *testing.T) {
+	air, sea := grid.AirQuality(), grid.Sea()
+	extra := EnvironmentDailyCalls(len(air.Nodes), len(sea.Nodes), EnvironmentInterval)
+	weather := DailyCalls(len(grid.SriLanka().Nodes), CurrentInterval, ForecastInterval)
+	if extra > 1300 {
+		t.Fatalf("air quality and sea cost %.0f calls a day", extra)
+	}
+	if total := weather + extra; total > 8500 {
+		t.Fatalf("all Open-Meteo collecting costs %.0f calls a day, against a free tier of 10,000", total)
+	}
+}
+
+func TestDecodeRecordedAirQuality(t *testing.T) {
+	payload, err := os.ReadFile("testdata/air_quality_two_locations.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	locations, err := DecodeEnvironment(KindAirQuality, payload, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, location := range locations {
+		if location.Values["us_aqi"] <= 0 || location.Values["pm2_5"] <= 0 || location.Time.IsZero() {
+			t.Fatalf("location = %+v", location)
+		}
+	}
+	at, fields, err := EnvironmentFields(KindAirQuality, locations)
+	if err != nil || at.IsZero() || len(fields) != 2 || fields[0].Variable != "us_aqi" {
+		t.Fatalf("fields = %+v at %s, %v", fields, at, err)
+	}
+}
+
+func TestDecodeRecordedMarine(t *testing.T) {
+	payload, err := os.ReadFile("testdata/marine_two_locations.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	locations, err := DecodeEnvironment(KindMarine, payload, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, location := range locations {
+		if height := location.Values["wave_height"]; height <= 0 || height > 20 {
+			t.Fatalf("wave height = %v", height)
+		}
+		if _, ok := location.Values["swell_wave_period"]; !ok {
+			t.Fatalf("location = %+v", location)
+		}
+	}
+}
+
+func TestEnvironmentFailsOnAWholeMissingVariableOrWrongCount(t *testing.T) {
+	missing := `{"current":{"time":1793000000,"us_aqi":null,"pm2_5":null}}`
+	locations, err := DecodeEnvironment(KindAirQuality, []byte(missing), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !math.IsNaN(float64(locations[0].Values["us_aqi"])) {
+		t.Fatalf("null should be NaN: %+v", locations[0])
+	}
+	if _, _, err := EnvironmentFields(KindAirQuality, locations); err == nil {
+		t.Fatal("a run with no values at all must not replace a good one")
+	}
+	if _, err := DecodeEnvironment(KindMarine, []byte(`[{"current":{"time":1793000000}}]`), 2); err == nil {
+		t.Fatal("expected an error for the wrong number of locations")
+	}
+	if _, err := DecodeEnvironment(KindMarine, []byte(`{"error":true,"reason":"bad"}`), 1); err == nil {
+		t.Fatal("expected the API's error")
+	}
+}
+
+func TestEnvironmentQueryAsksTheSeaForSeaCells(t *testing.T) {
+	sea := grid.Sea()
+	query := EnvironmentQuery(KindMarine, sea.Nodes, []int{0, 1})
+	if query.Get("cell_selection") != "sea" || strings.Count(query.Get("latitude"), ",") != 1 {
+		t.Fatalf("query = %v", query)
+	}
+	if !strings.Contains(query.Get("current"), "swell_wave_height") {
+		t.Fatalf("current = %s", query.Get("current"))
+	}
+	air := EnvironmentQuery(KindAirQuality, sea.Nodes, []int{0})
+	if air.Get("cell_selection") != "" || air.Get("current") != "us_aqi,pm2_5" {
+		t.Fatalf("air query = %v", air)
+	}
+	chunks := environmentChunks(120, 50)
+	if len(chunks) != 3 || len(chunks[2]) != 20 || chunks[2][19] != 119 {
+		t.Fatalf("chunks = %v", chunks)
+	}
+}

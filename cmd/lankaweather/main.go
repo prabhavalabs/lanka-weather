@@ -30,12 +30,15 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/googleflood"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrobasins"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrorivers"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/imerg"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigationgis"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/landslides"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/metstations"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/openmeteo"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/usgs"
+	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/grid"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
@@ -44,11 +47,13 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
+	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
+	"github.com/prabhavalabs/lanka-weather/internal/stations"
 	"github.com/prabhavalabs/lanka-weather/internal/summary"
 	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
@@ -131,6 +136,11 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 		&landslides.Collector{Pool: pool, Fetcher: client},
 		&usgs.Collector{Pool: pool, Fetcher: client},
 		&gdacs.Collector{Pool: pool, Fetcher: client},
+		&imerg.Collector{Pool: pool, Client: client, Logger: logger},
+		&metstations.ThreeHourlyCollector{Pool: pool, Client: client, Logger: logger},
+		&metstations.DailyCollector{Pool: pool, Client: client, Logger: logger},
+		&openmeteo.EnvironmentCollector{Pool: pool, Client: client, Grid: grid.AirQuality(), Kind: openmeteo.KindAirQuality, Logger: logger},
+		&openmeteo.EnvironmentCollector{Pool: pool, Client: client, Grid: grid.Sea(), Kind: openmeteo.KindMarine, Logger: logger},
 	}
 	if key := os.Getenv("LANKAWEATHER_GOOGLE_API_KEY"); key != "" {
 		list = append(list, &googleflood.Collector{Pool: pool, Client: client, APIKey: key, Logger: logger,
@@ -190,6 +200,8 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	riverRiskService := &riverrisk.Service{Pool: pool, Rivers: riverService, Floods: floodService, Weather: weatherService, Logger: logger}
 	warningService := &warnings.Service{Pool: pool, LandslideStaleAfter: staleAfter("landslide-warnings"),
 		BulletinStaleAfter: staleAfter("official-warnings")}
+	stationService := &stations.Service{Pool: pool, StaleAfter: staleAfter("weather-stations")}
+	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -200,12 +212,16 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Weather: weatherService,
 			Floods:  floodService,
 			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
-				Regions: regionService, RiverRisk: riverRiskService, Official: warningService, Logger: logger},
+				Regions: regionService, RiverRisk: riverRiskService, Official: warningService,
+				Stations: stationService, Environment: environmentService, Logger: logger},
 			RiverRisk: riverRiskService,
 			Warnings:  warningService,
 			Hazards: &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"),
 				CyclonesStaleAfter: staleAfter("cyclones")},
-			Ready: pool.Ping,
+			Stations:    stationService,
+			Rain:        &rainfall.Service{Pool: pool, StaleAfter: staleAfter("rainfall")},
+			Environment: environmentService,
+			Ready:       pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

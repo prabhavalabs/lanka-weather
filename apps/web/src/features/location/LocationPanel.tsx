@@ -32,6 +32,7 @@ import {
   placeFor,
   windFrom,
 } from "./present"
+import { ObservedSummary } from "../stations/ObservedSummary"
 import { usePointForecast, useSelectionLocation, useSummary } from "./queries"
 import type { Selection } from "./selection"
 
@@ -41,6 +42,7 @@ export interface LocationPanelProps {
   onSelectStation: (id: string) => void
   onSelectGauge: (id: string) => void
   onSelectRiver?: (id: string) => void
+  onSelectMetStation: (id: string) => void
 }
 
 function unavailableText(error: unknown, outside: boolean) {
@@ -59,6 +61,7 @@ export default function LocationPanel({
   onSelectStation,
   onSelectGauge,
   onSelectRiver,
+  onSelectMetStation,
 }: LocationPanelProps) {
   const regionId = selection.kind === "region" ? selection.id : null
   const region = useRegionDetail(regionId)
@@ -175,6 +178,13 @@ export default function LocationPanel({
           )}
         </li>
       )}
+      {summary.data?.observed && <li>Observed: Department of Meteorology, Sri Lanka</li>}
+      {summary.data?.airQuality && (
+        <li>
+          Air quality: Open-Meteo.com (CC BY 4.0), CAMS, generated using Copernicus information
+        </li>
+      )}
+      {summary.data?.sea && <li>Sea: Open-Meteo.com (CC BY 4.0)</li>}
       {riversShown && <li>River levels: Irrigation Department of Sri Lanka</li>}
       {floodsShown && <li>Flood forecasts: Google Flood Hub (Flood Forecasting API)</li>}
       {summary.data?.official.fetchedAt && (
@@ -211,9 +221,17 @@ export default function LocationPanel({
       status={status}
       unavailableText={unavailableText(point.error, summary.data?.weather === null && !point.error)}
       highlight={
-        aggregate.region && aggregate.level ? (
-          <RegionAggregate region={aggregate.region} level={aggregate.level} />
-        ) : undefined
+        <>
+          {aggregate.region && aggregate.level && (
+            <RegionAggregate region={aggregate.region} level={aggregate.level} />
+          )}
+          <ObservedSummary
+            observed={summary.data?.observed}
+            air={summary.data?.airQuality}
+            sea={summary.data?.sea}
+            onSelectStation={onSelectMetStation}
+          />
+        </>
       }
       sources={sources}
       onClose={onClose}

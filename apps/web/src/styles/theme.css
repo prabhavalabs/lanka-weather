@@ -134,6 +134,22 @@
   --cloud-3: #626e7c99;
   --cloud-4: #545f6dd9;
 
+  /* US Air Quality Index bands (0, 51, 101, 151, 201, 301+), near the EPA's colours */
+  --aqi-1: #3fb54a;
+  --aqi-2: #f2d13c;
+  --aqi-3: #f28c28;
+  --aqi-4: #dc3a35;
+  --aqi-5: #8f3f97;
+  --aqi-6: #7e0023;
+
+  /* Significant wave height, smooth to high (<0.5, 0.5, 1.25, 2.5, 4, 6+ m) */
+  --wave-1: #bfe3ea;
+  --wave-2: #7cc8d8;
+  --wave-3: #3a9fc9;
+  --wave-4: #2b6fc2;
+  --wave-5: #5a3dbf;
+  --wave-6: #b02a9a;
+
   /* Basemap, applied over the OpenFreeMap style (src/features/map/basemap.ts) */
   --map-land: #f6f6f4;
   --map-water: #d3dade;
@@ -251,6 +267,20 @@
   --cloud-2: #e4eaf040;
   --cloud-3: #e9eef380;
   --cloud-4: #f2f5f8c4;
+
+  --aqi-1: #4cc95a;
+  --aqi-2: #f5da4a;
+  --aqi-3: #f6983a;
+  --aqi-4: #ef4a44;
+  --aqi-5: #a855b0;
+  --aqi-6: #b0234a;
+
+  --wave-1: #2f6f80;
+  --wave-2: #2f93a8;
+  --wave-3: #3bb0d8;
+  --wave-4: #4a86e8;
+  --wave-5: #8260e6;
+  --wave-6: #e04bb8;
 
   --map-land: #121212;
   --map-water: #050607;

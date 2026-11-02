@@ -88,6 +88,36 @@ export const windScale: ScaleStep[] = [
   { from: 118, token: "--wind-7" },
 ]
 
+/** US Air Quality Index, by the EPA's bands. */
+export const aqiScale: ScaleStep[] = [
+  { from: 0, token: "--aqi-1" },
+  { from: 51, token: "--aqi-2" },
+  { from: 101, token: "--aqi-3" },
+  { from: 151, token: "--aqi-4" },
+  { from: 201, token: "--aqi-5" },
+  { from: 301, token: "--aqi-6" },
+]
+
+/** PM2.5 in µg/m³, by the EPA's 2024 AQI breakpoints, on the same colours. */
+export const pm25Scale: ScaleStep[] = [
+  { from: 0, token: "--aqi-1" },
+  { from: 9.1, token: "--aqi-2" },
+  { from: 35.5, token: "--aqi-3" },
+  { from: 55.5, token: "--aqi-4" },
+  { from: 125.5, token: "--aqi-5" },
+  { from: 225.5, token: "--aqi-6" },
+]
+
+/** Significant wave height in metres, by the WMO sea-state words. */
+export const waveScale: ScaleStep[] = [
+  { from: null, token: "--wave-1" },
+  { from: 0.5, token: "--wave-2" },
+  { from: 1.25, token: "--wave-3" },
+  { from: 2.5, token: "--wave-4" },
+  { from: 4, token: "--wave-5" },
+  { from: 6, token: "--wave-6" },
+]
+
 /** The token for a value on a scale (the last step whose lower bound it reaches), or null below the scale. */
 export function scaleToken(scale: ScaleStep[], value: number): `--${string}` | null {
   let token: `--${string}` | null = null

@@ -74,6 +74,61 @@ var SriLankaLattice = Lattice{Lon0: 79.4, Lat0: 5.6, Step: 0.2, Nx: 15, Ny: 23}
 // SriLanka returns the default weather grid.
 func SriLanka() Grid { return Build(SriLankaID, SriLankaLattice) }
 
+// Coarser grids for air quality and sea state, which their models do not
+// resolve as finely as the weather grid (ADR 0012).
+const (
+	AirQualityID = "lk-air-0.4"
+	SeaID        = "lk-sea-0.5"
+)
+
+// AirQualityLattice is 0.4°, the CAMS global model's own resolution, over the
+// weather grid's extent.
+var AirQualityLattice = Lattice{Lon0: 79.4, Lat0: 5.6, Step: 0.4, Nx: 8, Ny: 12}
+
+// SeaLattice is 0.5° from 79° E, 5° N to 82.5° E, 10.5° N: the waters within
+// about 70 km of Sri Lanka's coast, which is what coastal users need.
+var SeaLattice = Lattice{Lon0: 79, Lat0: 5, Step: 0.5, Nx: 8, Ny: 12}
+
+// AirQuality returns the air-quality grid, masked like the weather grid.
+func AirQuality() Grid { return Build(AirQualityID, AirQualityLattice) }
+
+// Sea returns the sea-state grid: the lattice's nodes that are not on land.
+func Sea() Grid {
+	sea := Grid{ID: SeaID, Lattice: SeaLattice, position: make([]int, SeaLattice.Size())}
+	for j := range SeaLattice.Ny {
+		for i := range SeaLattice.Nx {
+			index := SeaLattice.Index(i, j)
+			sea.position[index] = -1
+			lon, lat := SeaLattice.Lon(i), SeaLattice.Lat(j)
+			if OnLand(lon, lat) {
+				continue
+			}
+			sea.position[index] = len(sea.Nodes)
+			sea.Nodes = append(sea.Nodes, Node{Index: index, I: i, J: j, Lon: lon, Lat: lat})
+		}
+	}
+	return sea
+}
+
+// NearSea reports whether a point is on the water, or within `reach` degrees of
+// it in any of eight directions.
+func NearSea(lon, lat, reach float64) bool {
+	if !OnLand(lon, lat) {
+		return true
+	}
+	const diagonal = 0.7071
+	for _, step := range [][2]float64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {diagonal, diagonal}, {diagonal, -diagonal}, {-diagonal, diagonal}, {-diagonal, -diagonal}} {
+		if !OnLand(lon+step[0]*reach, lat+step[1]*reach) {
+			return true
+		}
+	}
+	return false
+}
+
+// Land returns Sri Lanka's land as closed outer rings of longitude, latitude
+// pairs, for masking a sea field to the coast.
+func Land() [][][2]float64 { return coastline }
+
 // Build applies the land mask to a lattice.
 func Build(id string, lattice Lattice) Grid {
 	grid := Grid{ID: id, Lattice: lattice, position: make([]int, lattice.Size())}
