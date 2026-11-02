@@ -91,10 +91,30 @@ earlier records leave open:
 - **Met stations:** the daily report's total, or the sum of the 3-hourly rain
   over the day to the newest reading when at least 6 of 8 are there.
 - **River gauges:** `river_readings.rainfall_mm` is rain since the reading
-  before it: positive values rarely repeat (9 of 494) and follow the afternoon
-  and evening. The 24-hour total is their sum, given at least 18 readings;
-  readings re-entered within 10 minutes count once. This is our reading of
-  the data; the department does not document the field.
+  before it. The 24-hour total is their sum, given at least 18 readings. The
+  department does not document the field, but its own bulletin settles it, as
+  checked on 2026-11-02:
+  - **The Irrigation Department's bulletin agrees.** Its evening water-level
+    report prints "9 Hr RF in mm at 6:00", on the DMC's site. Over four evenings
+    (30 October to 2 November), of the 144 rows with both figures, our sum of
+    readings from 09:00 to 18:00 local matches 141 within 0.1 mm (Manampitiya
+    76.1, Thaldena 49.8, Deraniyagala 26.0). The others: Nawalapitiya is 0.3 mm
+    under, and Padiyathalawa differs both ways (30 against our 0 one day, 0
+    against our 46.7 another), as that gauge's readings arrive in late batches.
+  - **It is not a running total.** Hourly values fall and rise within a day
+    (Thaldena 49.8, 16.3, 1.3, 1.7, 4.0) and have no reset at any hour.
+  - **`waterlevels.lk` agrees where it can.** Its `rain.fallen_24h_mm` matched
+    our 24-hour totals at 31 of 32 stations with rain figures, and is a sum from
+    the same feed, so it is a check on the arithmetic rather than on the meaning.
+    Wellawaya is the difference: it reads 21 mm against our 15 mm, counting
+    twice a 6 mm reading entered nine minutes apart with the same level.
+  - **Repeats were being handled wrongly, and now are not.** The first rule
+    counted once any readings within 10 minutes. The bulletin shows the two cases
+    differ. The same level and rain entered twice is one reading: Ellagawa's
+    9.5 mm appears twice on 30 October, and the bulletin's 11.5 mm for that
+    window is 9.5 + 2. Readings seconds apart with different levels are a backlog,
+    and each holds its own rain: Pitabeddara's 4.4 and 0 mm on 1 November, where
+    the bulletin's 38.9 mm is 34.5 + 4.4, and the old rule would have lost the 4.4.
 - Totals older than a week are left out of the layer. An old total keeps a
   hollow point but no number, so it cannot read as today's rain.
 

@@ -119,3 +119,34 @@ func TestNearestInPicksTheClosestWithATemperature(t *testing.T) {
 		t.Fatalf("nothing should be within 75 km, got %+v", far)
 	}
 }
+
+// Each pair is from a day the Irrigation Department's bulletin settles.
+func TestGaugeTotalKeepsABacklogAndCountsAReEntryOnce(t *testing.T) {
+	end := time.Date(2026, 11, 1, 18, 0, 0, 0, time.UTC)
+	mm := func(value float64) *float64 { return &value }
+	filler := func(readings []GaugeReading, from time.Time, count int) []GaugeReading {
+		for index := range count {
+			readings = append(readings, GaugeReading{ObservedAt: from.Add(-time.Duration(index) * time.Hour), WaterLevel: 1, RainMm: mm(0)})
+		}
+		return readings
+	}
+	start := end.Add(-2 * time.Hour)
+
+	// Pitabeddara, 1 November: 1.67 m with 4.4 mm, then 1.69 m with 0, a second apart.
+	backlog := filler([]GaugeReading{
+		{ObservedAt: start.Add(time.Second), WaterLevel: 1.69, RainMm: mm(0)},
+		{ObservedAt: start, WaterLevel: 1.67, RainMm: mm(4.4)},
+	}, start.Add(-time.Hour), 20)
+	if total, _, ok := GaugeTotal(backlog); !ok || total != 4.4 {
+		t.Fatalf("a backlog should keep its rain: %v %v", total, ok)
+	}
+
+	// Ellagawa, 30 October: 8.72 m with 9.5 mm, twice, seconds apart.
+	repeat := filler([]GaugeReading{
+		{ObservedAt: start.Add(2 * time.Second), WaterLevel: 8.72, RainMm: mm(9.5)},
+		{ObservedAt: start, WaterLevel: 8.72, RainMm: mm(9.5)},
+	}, start.Add(-time.Hour), 20)
+	if total, _, ok := GaugeTotal(repeat); !ok || total != 9.5 {
+		t.Fatalf("a repeat should count once: %v %v", total, ok)
+	}
+}

@@ -44,7 +44,8 @@ const (
 	minimumGaugeReadings = 18
 	gaugeLookback        = 48 * time.Hour
 	gaugeWindow          = 24 * time.Hour
-	// A gauge reading re-entered within this time counts once.
+	// A gauge reading entered again within this time, with the same level and
+	// rain, counts once.
 	gaugeRepeat = 10 * time.Minute
 )
 
@@ -447,6 +448,7 @@ type RainProperties struct {
 // GaugeReading is one river gauge's rainfall reading.
 type GaugeReading struct {
 	ObservedAt time.Time
+	WaterLevel float64
 	RainMm     *float64
 }
 
@@ -460,16 +462,18 @@ func GaugeTotal(readings []GaugeReading) (total float64, end time.Time, ok bool)
 	}
 	end = readings[0].ObservedAt
 	counted := 0
-	var previous time.Time
+	var previous *GaugeReading
 	for _, reading := range readings {
 		if end.Sub(reading.ObservedAt) >= gaugeWindow {
 			break
 		}
-		// Readings re-entered moments apart are one reading.
-		if !previous.IsZero() && previous.Sub(reading.ObservedAt) < gaugeRepeat {
+		// The same reading entered twice counts once. Readings moments apart that
+		// differ are a backlog delivered together, and each holds its own rain.
+		if previous != nil && previous.ObservedAt.Sub(reading.ObservedAt) < gaugeRepeat && sameReading(*previous, reading) {
 			continue
 		}
-		previous = reading.ObservedAt
+		current := reading
+		previous = &current
 		if reading.RainMm == nil {
 			continue
 		}
@@ -480,6 +484,11 @@ func GaugeTotal(readings []GaugeReading) (total float64, end time.Time, ok bool)
 		return 0, time.Time{}, false
 	}
 	return total, end, true
+}
+
+func sameReading(a, b GaugeReading) bool {
+	sameRain := (a.RainMm == nil && b.RainMm == nil) || (a.RainMm != nil && b.RainMm != nil && *a.RainMm == *b.RainMm)
+	return sameRain && a.WaterLevel == b.WaterLevel
 }
 
 // ObservedRainfall returns 24-hour totals at stations and river gauges.
@@ -500,7 +509,7 @@ func (service *Service) ObservedRainfall(ctx context.Context) (*RainCollection, 
 	}
 	readings := map[string][]GaugeReading{}
 	for _, row := range rows {
-		readings[row.StationID] = append(readings[row.StationID], GaugeReading{ObservedAt: row.ObservedAt.UTC(), RainMm: row.RainfallMm})
+		readings[row.StationID] = append(readings[row.StationID], GaugeReading{ObservedAt: row.ObservedAt.UTC(), WaterLevel: row.WaterLevel, RainMm: row.RainfallMm})
 	}
 	out := &RainCollection{Type: "FeatureCollection", Features: []RainFeature{},
 		Meta: RainMeta{Attribution: "Department of Meteorology, Sri Lanka; Irrigation Department of Sri Lanka", GeneratedAt: now, Observed: true}}
