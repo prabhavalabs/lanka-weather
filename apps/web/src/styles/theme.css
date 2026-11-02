@@ -90,6 +90,29 @@
   --river-stream: #8fb3c9;
   --river-casing: #ffffff;
   --river-label: #0b5a8f;
+  /* Flood Hub's language, for Google's flood forecast: gauges by expected severity */
+  --flood-normal: #2f9e5f;
+  --flood-normal-foreground: #0a0a0a;
+  --flood-warning: #f59321;
+  --flood-warning-foreground: #0a0a0a;
+  --flood-danger: #e8431a;
+  --flood-danger-foreground: #0a0a0a;
+  --flood-extreme: #960b12;
+  --flood-extreme-foreground: #ffffff;
+  --flood-nodata: #a8a8a4;
+  --flood-nodata-foreground: #0a0a0a;
+  --flood-ring: #ffffff;
+  --flood-glyph: #0a0a0a;
+  /* Flash-flood areas: orange for likely, red for highly likely */
+  --flood-flash-likely: #ea8a1d;
+  --flood-flash-highly: #e23b2b;
+  /* Inundation probability, very high to moderate */
+  --flood-inundation-high: #174ea6;
+  --flood-inundation-medium: #5a8fe6;
+  --flood-inundation-low: #b4ccf5;
+  /* Significant flood events */
+  --flood-event: #f0655a;
+
   /* Flood basin outlines */
   --basin-outline: #4c6b80;
   /* Past flood extents: violet, because no live forecast uses it */
@@ -240,6 +263,25 @@
   --river-stream: #48687d;
   --river-casing: #050607;
   --river-label: #8fd0fa;
+  --flood-normal: #45bd78;
+  --flood-normal-foreground: #0a0a0a;
+  --flood-warning: #ffa23d;
+  --flood-warning-foreground: #0a0a0a;
+  --flood-danger: #ff5c2e;
+  --flood-danger-foreground: #0a0a0a;
+  --flood-extreme: #c8141d;
+  --flood-extreme-foreground: #ffffff;
+  --flood-nodata: #9c9c9c;
+  --flood-nodata-foreground: #0a0a0a;
+  --flood-ring: #f4f4f4;
+  --flood-glyph: #0a0a0a;
+  --flood-flash-likely: #ffa23d;
+  --flood-flash-highly: #ff5247;
+  --flood-inundation-high: #3b78ff;
+  --flood-inundation-medium: #76a2f5;
+  --flood-inundation-low: #b9cff7;
+  --flood-event: #ff7a6e;
+
   --basin-outline: #8aa9bd;
   --past-flood: #b89bee;
   --reservoir-spilling: #e879f9;

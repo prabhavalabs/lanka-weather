@@ -28,7 +28,7 @@ import type { Layer } from "@/lib/layers"
 import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
 import { useTheme } from "@/lib/theme"
 import { useLocalStorage } from "@/lib/useLocalStorage"
-import { anyUnverified, countBasins } from "./features/floods/basins"
+import { anyUnverified, countBasins, topArea } from "./features/floods/basins"
 import { BasinPanel } from "./features/floods/BasinPanel"
 import { FloodAreaPanel } from "./features/floods/FloodAreaPanel"
 import { FloodBasinsLayer, BASIN_FILL, SUBBASIN_FILL } from "./features/floods/FloodBasinsLayer"
@@ -44,6 +44,12 @@ import { FloodLegend } from "./features/floods/FloodLegend"
 import { countBySeverity, floodSummary, isGauge } from "./features/floods/present"
 import { useFloodForecast } from "./features/floods/queries"
 import type { FloodAreaFeature } from "./features/floods/types"
+import {
+  basinsForView,
+  defaultFloodView,
+  floodsForView,
+  type FloodView,
+} from "./features/floods/view"
 import { hazardDefaults, useHazards } from "./features/hazards/useHazards"
 import { LayerPanel } from "./features/layers/LayerPanel"
 import { count, layerStatus, type LayerStatus } from "./features/layers/status"
@@ -190,6 +196,10 @@ export function App() {
     "lanka-weather:grid-variable",
     "temperature",
   )
+  const [floodView, setFloodView] = useLocalStorage<FloodView>(
+    "lanka-weather:flood-view",
+    defaultFloodView,
+  )
   const [selection, setSelection] = useUrlSelection()
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -263,7 +273,18 @@ export function App() {
     riversNetworkLayer,
     riverNetworkOn || selection?.kind === "river" || searchLoaded,
   )
-  const basins = useFloodBasins(floodLayer, floodsOn || selection?.kind === "basin")
+  const basinQuery = useFloodBasins(floodLayer, floodsOn || selection?.kind === "basin")
+  const shownFloods = useMemo(
+    () => (floods.data ? floodsForView(floods.data, floodView) : undefined),
+    [floods.data, floodView],
+  )
+  const basins = useMemo(
+    () => ({
+      ...basinQuery,
+      data: basinQuery.data ? basinsForView(basinQuery.data, floodView) : undefined,
+    }),
+    [basinQuery, floodView],
+  )
   const pastFloods = usePastFloods(pastFloodsLayer, pastFloodsOn || selection?.kind === "past")
   const reservoirs = useReservoirs(
     reservoirLayer,
@@ -612,8 +633,10 @@ export function App() {
         return openReservoir(String(feature.properties.id))
       }
       if (hazards.handleHit(feature)) return
-      if (layer === FLOOD_AREAS && typeof feature.properties.id === "string") {
-        return openArea(feature.properties.id)
+      if (layer === FLOOD_AREAS) {
+        // Overlapping areas come in no useful order; the most specific one opens.
+        const top = topArea(queryMap(map, event.point, pointSlack)([FLOOD_AREAS], false)) ?? feature
+        if (typeof top.properties.id === "string") return openArea(top.properties.id)
       }
       if (RIVER_LINES.includes(layer) && feature.properties.river) {
         const reach =
@@ -793,7 +816,8 @@ export function App() {
   }
 
   const floodGauges = floods.data?.features.filter(isGauge) ?? []
-  const floodCounts = floods.data ? countBySeverity(floodGauges) : undefined
+  const shownGauges = shownFloods?.features.filter(isGauge) ?? []
+  const floodCounts = shownFloods ? countBySeverity(shownGauges) : undefined
   if (floodLayer) {
     const issued = floodGauges
       .map((feature) => feature.properties.issuedAt)
@@ -801,9 +825,9 @@ export function App() {
       .at(-1)
     statuses[FLOOD_FORECAST] = layerStatus({
       layer: floodLayer,
-      parts: floods.data
-        ? floods.data.meta.configured
-          ? [floodSummary(floods.data)]
+      parts: shownFloods
+        ? shownFloods.meta.configured
+          ? [floodSummary(shownFloods)]
           : ["Not configured on this server"]
         : [],
       observedAt: issued ?? floods.data?.meta.fetchedAt,
@@ -820,18 +844,17 @@ export function App() {
   }
   const basinCounts = basins.data ? countBasins(basins.data.basins) : undefined
   const basinsUnverified = basins.data ? anyUnverified(basins.data.basins) : false
-  const areaCount = floods.data?.meta.areas ?? 0
-  if (floodCounts) {
-    details[FLOOD_FORECAST] = (
-      <FloodLegend
-        bare
-        counts={floodCounts}
-        basinCounts={basinCounts}
-        unverified={basinsUnverified}
-        areaCount={areaCount}
-      />
-    )
+  const floodLegendProps = {
+    view: floodView,
+    onViewChange: setFloodView,
+    counts: floodCounts,
+    basinCounts,
+    unverified: basinsUnverified,
+    flashAreas: floods.data?.meta.flashAreas ?? 0,
+    checkedAt: floods.data?.meta.fetchedAt,
+    lowerConfidenceGauges: floods.data?.meta.lowerConfidenceGauges ?? 0,
   }
+  if (floodCounts) details[FLOOD_FORECAST] = <FloodLegend bare {...floodLegendProps} />
 
   if (riversNetworkLayer) {
     const atRiskCount = riverRisk.data ? riversAtRisk(riverRisk.data.rivers).length : 0
@@ -1294,14 +1317,7 @@ export function App() {
       )}
       <MapKey>
         {riverNetworkOn && <RiverRiskLegend card />}
-        {floodsOn && floodGauges.length > 0 && (
-          <FloodLegend
-            counts={floodCounts}
-            basinCounts={basinCounts}
-            unverified={basinsUnverified}
-            areaCount={areaCount}
-          />
-        )}
+        {floodsOn && floodGauges.length > 0 && <FloodLegend {...floodLegendProps} />}
         {riversOn && <RiverLegend counts={riverCounts} />}
         {reservoirsOn && <ReservoirLegend counts={reservoirCounts} />}
         {hazards.legends}
@@ -1368,7 +1384,7 @@ export function App() {
             )}
             {floodsOn && (
               <FloodForecastLayer
-                data={floods.data}
+                data={shownFloods}
                 selectedId={selection?.kind === "gauge" ? selection.id : null}
               />
             )}

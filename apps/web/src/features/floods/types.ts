@@ -34,12 +34,15 @@ export interface FloodAreaProperties {
   id?: string
   kind: FloodAreaKind
   gaugeId?: string
-  severity: FloodSeverity
+  /** A gauge's severity, or a flash flood's likelihood or an event's size. */
+  severity: FloodSeverity | "likely" | "highly_likely" | "moderate" | "minor"
   issuedAt?: string
   validFrom?: string
   validUntil?: string
   details?: Record<string, unknown>
   fetchedAt?: string
+  /** The area of a gauge Google has not verified; shown only with Extended coverage. */
+  lowerConfidence?: boolean
 }
 
 export interface FloodGaugeFeature {
@@ -70,5 +73,8 @@ export interface FloodForecastCollection {
     generatedAt: string
     gauges: number
     areas: number
+    verifiedGauges?: number
+    lowerConfidenceGauges?: number
+    flashAreas?: number
   }
 }

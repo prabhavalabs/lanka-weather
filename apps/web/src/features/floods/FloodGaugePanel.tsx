@@ -47,8 +47,8 @@ export function FloodGaugePanel({ gauge, areas = [], onClose, className }: Flood
       }
       footer={
         <p>
-          Source: Google Flood Hub (Flood Forecasting API). Official flood warnings come from the
-          Irrigation Department and the DMC.
+          Google Flood Hub (Flood Forecasting API). A forecast, not an official warning. Official
+          flood warnings come from the Irrigation Department and the DMC.
         </p>
       }
     >
@@ -64,7 +64,20 @@ export function FloodGaugePanel({ gauge, areas = [], onClose, className }: Flood
             Out of date
           </Badge>
         )}
+        {!gauge.qualityVerified && (
+          <Badge variant="chip" className="text-foreground">
+            Lower confidence
+          </Badge>
+        )}
       </div>
+
+      {!gauge.qualityVerified && (
+        <p className="rounded-xl border border-border bg-inset px-3 py-2 text-xs text-foreground">
+          Google has not quality-verified this gauge&apos;s model, and asks that it be used with
+          caution. Flood Hub calls this Extended coverage. It does not raise river risk, alerts or
+          the overview here.
+        </p>
+      )}
 
       <LabeledRows>
         <LabeledRow
@@ -78,7 +91,7 @@ export function FloodGaugePanel({ gauge, areas = [], onClose, className }: Flood
         />
         <LabeledRow
           label="Quality"
-          value={gauge.qualityVerified ? "Verified by Google" : "Not verified"}
+          value={gauge.qualityVerified ? "Verified by Google" : "Lower confidence, not verified"}
           numeric={false}
         />
       </LabeledRows>
@@ -88,18 +101,18 @@ export function FloodGaugePanel({ gauge, areas = [], onClose, className }: Flood
           <h3 className="text-xs font-medium text-muted-foreground">Gauge model thresholds</h3>
           <LabeledRows>
             <LabeledRow
-              leading={<LegendSwatch color="var(--status-alert)" />}
+              leading={<LegendSwatch color="var(--flood-warning)" />}
               label="Warning"
               value={formatThreshold(thresholds.warning, thresholds.unit)}
             />
             <LabeledRow
-              leading={<LegendSwatch color="var(--status-minor-flood)" />}
+              leading={<LegendSwatch color="var(--flood-danger)" />}
               label="Danger"
               value={formatThreshold(thresholds.danger, thresholds.unit)}
             />
             <LabeledRow
-              leading={<LegendSwatch color="var(--status-major-flood)" />}
-              label="Extreme danger"
+              leading={<LegendSwatch color="var(--flood-extreme)" />}
+              label="Extreme"
               value={formatThreshold(thresholds.extremeDanger, thresholds.unit)}
             />
           </LabeledRows>

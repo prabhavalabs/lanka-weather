@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { ApiError, isNotReady } from "@/lib/api"
 import { formatAge } from "@/lib/format"
 import {
+  areaBadge,
+  areaLikelihood,
   floodAreaLabels,
   floodSeverityBadge,
   floodSeverityLabels,
@@ -147,8 +149,8 @@ export default function LocationPanel({
         <span className="numeric">{formatWindow(floodArea.validFrom, floodArea.validUntil)}</span>
       ) : undefined,
       badge: {
-        variant: floodSeverityBadge[floodArea.severity],
-        label: floodSeverityLabels[floodArea.severity],
+        variant: areaBadge(floodArea as Parameters<typeof areaBadge>[0]),
+        label: areaLikelihood(floodArea as Parameters<typeof areaLikelihood>[0]).label,
       },
     }),
   )

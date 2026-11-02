@@ -179,6 +179,7 @@ export interface BasinArea {
   id: string
   kind: string
   state: BasinState
+  lowerConfidence?: boolean
 }
 
 export interface BasinStatus {
@@ -194,6 +195,8 @@ export interface BasinStatus {
   gauges: BasinGauge[]
   areas: BasinArea[]
   onlyUnverified: boolean
+  /** What verified evidence alone says: drawn while Extended coverage is off. */
+  verifiedState?: BasinState
   observedAt: string | null
 }
 
@@ -201,6 +204,7 @@ export interface SubbasinStatus {
   fid: number
   state: BasinState
   onlyUnverified: boolean
+  verifiedState?: BasinState
 }
 
 export interface BasinsDocument {

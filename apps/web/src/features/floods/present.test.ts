@@ -62,7 +62,7 @@ describe("formatWindow", () => {
 describe("floodSummary", () => {
   it("counts gauges above normal and areas", () => {
     expect(floodSummary(collection([gauge("no_flooding"), gauge("no_flooding")]))).toBe(
-      "2 gauges · none above normal",
+      "2 gauges · none at warning or above",
     )
     const area = {
       type: "Feature" as const,
@@ -71,7 +71,7 @@ describe("floodSummary", () => {
       properties: { kind: "notification" as const, severity: "severe" as const },
     }
     expect(floodSummary(collection([gauge("severe"), gauge("above_normal"), area]))).toBe(
-      "2 gauges · 2 above normal · 1 area",
+      "2 gauges · 2 at warning or above · 1 area",
     )
   })
 

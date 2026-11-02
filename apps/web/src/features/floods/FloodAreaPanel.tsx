@@ -3,9 +3,9 @@ import { LabeledRow, LabeledRows } from "@/components/LabeledRow"
 import { Panel } from "@/components/Panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { formatDayTime } from "@/lib/format"
+import { formatAge, formatDayTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { floodAreaLabels, floodSeverityBadge, floodSeverityLabels } from "./present"
+import { areaBadge, areaLikelihood, floodAreaLabels } from "./present"
 import type { FloodAreaFeature } from "./types"
 
 interface FloodAreaPanelProps {
@@ -16,7 +16,17 @@ interface FloodAreaPanelProps {
   className?: string
 }
 
-/** One of Google's flood polygons: what it means and when it applies. */
+const kindNames: Record<FloodAreaFeature["properties"]["kind"], string> = {
+  notification: "Riverine flood notification",
+  inundation_high: "Inundation",
+  inundation_medium: "Inundation",
+  inundation_low: "Inundation",
+  flash_likely: "Flash flood",
+  flash_highly_likely: "Flash flood",
+  significant_event: "Significant flood event",
+}
+
+/** One of Google's flood polygons: what kind it is, how likely, and when it applies. */
 export function FloodAreaPanel({
   area,
   seeded,
@@ -24,7 +34,9 @@ export function FloodAreaPanel({
   onSelectGauge,
   className,
 }: FloodAreaPanelProps) {
-  const { kind, severity, validFrom, validUntil, issuedAt, gaugeId } = area.properties
+  const { kind, validFrom, validUntil, issuedAt, gaugeId, fetchedAt, lowerConfidence } =
+    area.properties
+  const likelihood = areaLikelihood(area.properties)
   return (
     <Panel
       icon={<WavesIcon />}
@@ -43,13 +55,18 @@ export function FloodAreaPanel({
       }
       footer={
         <p>
-          Source: Google Flood Hub (Flood Forecasting API). Official flood warnings come from the
-          Irrigation Department and the DMC.
+          Google Flood Hub (Flood Forecasting API). A forecast, not an official warning. Official
+          flood warnings come from the Irrigation Department and the DMC.
         </p>
       }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={floodSeverityBadge[severity]}>{floodSeverityLabels[severity]}</Badge>
+        <Badge variant={areaBadge(area.properties)}>{likelihood.label}</Badge>
+        {lowerConfidence && (
+          <Badge variant="chip" className="text-foreground">
+            Lower confidence
+          </Badge>
+        )}
         {seeded && (
           <Badge variant="destructive" className="uppercase">
             Test data
@@ -57,10 +74,25 @@ export function FloodAreaPanel({
         )}
       </div>
       <LabeledRows>
-        <LabeledRow label="Valid from" value={validFrom ? formatDayTime(validFrom) : "–"} />
-        <LabeledRow label="Valid until" value={validUntil ? formatDayTime(validUntil) : "–"} />
-        {issuedAt && <LabeledRow label="Issued" value={formatDayTime(issuedAt)} />}
+        <LabeledRow label="Kind" value={kindNames[kind] ?? "Flood area"} numeric={false} />
+        <LabeledRow label="Likelihood" value={likelihood.label} numeric={false} />
+        <LabeledRow
+          label="Forecast from"
+          value={validFrom ? formatDayTime(validFrom) : "Not given"}
+        />
+        <LabeledRow
+          label="Forecast until"
+          value={validUntil ? formatDayTime(validUntil) : "Not given"}
+        />
+        {issuedAt && (
+          <LabeledRow
+            label="Issued"
+            value={`${formatDayTime(issuedAt)} · ${formatAge(issuedAt)}`}
+          />
+        )}
+        {fetchedAt && <LabeledRow label="Read" value={formatAge(fetchedAt)} />}
       </LabeledRows>
+      {likelihood.note && <p className="text-xs text-muted-foreground">{likelihood.note}</p>}
       {gaugeId && (
         <Button
           variant="secondary"

@@ -7,6 +7,7 @@ import {
   basinIdsByState,
   countBasins,
   subbasinIdsByState,
+  topArea,
 } from "./basins"
 
 describe("basin tints", () => {
@@ -62,5 +63,23 @@ describe("flood area styles", () => {
   it("covers every kind Google publishes", () => {
     expect(areaKinds).toHaveLength(7)
     for (const kind of areaKinds) expect(areaStyle[kind].width).toBeGreaterThan(0)
+  })
+})
+
+describe("flash-flood areas", () => {
+  it("draws highly likely over likely, and both over inundation", () => {
+    expect(areaStyle.flash_highly_likely.rank).toBeGreaterThan(areaStyle.flash_likely.rank)
+    expect(areaStyle.flash_likely.rank).toBeGreaterThan(areaStyle.inundation_high.rank)
+    expect(areaStyle.inundation_high.rank).toBeGreaterThan(areaStyle.inundation_low.rank)
+  })
+
+  it("names the topmost of overlapping areas", () => {
+    const areas = [
+      { id: 1, properties: { kind: "flash_likely" } },
+      { id: 2, properties: { kind: "flash_highly_likely" } },
+      { id: 3, properties: { kind: "inundation_low" } },
+    ]
+    expect(topArea(areas)?.id).toBe(2)
+    expect(topArea([])).toBeUndefined()
   })
 })

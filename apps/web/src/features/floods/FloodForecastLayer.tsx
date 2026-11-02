@@ -6,18 +6,19 @@ import { useMap } from "../map/MapContext"
 import { polygonSdf, type Point } from "../map/sdf"
 import { slotBefore, styleReady } from "../map/slots"
 import { areaKinds, areaStyle } from "./basins"
-import { floodSeverityTokens } from "./present"
+import { floodSeverityGlyphs, floodSeverityOrder, floodSeverityTokens } from "./present"
 import type { FloodForecastCollection } from "./types"
 
 const SOURCE = "flood-forecast"
 /** The gauges: what clicks and hovers hit. */
 export const FLOOD_GAUGES = "flood-forecast-gauges"
+const SHADOWS = "flood-forecast-gauge-shadows"
+const GLYPHS = "flood-forecast-glyphs"
 const TRENDS = "flood-forecast-trends"
 /** Google's flood polygons: what clicks and hovers hit. */
 export const FLOOD_AREAS = "flood-forecast-areas"
 const AREAS = FLOOD_AREAS
 const AREA_LINES = "flood-forecast-area-lines"
-const DIAMOND = "flood-diamond"
 const RISE = "flood-trend-rise"
 const FALL = "flood-trend-fall"
 
@@ -42,13 +43,6 @@ const ICON_RATIO = 2
 function addIcons(map: MapLibreMap) {
   const size = 40
   const half = size / 2
-  const r = 14
-  const diamond: Point[] = [
-    [half, half - r],
-    [half + r, half],
-    [half, half + r],
-    [half - r, half],
-  ]
   const up: Point[] = [
     [half, half - 9],
     [half + 8, half + 6],
@@ -56,7 +50,6 @@ function addIcons(map: MapLibreMap) {
   ]
   const down = up.map(([x, y]) => [x, size - y] as Point)
   const images: [string, Point[]][] = [
-    [DIAMOND, diamond],
     [RISE, up],
     [FALL, down],
   ]
@@ -81,7 +74,8 @@ function readPalette() {
   return readTokens({
     ...floodSeverityTokens,
     ...Object.fromEntries(areaKinds.map((kind) => [`area:${kind}`, areaStyle[kind].token])),
-    stroke: "--status-stroke",
+    ring: "--flood-ring",
+    glyph: "--flood-glyph",
     strokeSelected: "--status-stroke-selected",
     label: "--map-label-strong",
     halo: "--map-label-halo",
@@ -106,23 +100,53 @@ function severityColor(palette: Palette): ExpressionSpecification {
   ]
 }
 
-/** Draws severe gauges above calm ones. */
-const severityRank: ExpressionSpecification = [
-  "match",
-  ["get", "severity"],
-  "extreme",
-  4,
-  "severe",
-  3,
-  "above_normal",
-  2,
-  "no_flooding",
-  1,
-  0,
+/** Draws severe gauges above calm ones, and verified above lower-confidence ones. */
+const gaugeOrder: ExpressionSpecification = [
+  "+",
+  ["match", ["get", "severity"], "extreme", 4, "severe", 3, "above_normal", 2, "no_flooding", 1, 0],
+  ["case", ["get", "qualityVerified"], 10, 0],
 ]
 
 const isGauge: ExpressionSpecification = ["==", ["get", "kind"], "gauge"]
 const selected: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false]
+const verified: ExpressionSpecification = ["get", "qualityVerified"]
+const raised: ExpressionSpecification = [
+  "in",
+  ["get", "severity"],
+  ["literal", ["above_normal", "severe", "extreme"]],
+]
+
+/** A gauge's radius at a zoom: raised gauges larger, lower-confidence ones smaller. */
+function radius(extra = 0): ExpressionSpecification {
+  const at = (base: number) => [
+    "case",
+    verified,
+    ["case", raised, base + 1.5 + extra, base + extra],
+    base * 0.72 + extra,
+  ]
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    5,
+    at(4.5),
+    7,
+    at(6),
+    9,
+    at(7),
+    12,
+    at(8.5),
+  ] as ExpressionSpecification
+}
+
+function glyphText(): ExpressionSpecification {
+  const expression: unknown[] = ["match", ["get", "severity"]]
+  for (const severity of floodSeverityOrder) {
+    expression.push(severity, floodSeverityGlyphs[severity])
+  }
+  expression.push("")
+  return expression as ExpressionSpecification
+}
 
 function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
   const palette = readPalette()
@@ -132,7 +156,9 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
       type: "geojson",
       data: data as unknown as FeatureCollection,
       promoteId: "gaugeId",
-      attribution: "Flood forecasts: Google Flood Hub",
+      // Keeps the corners of Google's pixel-grid polygons at every zoom.
+      tolerance: 0.1,
+      attribution: "Flood forecasts: Google Flood Hub (Flood Forecasting API)",
     })
   }
   if (!map.getLayer(AREAS)) {
@@ -162,7 +188,8 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
         source: SOURCE,
         filter: ["!", isGauge],
         layout: {
-          "line-join": "round",
+          // Square corners: these are grid cells, and a round join would soften them.
+          "line-join": "miter",
           "line-sort-key": areaValue((kind) => areaStyle[kind].rank, 0),
         },
         paint: {
@@ -176,38 +203,75 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
       slotBefore(map, "areas"),
     )
   }
+  if (!map.getLayer(SHADOWS)) {
+    map.addLayer(
+      {
+        id: SHADOWS,
+        type: "circle",
+        source: SOURCE,
+        filter: isGauge,
+        layout: { "circle-sort-key": gaugeOrder },
+        paint: {
+          // A soft edge, so the light ring holds on a pale basemap as Flood Hub's does.
+          "circle-radius": radius(4),
+          "circle-color": "#000000",
+          "circle-opacity": 0.22,
+          "circle-blur": 0.55,
+        },
+      },
+      slotBefore(map, "points"),
+    )
+  }
   if (!map.getLayer(FLOOD_GAUGES)) {
     map.addLayer(
       {
         id: FLOOD_GAUGES,
-        type: "symbol",
+        type: "circle",
         source: SOURCE,
         filter: isGauge,
-        layout: {
-          "icon-image": DIAMOND,
-          // Calm forecasts stay small until there is room; a raised one never does.
-          "icon-size": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            4,
-            ["case", ["==", ["get", "severity"], "no_flooding"], 0.2, 0.6],
-            6,
-            ["case", ["==", ["get", "severity"], "no_flooding"], 0.42, 0.75],
-            8,
-            ["case", ["==", ["get", "severity"], "no_flooding"], 0.58, 0.85],
-            10,
-            1,
+        layout: { "circle-sort-key": gaugeOrder },
+        paint: {
+          "circle-radius": radius(),
+          // A lower-confidence gauge is hollow: its colour on the ring, not filled.
+          "circle-color": ["case", verified, severityColor(palette), palette.ring],
+          "circle-opacity": ["case", ["get", "stale"], 0.45, 1],
+          "circle-stroke-color": [
+            "case",
+            selected,
+            palette.strokeSelected,
+            verified,
+            palette.ring,
+            severityColor(palette),
           ],
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
-          "symbol-sort-key": severityRank,
+          "circle-stroke-width": ["case", selected, 3, verified, 2.25, 2],
+        },
+      },
+      slotBefore(map, "points"),
+    )
+  }
+  if (!map.getLayer(GLYPHS)) {
+    map.addLayer(
+      {
+        id: GLYPHS,
+        type: "symbol",
+        source: SOURCE,
+        filter: ["all", isGauge, ["!=", ["get", "severity"], "no_flooding"]],
+        minzoom: 6,
+        layout: {
+          "text-field": glyphText(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 10,
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+          "symbol-sort-key": gaugeOrder,
         },
         paint: {
-          "icon-color": severityColor(palette),
-          "icon-opacity": ["case", ["get", "stale"], 0.45, 1],
-          "icon-halo-color": ["case", selected, palette.strokeSelected, palette.stroke],
-          "icon-halo-width": ["case", selected, 3, 1.25],
+          "text-color": [
+            "case",
+            ["all", verified, ["==", ["get", "severity"], "extreme"]],
+            palette.ring,
+            palette.glyph,
+          ],
         },
       },
       slotBefore(map, "points"),
@@ -224,7 +288,7 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
         layout: {
           "icon-image": ["match", ["get", "trend"], "rise", RISE, FALL],
           "icon-size": 0.5,
-          "icon-offset": [22, -18],
+          "icon-offset": [26, -20],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
         },
@@ -241,7 +305,7 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
 
 function removeLayers(map: MapLibreMap) {
   if (!styleReady(map)) return
-  for (const id of [TRENDS, FLOOD_GAUGES, AREA_LINES, AREAS]) {
+  for (const id of [TRENDS, GLYPHS, FLOOD_GAUGES, SHADOWS, AREA_LINES, AREAS]) {
     if (map.getLayer(id)) map.removeLayer(id)
   }
   if (map.getSource(SOURCE)) map.removeSource(SOURCE)
@@ -253,10 +317,10 @@ interface FloodForecastLayerProps {
 }
 
 /**
- * Google flood forecast gauges as diamonds coloured by severity (the river
- * status colours), with an arrow when the forecast rises or falls, and
- * forecast flood areas as solid fills with strong outlines: inundation graded
- * by how likely the water is, the likeliest drawn on top.
+ * Google's flood forecast in Flood Hub's language: round gauges with a light ring,
+ * coloured by expected severity, with a mark beside the colour and an arrow when the
+ * forecast rises or falls; flash-flood areas with a pale fill and a strong outline,
+ * highly likely on top; and inundation on a blue ramp. Takes what the view shows.
  */
 export function FloodForecastLayer({ data, selectedId }: FloodForecastLayerProps) {
   const map = useMap()

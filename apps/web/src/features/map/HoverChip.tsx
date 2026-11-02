@@ -2,7 +2,7 @@ import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl"
 import { useEffect, useRef, useState } from "react"
 import { formatNumber } from "@/lib/format"
 import { useMediaQuery } from "@/lib/useMediaQuery"
-import { basinStateLabels } from "../floods/basins"
+import { basinStateLabels, topArea } from "../floods/basins"
 import { SUBBASIN_FILL } from "../floods/FloodBasinsLayer"
 import { floodAreaLabels, floodSeverityLabels, gaugeName } from "../floods/present"
 import { FLOOD_AREAS, FLOOD_GAUGES } from "../floods/FloodForecastLayer"
@@ -172,8 +172,9 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
           river: point.properties.river as string | undefined,
         })
         lines.push(
-          `Flood forecast: ${floodSeverityLabels[point.properties.severity as FloodSeverity] ?? "unknown"}`,
+          `Flood forecast: ${floodSeverityLabels[point.properties.severity as FloodSeverity] ?? "no data"}`,
         )
+        if (point.properties.qualityVerified === false) lines.push("Lower confidence")
       } else if (hazard) {
         const described = hazardLayers?.describe(hazard)
         if (described) {
@@ -182,7 +183,8 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
           lines.push(...described.lines)
         }
       } else if (area) {
-        title = floodAreaLabels[area.properties.kind as FloodAreaKind] ?? "Flood area"
+        const top = topArea(queryMap(map, event.point, pointSlack)([FLOOD_AREAS], false)) ?? area
+        title = floodAreaLabels[top.properties.kind as FloodAreaKind] ?? "Flood area"
         lines.push("Google flood forecast")
       } else if (river) {
         const known = riverInfo?.byId.get(String(river.properties.river))
