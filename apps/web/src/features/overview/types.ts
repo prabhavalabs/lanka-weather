@@ -7,6 +7,7 @@ export interface OverviewTarget {
     | "landslide"
     | "river"
     | "station"
+    | "raingauge"
     | "reservoir"
     | "reservoirs"
     | "cyclone"

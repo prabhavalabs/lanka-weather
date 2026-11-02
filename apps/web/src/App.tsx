@@ -121,7 +121,13 @@ import { overviewAction } from "./features/overview/present"
 import { useOverview } from "./features/overview/queries"
 import type { OverviewTarget } from "./features/overview/types"
 import { observedChip, observedPointLayers, observedTarget } from "./features/observed/points"
-import { useObservedLayers, WEATHER_STATIONS } from "./features/observed/useObservedLayers"
+import {
+  RAIN_GAUGES,
+  useObservedLayers,
+  WEATHER_STATIONS,
+} from "./features/observed/useObservedLayers"
+import { CanalsPanel } from "./features/canals/CanalsPanel"
+import { RainGaugePanel } from "./features/raingauges/RainGaugePanel"
 import { placeZoom } from "./features/search/present"
 import type { SearchChoice } from "./features/search/types"
 import { countValues } from "./features/weather-grid/field"
@@ -163,10 +169,11 @@ const defaultLayers = [
   RIVER_LEVELS,
   FLOOD_FORECAST,
   RESERVOIRS,
+  RAIN_GAUGES,
   ADMIN_REGIONS,
 ]
 /** Default layers added since people may have saved their choice; offered to them once. */
-const newDefaultLayers = [RIVERS, RESERVOIRS, ...hazardDefaults]
+const newDefaultLayers = [RIVERS, RESERVOIRS, RAIN_GAUGES, ...hazardDefaults]
 
 type RegionFill = RegionVariable | "none"
 
@@ -249,6 +256,7 @@ export function App() {
     available,
     enabled,
     selectedMetId: selection?.kind === "met" ? selection.id : null,
+    selectedRainGaugeId: selection?.kind === "raingauge" ? selection.id : null,
     theme,
     onShowModelRain: () => {
       setGridVariable("precipitation")
@@ -355,6 +363,8 @@ export function App() {
       : undefined
   const metStation =
     selection?.kind === "met" ? observedLayers.stationFeature(selection.id) : undefined
+  const rainGauge =
+    selection?.kind === "raingauge" ? observedLayers.rainGaugeFeature(selection.id) : undefined
   const reservoir =
     selection?.kind === "reservoir"
       ? reservoirs.data?.features.find((feature) => feature.id === selection.id)
@@ -374,6 +384,7 @@ export function App() {
     if (!turningOn && id === RIVERS && selection?.kind === "river") setSelection(null)
     if (!turningOn && id === PAST_FLOODS && selection?.kind === "past") setSelection(null)
     if (!turningOn && id === WEATHER_STATIONS && selection?.kind === "met") setSelection(null)
+    if (!turningOn && id === RAIN_GAUGES && selection?.kind === "raingauge") setSelection(null)
     if (
       !turningOn &&
       id === RESERVOIRS &&
@@ -485,6 +496,9 @@ export function App() {
     } else if (selection.kind === "met") {
       if (!metStation) return
       lngLat = metStation.geometry.coordinates
+    } else if (selection.kind === "raingauge") {
+      if (!rainGauge) return
+      lngLat = rainGauge.geometry.coordinates
     } else if (selection.kind === "reservoir") {
       if (!reservoir) return
       // A reservoir with no known position opens without moving the map.
@@ -502,6 +516,7 @@ export function App() {
     station,
     gauge,
     metStation,
+    rainGauge,
     reservoir,
     selectedRiver,
     selectedBasin,
@@ -588,6 +603,20 @@ export function App() {
     [enable, pendingCamera, setSelection],
   )
 
+  const openRainGauge = useCallback(
+    (id: string) => {
+      enable(RAIN_GAUGES)
+      const next: Selection = { kind: "raingauge", id }
+      pendingCamera(next, "reveal")
+      setSelection(next)
+    },
+    [enable, pendingCamera, setSelection],
+  )
+  const openCanals = useCallback(() => {
+    pending.current = null
+    setSelection({ kind: "canals" })
+  }, [setSelection])
+
   const openReservoir = useCallback(
     (id: string) => {
       enable(RESERVOIRS)
@@ -625,6 +654,7 @@ export function App() {
       const layer = feature.layer.id
       const observed = observedTarget(feature)
       if (observed) {
+        if (observed.kind === "raingauge") return openRainGauge(observed.id)
         return observed.kind === "met" ? openMetStation(observed.id) : openStation(observed.id)
       }
       if (layer === RIVER_STATIONS) return openStation(String(feature.properties.id))
@@ -811,6 +841,10 @@ export function App() {
           }))}
         />
         <RiverLegend bare counts={riverCounts} />
+        <Button size="sm" variant="secondary" onClick={openCanals} className="w-full">
+          <ListIcon />
+          Colombo canals
+        </Button>
       </div>
     )
   }
@@ -1161,6 +1195,8 @@ export function App() {
           onSelectRiver={openRiver}
           onSelectMetStation={openMetStation}
           onSelectReservoir={openReservoir}
+          onSelectRainGauge={openRainGauge}
+          onOpenCanals={openCanals}
         />
       </Suspense>
     )
@@ -1246,6 +1282,12 @@ export function App() {
   } else if (selection?.kind === "met") {
     detailLabel = "Weather station"
     detail = <MetStationPanel id={selection.id} onClose={close} />
+  } else if (selection?.kind === "raingauge") {
+    detailLabel = "Rain gauge"
+    detail = <RainGaugePanel id={selection.id} onClose={close} />
+  } else if (selection?.kind === "canals") {
+    detailLabel = "Colombo canals"
+    detail = <CanalsPanel onClose={close} />
   } else if (selection?.kind === "gauge") {
     detailLabel = "Flood forecast gauge"
     const areas = (floods.data?.features ?? []).filter(
@@ -1320,6 +1362,7 @@ export function App() {
         {floodsOn && floodGauges.length > 0 && <FloodLegend {...floodLegendProps} />}
         {riversOn && <RiverLegend counts={riverCounts} />}
         {reservoirsOn && <ReservoirLegend counts={reservoirCounts} />}
+        {observedLayers.legendsInKey}
         {hazards.legends}
       </MapKey>
     </>

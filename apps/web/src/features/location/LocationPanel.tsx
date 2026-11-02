@@ -20,6 +20,7 @@ import {
   formatWindow,
   gaugeName,
 } from "../floods/present"
+import { bandBadge, bandLabels } from "../raingauges/present"
 import { riskBadge, riskLabels } from "../river-risk/present"
 import { flowShort, reservoirStatusLabels } from "../reservoirs/present"
 import { formatLevel, statusLabels, trendArrows } from "../rivers/present"
@@ -47,6 +48,8 @@ export interface LocationPanelProps {
   onSelectRiver?: (id: string) => void
   onSelectMetStation: (id: string) => void
   onSelectReservoir: (id: string) => void
+  onSelectRainGauge?: (id: string) => void
+  onOpenCanals?: () => void
 }
 
 function unavailableText(error: unknown, outside: boolean) {
@@ -67,6 +70,8 @@ export default function LocationPanel({
   onSelectRiver,
   onSelectMetStation,
   onSelectReservoir,
+  onSelectRainGauge,
+  onOpenCanals,
 }: LocationPanelProps) {
   const regionId = selection.kind === "region" ? selection.id : null
   const region = useRegionDetail(regionId)
@@ -169,6 +174,52 @@ export default function LocationPanel({
     onSelect: () => onSelectReservoir(reservoir.id),
   }))
 
+  const nearRainGauge = summary.data?.rainGauge
+  const liveRain: GaugeListItem[] = nearRainGauge
+    ? [
+        {
+          id: nearRainGauge.id,
+          title: nearRainGauge.name,
+          subtitle: (
+            <>
+              <span className="numeric">{nearRainGauge.distanceKm.toFixed(1)} km</span> ·{" "}
+              {nearRainGauge.institution} ·{" "}
+              <span className="numeric">{formatAge(nearRainGauge.observedAt)}</span>
+            </>
+          ),
+          value:
+            nearRainGauge.rain24hMm !== null
+              ? `${nearRainGauge.rain24hMm.toFixed(1)} mm`
+              : undefined,
+          badge: { variant: bandBadge[nearRainGauge.band], label: bandLabels[nearRainGauge.band] },
+          onSelect: onSelectRainGauge ? () => onSelectRainGauge(nearRainGauge.id) : undefined,
+        },
+      ]
+    : []
+  const nearCanals = summary.data?.canals
+  const canalRows: GaugeListItem[] = nearCanals
+    ? [
+        {
+          id: "colombo-canals",
+          title: "Colombo canals",
+          subtitle: (
+            <>
+              <span className="numeric">
+                {nearCanals.reporting} of {nearCanals.total}
+              </span>{" "}
+              gauges reporting · context, not a flood warning
+            </>
+          ),
+          badge: nearCanals.stale
+            ? { variant: "chip" as const, label: "Out of date" }
+            : nearCanals.raised > 0
+              ? { variant: "alert" as const, label: `${nearCanals.raised} raised` }
+              : { variant: "normal" as const, label: "None raised" },
+          onSelect: onOpenCanals,
+        },
+      ]
+    : []
+
   const meta = point.data?.meta
   const weatherAge = meta?.currentFetchedAt ?? current?.observedAt ?? null
   const riversShown = rivers.length > 0
@@ -266,6 +317,7 @@ export default function LocationPanel({
       sources={sources}
       onClose={onClose}
     >
+      <GaugeList title="Rain gauge nearby, last 24 hours" items={liveRain} />
       <GaugeList title="Rivers nearby" items={nearbyRivers} />
       {status === "unavailable" && (
         <section className="flex flex-col gap-2">
@@ -279,6 +331,7 @@ export default function LocationPanel({
         </section>
       )}
       <GaugeList title="River gauges nearby" items={rivers} />
+      <GaugeList title="Canals" items={canalRows} />
       <GaugeList title="Flood forecast gauges nearby" items={floodGauges} />
       <GaugeList title="Flood areas here" items={floodAreas} />
       <GaugeList title="Reservoirs spilling or releasing nearby" items={reservoirs} />

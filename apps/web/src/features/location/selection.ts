@@ -19,6 +19,8 @@
  * - `?met=colombo`: a Department of Meteorology station.
  * - `?reservoir=minneriya`: a reservoir;
  * - `?reservoirs=active`: the list of reservoirs spilling or releasing.
+ * - `?raingauge=r47`: a live rain gauge;
+ * - `?canals=colombo`: the list of Colombo's canal gauges.
  */
 export type Selection =
   | { kind: "point"; lat: number; lon: number; name?: string }
@@ -36,6 +38,8 @@ export type Selection =
   | { kind: "met"; id: string }
   | { kind: "reservoir"; id: string }
   | { kind: "reservoirs" }
+  | { kind: "raingauge"; id: string }
+  | { kind: "canals" }
 
 /** The area the API answers for (`/v1/summary`, `/v1/regions/lookup`). */
 export const pointBounds = { south: 5.5, north: 10.5, west: 79, east: 82.5 }
@@ -48,6 +52,8 @@ const selectionKeys = [
   "gauge",
   "reservoir",
   "reservoirs",
+  "raingauge",
+  "canals",
   "met",
   "river",
   "reach",
@@ -172,6 +178,11 @@ export function parseSelection(search: string): Selection | null {
 
   if (params.has("reservoirs")) return { kind: "reservoirs" }
 
+  const rainGauge = safeId(params.get("raingauge"))
+  if (rainGauge) return { kind: "raingauge", id: rainGauge }
+
+  if (params.has("canals")) return { kind: "canals" }
+
   return null
 }
 
@@ -218,6 +229,10 @@ export function selectionSearch(selection: Selection | null, current = ""): stri
     params.set("reservoir", selection.id)
   } else if (selection?.kind === "reservoirs") {
     params.set("reservoirs", "active")
+  } else if (selection?.kind === "raingauge") {
+    params.set("raingauge", selection.id)
+  } else if (selection?.kind === "canals") {
+    params.set("canals", "colombo")
   }
   const text = params.toString().replace(/%2C/g, ",")
   return text ? `?${text}` : ""
@@ -238,6 +253,6 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
   if (a.kind === "warnings" && b.kind === "warnings") {
     return a.type === b.type && a.district === b.district
   }
-  if (a.kind === "reservoirs") return true
+  if (a.kind === "reservoirs" || a.kind === "canals") return true
   return "id" in a && "id" in b && a.id === b.id
 }

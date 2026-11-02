@@ -4,14 +4,25 @@
  */
 import type { MapGeoJSONFeature } from "maplibre-gl"
 import { formatAge, formatNumber } from "@/lib/format"
-import { RAIN_GAUGE_POINTS, RAIN_MET_POINTS } from "../rainfall/ObservedRainLayer"
+import { RAIN_GAUGE_POINTS } from "../raingauges/RainGaugesLayer"
+import { bandLabels } from "../raingauges/present"
+import type { RainBand } from "../raingauges/types"
+import {
+  RAIN_GAUGE_POINTS as RIVER_RAIN_POINTS,
+  RAIN_MET_POINTS,
+} from "../rainfall/ObservedRainLayer"
 import { methodLabels } from "../rainfall/present"
 import type { ObservedRainMethod } from "../rainfall/types"
 import { MET_STATIONS } from "../stations/MetStationsLayer"
 import { formatRain } from "../stations/present"
 
 /** Point layers these layers draw, for clicks and hovers. */
-export const observedPointLayers = [MET_STATIONS, RAIN_GAUGE_POINTS, RAIN_MET_POINTS]
+export const observedPointLayers = [
+  RAIN_GAUGE_POINTS,
+  MET_STATIONS,
+  RIVER_RAIN_POINTS,
+  RAIN_MET_POINTS,
+]
 
 type Hit = Pick<MapGeoJSONFeature, "properties"> & { layer: Pick<MapGeoJSONFeature["layer"], "id"> }
 
@@ -30,7 +41,20 @@ export function observedChip(point: Hit): { title: string; lines: string[] } | n
       ],
     }
   }
-  if (point.layer.id === RAIN_GAUGE_POINTS || point.layer.id === RAIN_MET_POINTS) {
+  if (point.layer.id === RAIN_GAUGE_POINTS) {
+    const observedAt = typeof properties.observedAt === "string" ? properties.observedAt : null
+    const rain = typeof properties.rain24hMm === "number" ? properties.rain24hMm : null
+    return {
+      title: String(properties.name ?? "Rain gauge"),
+      lines: [
+        rain === null
+          ? "Out of date: no current total"
+          : `Rain, 24 h: ${formatRain(rain)} · ${bandLabels[properties.band as RainBand] ?? ""}`,
+        `${String(properties.institution ?? "")} · ${formatAge(observedAt)}`,
+      ],
+    }
+  }
+  if (point.layer.id === RIVER_RAIN_POINTS || point.layer.id === RAIN_MET_POINTS) {
     const windowEnd = typeof properties.windowEnd === "string" ? properties.windowEnd : null
     return {
       title: String(properties.name ?? "Rainfall"),
@@ -45,10 +69,14 @@ export function observedChip(point: Hit): { title: string; lines: string[] } | n
 }
 
 /** What a click on one of these layers' points opens; null for another's. */
-export function observedTarget(hit: Hit): { kind: "met" | "station"; id: string } | null {
+export function observedTarget(
+  hit: Hit,
+): { kind: "met" | "station" | "raingauge"; id: string } | null {
+  if (hit.layer.id === RAIN_GAUGE_POINTS)
+    return { kind: "raingauge", id: String(hit.properties.id) }
   if (hit.layer.id === MET_STATIONS) return { kind: "met", id: String(hit.properties.id) }
   if (hit.layer.id === RAIN_MET_POINTS) return { kind: "met", id: String(hit.properties.stationId) }
-  if (hit.layer.id === RAIN_GAUGE_POINTS) {
+  if (hit.layer.id === RIVER_RAIN_POINTS) {
     return { kind: "station", id: String(hit.properties.stationId) }
   }
   return null

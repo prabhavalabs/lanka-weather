@@ -86,6 +86,12 @@ export function overviewAction(target: OverviewTarget): OverviewAction {
         selection: { kind: "station", id },
         camera: "reveal",
       }
+    case "raingauge":
+      return {
+        enable: [...enable, "rain-gauges"],
+        selection: { kind: "raingauge", id },
+        camera: "reveal",
+      }
     case "reservoir":
       return {
         enable: [...enable, "reservoirs"],

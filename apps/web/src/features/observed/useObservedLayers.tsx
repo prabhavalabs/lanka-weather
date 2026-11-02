@@ -25,6 +25,10 @@ import { FieldLayer } from "../environment/FieldLayer"
 import { useAirGrid, useSeaGrid } from "../environment/queries"
 import type { AirKey } from "../environment/types"
 import { count, layerStatus, type LayerStatus } from "../layers/status"
+import { countBands, gaugesSummary, withoutLiveDuplicates } from "../raingauges/present"
+import { useRainGauges } from "../raingauges/queries"
+import { RainGaugeLegend } from "../raingauges/RainGaugeLegend"
+import { RainGaugesLayer } from "../raingauges/RainGaugesLayer"
 import { ObservedRainLayer } from "../rainfall/ObservedRainLayer"
 import { useObservedRain, useRainSteps } from "../rainfall/queries"
 import { RainImageLayer } from "../rainfall/RainImageLayer"
@@ -36,6 +40,7 @@ import { useMetStations } from "../stations/queries"
 import { sampleGrid } from "../weather-grid/field"
 
 export const RAINFALL = "rainfall"
+export const RAIN_GAUGES = "rain-gauges"
 export const WEATHER_STATIONS = "weather-stations"
 export const AIR_QUALITY = "air-quality"
 export const SEA_CONDITIONS = "sea-conditions"
@@ -64,6 +69,8 @@ interface ObservedLayersOptions {
   enabled: string[]
   /** The selected Met station, if any. */
   selectedMetId: string | null
+  /** The selected live rain gauge, if any. */
+  selectedRainGaugeId: string | null
   theme: ResolvedTheme
   /** Shows the weather field's forecast rain. */
   onShowModelRain: () => void
@@ -90,6 +97,7 @@ export function useObservedLayers({
   available,
   enabled,
   selectedMetId,
+  selectedRainGaugeId,
   theme,
   onShowModelRain,
 }: ObservedLayersOptions) {
@@ -99,16 +107,19 @@ export function useObservedLayers({
   )
   const on = (id: string) => enabled.includes(id) && available(id) !== undefined
   const rainLayer = available(RAINFALL)
+  const gaugeLayer = available(RAIN_GAUGES)
   const stationLayer = available(WEATHER_STATIONS)
   const airLayer = available(AIR_QUALITY)
   const seaLayer = available(SEA_CONDITIONS)
   const rainOn = on(RAINFALL)
+  const gaugesOn = on(RAIN_GAUGES)
   const stationsOn = on(WEATHER_STATIONS)
   const airOn = on(AIR_QUALITY)
   const seaOn = on(SEA_CONDITIONS)
 
   const rain = useRainSteps(rainLayer, rainOn)
   const observedRain = useObservedRain(rainOn)
+  const rainGauges = useRainGauges(gaugeLayer, gaugesOn || selectedRainGaugeId !== null)
   const stations = useMetStations(stationLayer, stationsOn || selectedMetId !== null)
   const air = useAirGrid(airLayer, airOn)
   const sea = useSeaGrid(seaLayer, seaOn)
@@ -149,7 +160,8 @@ export function useObservedLayers({
         <h3 className="font-medium text-foreground">Measured, last 24 hours</h3>
         <p>
           Circles are river gauges and squares Met stations. Hollow points are too old to be
-          current; open one for its date.
+          current; open one for its date. Where a live rain gauge stands beside one, only the live
+          gauge shows while that layer is on.
           {observedRain.data &&
             ` ${observedRain.data.meta.fresh} current, ${observedRain.data.meta.stale} old.`}
         </p>
@@ -162,6 +174,38 @@ export function useObservedLayers({
           Show forecast rain
         </Button>
       </section>
+    </div>
+  )
+
+  // Live rain gauges: what was measured, wetter ones showing first.
+  const gaugeMeta = rainGauges.data?.meta
+  if (gaugeLayer) {
+    statuses[RAIN_GAUGES] = layerStatus({
+      layer: gaugeLayer,
+      parts: gaugeMeta ? [gaugesSummary(gaugeMeta)] : [],
+      observedAt: gaugeMeta?.sourceTime,
+      error: rainGauges.error,
+      pending: rainGauges.isPending,
+    })
+  }
+  const gaugeCounts = rainGauges.data ? countBands(rainGauges.data.features) : undefined
+  details[RAIN_GAUGES] = (
+    <div className="flex flex-col gap-3 text-xs text-muted-foreground">
+      <RainGaugeLegend bare counts={gaugeCounts} />
+      <p>
+        Rolling 24-hour totals, measured. Zoom in for light rain, then for dry gauges; a hollow drop
+        has not reported for over 3 hours, which does not mean it has been dry.
+      </p>
+      {gaugeMeta?.institutions && (
+        <p>
+          {Object.entries(gaugeMeta.institutions)
+            .sort(([, a], [, b]) => b - a)
+            .map(([name, value]) => `${name} ${value}`)
+            .join(" · ")}
+          .
+        </p>
+      )}
+      <p>{gaugeLayer?.attribution}. Not an official warning.</p>
     </div>
   )
 
@@ -370,7 +414,14 @@ export function useObservedLayers({
           theme={theme}
         />
       )}
-      {rainOn && <ObservedRainLayer data={observedRain.data} />}
+      {rainOn && (
+        <ObservedRainLayer
+          data={
+            gaugesOn ? withoutLiveDuplicates(observedRain.data, rainGauges.data) : observedRain.data
+          }
+        />
+      )}
+      {gaugesOn && <RainGaugesLayer data={rainGauges.data} selectedId={selectedRainGaugeId} />}
       {stationsOn && <MetStationsLayer data={stations.data} selectedId={selectedMetId} />}
     </>
   )
@@ -405,10 +456,13 @@ export function useObservedLayers({
     statuses,
     details,
     legends,
+    legendsInKey: gaugesOn ? <RainGaugeLegend counts={gaugeCounts} /> : null,
     rainTimeline,
     mapLayers,
     lineAt,
     stationFeature: (id: string) => stations.data?.features.find((feature) => feature.id === id),
+    rainGaugeFeature: (id: string) =>
+      rainGauges.data?.features.find((feature) => feature.id === id),
     stationsPending: stations.isPending,
     /** Whether any layer is waiting for its first collection. */
     waiting: [

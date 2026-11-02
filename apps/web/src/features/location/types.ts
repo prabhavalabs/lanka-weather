@@ -1,4 +1,7 @@
 /** Mirrors the location endpoints of the Go service (docs/api/weather-and-floods.md). */
+import type { CanalsBrief } from "../canals/types"
+import type { NearbyRainGauge } from "../raingauges/types"
+
 import type { NearbyRiverRisk } from "../river-risk/types"
 import type { ReservoirFlow, ReservoirStatus } from "../reservoirs/types"
 import type { LevelUnit, RiverStatus, RiverTrend } from "../rivers/types"
@@ -199,6 +202,10 @@ export interface Summary {
   official: OfficialAt
   /** The nearest station's latest reading: measured, not modelled. */
   observed?: NearbyObservation | null
+  /** The nearest live rain gauge, within 30 km. */
+  rainGauge?: NearbyRainGauge | null
+  /** How the canals read, in the Colombo area only. */
+  canals?: CanalsBrief | null
   /** Model estimate here; null outside its grid. */
   airQuality?: AirQualityPoint | null
   /** Model sea state on the water or at a coast; null inland. */
