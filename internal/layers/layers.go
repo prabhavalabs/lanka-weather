@@ -156,8 +156,6 @@ var catalogue = []Layer{
 		StaleAfterSeconds: seconds(10 * time.Hour),
 		Attribution:       "NASA GIBS, GPM IMERG; Department of Meteorology; Irrigation Department",
 		DataPath:          "/v1/rain/steps",
-		MinZoom:           6,
-		MaxZoom:           6,
 	},
 	{
 		ID:                "weather-stations",

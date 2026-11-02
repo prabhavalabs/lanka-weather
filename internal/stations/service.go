@@ -32,8 +32,8 @@ const (
 )
 
 const (
-	// rainMaxAge leaves out totals too old to help anyone.
-	rainMaxAge = 14 * 24 * time.Hour
+	// rainMaxAge leaves out totals too old to say anything about recent rain.
+	rainMaxAge = 7 * 24 * time.Hour
 	// nearbyKm bounds the nearest station a place is told about.
 	nearbyKm = 75.0
 	// minimumSlots of the eight 3-hourly readings make a 24-hour total.
@@ -194,6 +194,7 @@ func sumRain(readings []Three) *float64 {
 	if counted < minimumSlots {
 		return nil
 	}
+	total = round1(total)
 	return &total
 }
 
