@@ -168,6 +168,19 @@ func (scheduler *Scheduler) cleanup(ctx context.Context, now time.Time) {
 	if err := queries.DeleteSourceRunsBefore(ctx, now.Add(-runRetention)); err != nil {
 		scheduler.Logger.Warn("delete old runs failed", "error", err)
 	}
+	for _, collector := range scheduler.Collectors {
+		if pruner, ok := collector.(source.Pruner); ok {
+			if err := pruner.Prune(ctx, now); err != nil {
+				scheduler.Logger.Warn("prune failed", "source", collector.Name(), "error", err)
+			}
+		}
+	}
+}
+
+// Prune applies every collector's retention limit now, as the worker does
+// hourly; `collect` calls it after its run.
+func (scheduler *Scheduler) Prune(ctx context.Context) {
+	scheduler.cleanup(ctx, scheduler.now())
 }
 
 func (scheduler *Scheduler) now() time.Time {
