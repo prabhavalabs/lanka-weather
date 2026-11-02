@@ -110,6 +110,19 @@
   --wind-6: #db3b3b;
   --wind-7: #a3238c;
 
+  /* Relative humidity, dry to saturated (<60, 60, 70, 80, 90+ %) */
+  --humidity-1: #d4a85a;
+  --humidity-2: #a9bf5e;
+  --humidity-3: #5db98a;
+  --humidity-4: #3398b5;
+  --humidity-5: #2f62c0;
+
+  /* Cloud cover, a veil over the land (0, 30, 60, 90+ %); alpha in the last two digits */
+  --cloud-1: #6f7b8800;
+  --cloud-2: #6f7b8852;
+  --cloud-3: #626e7c99;
+  --cloud-4: #545f6dd9;
+
   /* Basemap, applied over the OpenFreeMap style (src/features/map/basemap.ts) */
   --map-land: #f6f6f4;
   --map-water: #d3dade;
@@ -209,6 +222,17 @@
   --wind-5: #f48c3e;
   --wind-6: #ec4a4a;
   --wind-7: #c23aa6;
+
+  --humidity-1: #deb468;
+  --humidity-2: #b4cb6a;
+  --humidity-3: #66c896;
+  --humidity-4: #3eaed0;
+  --humidity-5: #4f80e0;
+
+  --cloud-1: #e4eaf000;
+  --cloud-2: #e4eaf040;
+  --cloud-3: #e9eef380;
+  --cloud-4: #f2f5f8c4;
 
   --map-land: #121212;
   --map-water: #050607;

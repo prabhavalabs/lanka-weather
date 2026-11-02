@@ -22,14 +22,25 @@ const transformStyle: maplibregl.TransformStyleFunction = (_previous, next) =>
 
 interface MapViewProps {
   theme: MapTheme
+  /** Called with the map once its first style has loaded, and with null when it goes. */
+  onReady?: (map: maplibregl.Map | null) => void
   /** Data layers; they read the map from MapContext. */
   children?: ReactNode
 }
 
 /** The base map of Sri Lanka. Data layers are rendered as children. */
-export function MapView({ theme, children }: MapViewProps) {
+export function MapView({ theme, onReady, children }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
+  const ready = useRef(onReady)
+
+  useEffect(() => {
+    ready.current = onReady
+  }, [onReady])
+
+  useEffect(() => {
+    ready.current?.(map)
+  }, [map])
 
   useEffect(() => {
     if (!container.current) return

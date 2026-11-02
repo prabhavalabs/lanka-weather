@@ -50,6 +50,33 @@ export const rainfallScale: ScaleStep[] = [
   { from: 150, token: "--rain-6" },
 ]
 
+/** Rain in one hour in mm, for the current-conditions field. */
+export const rainRateScale: ScaleStep[] = [
+  { from: 0.1, token: "--rain-1" },
+  { from: 0.5, token: "--rain-2" },
+  { from: 1, token: "--rain-3" },
+  { from: 2.5, token: "--rain-4" },
+  { from: 5, token: "--rain-5" },
+  { from: 10, token: "--rain-6" },
+]
+
+/** Relative humidity in %, dry to saturated. */
+export const humidityScale: ScaleStep[] = [
+  { from: null, token: "--humidity-1" },
+  { from: 60, token: "--humidity-2" },
+  { from: 70, token: "--humidity-3" },
+  { from: 80, token: "--humidity-4" },
+  { from: 90, token: "--humidity-5" },
+]
+
+/** Cloud cover in %: a veil that thickens, transparent when clear. */
+export const cloudScale: ScaleStep[] = [
+  { from: 0, token: "--cloud-1" },
+  { from: 30, token: "--cloud-2" },
+  { from: 60, token: "--cloud-3" },
+  { from: 90, token: "--cloud-4" },
+]
+
 /** Wind speed in km/h; from 118 km/h a cyclone is "very severe" on the IMD scale. */
 export const windScale: ScaleStep[] = [
   { from: null, token: "--wind-1" },
