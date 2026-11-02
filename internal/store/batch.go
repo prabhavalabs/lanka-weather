@@ -17,6 +17,85 @@ var (
 	ErrBatchAlreadyClosed = errors.New("batch already closed")
 )
 
+const insertNextHour = `-- name: InsertNextHour :batchexec
+INSERT INTO river_next_hour (station_id, issued_at, level_ft, low_ft, high_ft, change_ft,
+                             direction, crossing, method, source, fetched_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (station_id, issued_at) DO UPDATE
+SET level_ft = EXCLUDED.level_ft,
+    low_ft = EXCLUDED.low_ft,
+    high_ft = EXCLUDED.high_ft,
+    change_ft = EXCLUDED.change_ft,
+    direction = EXCLUDED.direction,
+    crossing = EXCLUDED.crossing,
+    method = EXCLUDED.method,
+    source = EXCLUDED.source,
+    fetched_at = EXCLUDED.fetched_at
+`
+
+type InsertNextHourBatchResults struct {
+	br     pgx.BatchResults
+	tot    int
+	closed bool
+}
+
+type InsertNextHourParams struct {
+	StationID string    `json:"station_id"`
+	IssuedAt  time.Time `json:"issued_at"`
+	LevelFt   float64   `json:"level_ft"`
+	LowFt     *float64  `json:"low_ft"`
+	HighFt    *float64  `json:"high_ft"`
+	ChangeFt  *float64  `json:"change_ft"`
+	Direction *string   `json:"direction"`
+	Crossing  *string   `json:"crossing"`
+	Method    *string   `json:"method"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+func (q *Queries) InsertNextHour(ctx context.Context, arg []InsertNextHourParams) *InsertNextHourBatchResults {
+	batch := &pgx.Batch{}
+	for _, a := range arg {
+		vals := []interface{}{
+			a.StationID,
+			a.IssuedAt,
+			a.LevelFt,
+			a.LowFt,
+			a.HighFt,
+			a.ChangeFt,
+			a.Direction,
+			a.Crossing,
+			a.Method,
+			a.Source,
+			a.FetchedAt,
+		}
+		batch.Queue(insertNextHour, vals...)
+	}
+	br := q.db.SendBatch(ctx, batch)
+	return &InsertNextHourBatchResults{br, len(arg), false}
+}
+
+func (b *InsertNextHourBatchResults) Exec(f func(int, error)) {
+	defer b.br.Close()
+	for t := 0; t < b.tot; t++ {
+		if b.closed {
+			if f != nil {
+				f(t, ErrBatchAlreadyClosed)
+			}
+			continue
+		}
+		_, err := b.br.Exec()
+		if f != nil {
+			f(t, err)
+		}
+	}
+}
+
+func (b *InsertNextHourBatchResults) Close() error {
+	b.closed = true
+	return b.br.Close()
+}
+
 const insertRiverReading = `-- name: InsertRiverReading :batchexec
 INSERT INTO river_readings (station_id, observed_at, water_level, rainfall_mm, fetched_at)
 VALUES ($1, $2, $3, $4, $5)

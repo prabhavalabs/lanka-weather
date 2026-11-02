@@ -98,3 +98,36 @@ func (r iteratorForStageRegions) Err() error {
 func (q *Queries) StageRegions(ctx context.Context, arg []StageRegionsParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"region_staging"}, []string{"id", "fid", "level", "name", "name_si", "name_ta", "parent_id", "province_id", "district_id", "ds_id", "iso_code", "gn_number", "area_km2", "population", "population_year", "center_lon", "center_lat", "geom_wkb", "simple_wkb"}, &iteratorForStageRegions{rows: arg})
 }
+
+// iteratorForStageReservoirCandidates implements pgx.CopyFromSource.
+type iteratorForStageReservoirCandidates struct {
+	rows                 []StageReservoirCandidatesParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForStageReservoirCandidates) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForStageReservoirCandidates) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].OsmID,
+		r.rows[0].Lines,
+	}, nil
+}
+
+func (r iteratorForStageReservoirCandidates) Err() error {
+	return nil
+}
+
+func (q *Queries) StageReservoirCandidates(ctx context.Context, arg []StageReservoirCandidatesParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"reservoir_candidate_staging"}, []string{"osm_id", "lines"}, &iteratorForStageReservoirCandidates{rows: arg})
+}
