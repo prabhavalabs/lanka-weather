@@ -526,8 +526,8 @@ const maxBasinName = 60
 // WithdrawnBasins reads the basins a flood warning withdrawal notice lists, in
 // the issuer's spelling, without the warning details that can follow a name:
 //
-//	1. Kelani Ganga 2. Kalu Ganga 3. Gin Ganga
-//	1. Kelani River Basin: Flood Warning - No. 03 issued on 03.08.2026 at 1:30 PM
+//  1. Kelani Ganga 2. Kalu Ganga 3. Gin Ganga
+//  1. Kelani River Basin: Flood Warning - No. 03 issued on 03.08.2026 at 1:30 PM
 //
 // It returns nil unless the English text has the preamble and a list numbered
 // from 1: some notices are only in Sinhala. Nothing is read from a list it cannot

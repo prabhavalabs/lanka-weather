@@ -117,7 +117,7 @@ func (service *Service) loadLandslides(ctx context.Context) (loaded, error) {
 	queries := store.New(service.Pool)
 	result := loaded{meta: LandslideMeta{
 		Source: landslides.SourceName, Attribution: landslides.Attribution, Status: StatusWaiting,
-		Note:   "Landslide warnings have not been collected yet.", Limit: landslideLimit,
+		Note: "Landslide warnings have not been collected yet.", Limit: landslideLimit,
 		Counts: map[string]int{"1": 0, "2": 0, "3": 0}, Unresolved: []string{}, GeneratedAt: now,
 	}}
 	if version, err := queries.GetSourceVersion(ctx, landslides.SourceName); err == nil {

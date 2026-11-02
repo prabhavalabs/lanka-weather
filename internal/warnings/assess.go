@@ -196,9 +196,9 @@ type Bulletin struct {
 	// WithdrawnBasins are the basins a withdrawal notice lists; null if none
 	// could be read.
 	WithdrawnBasins []string `json:"withdrawnBasins"`
-	PDFURL        string `json:"pdfUrl"`
-	SourcePageURL string `json:"sourcePageUrl"`
-	Language      string `json:"language"`
+	PDFURL          string   `json:"pdfUrl"`
+	SourcePageURL   string   `json:"sourcePageUrl"`
+	Language        string   `json:"language"`
 	// Text is an excerpt copied unchanged from the bulletin's English
 	// sentences, or null when no clean text is available.
 	Text       *string `json:"text"`
