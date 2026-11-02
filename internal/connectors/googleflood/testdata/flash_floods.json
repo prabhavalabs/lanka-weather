@@ -1,0 +1,19 @@
+{
+  "flashFloodEvents": [
+    {
+      "eventPolygonId": "flash-us",
+      "forecastIssueTime": "2026-10-05T00:41:27.318552Z",
+      "forecastPeriodHours": 24,
+      "affectedCountryCodes": ["US"],
+      "likelyAffectedPolygonId": "flash-us-likely"
+    },
+    {
+      "eventPolygonId": "flash-lk",
+      "forecastIssueTime": "2026-11-02T00:41:27Z",
+      "forecastPeriodHours": "24",
+      "affectedCountryCodes": ["IN", "lk"],
+      "likelyAffectedPolygonId": "flash-lk-likely",
+      "highlyLikelyAffectedPolygonId": "flash-lk-highly"
+    }
+  ]
+}

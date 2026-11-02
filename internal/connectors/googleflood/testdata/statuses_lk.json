@@ -1,0 +1,43 @@
+{
+  "floodStatuses": [
+    {
+      "gaugeId": "hybas_4121601300",
+      "issuedTime": "2026-11-02T12:23:13.138078Z",
+      "forecastTimeRange": { "start": "2026-11-07T00:00:00Z", "end": "2026-11-08T00:00:00Z" },
+      "forecastTrend": "RISE",
+      "severity": "NO_FLOODING",
+      "source": "HYBAS",
+      "gaugeLocation": { "latitude": 7.93958333333228, "longitude": 81.33541666666247 },
+      "qualityVerified": true
+    },
+    {
+      "gaugeId": "hybas_4121156400",
+      "issuedTime": "2026-11-02T12:22:59.533706Z",
+      "forecastTimeRange": { "start": "2026-11-03T00:00:00Z", "end": "2026-11-04T00:00:00Z" },
+      "forecastTrend": "FORECAST_TREND_UNSPECIFIED",
+      "severity": "SEVERE",
+      "source": "HYBAS",
+      "gaugeLocation": { "latitude": 8.256249999999, "longitude": 81.16458333332918 },
+      "qualityVerified": true,
+      "inundationMapSet": {
+        "inundationMaps": [
+          { "level": "HIGH", "serializedPolygonId": "poly-high" },
+          { "level": "LOW", "serializedPolygonId": "poly-low" }
+        ]
+      },
+      "serializedNotificationPolygonId": "poly-notification"
+    },
+    {
+      "gaugeId": "hybas_far_away",
+      "issuedTime": "2026-11-02T12:22:59Z",
+      "severity": "EXTREME",
+      "gaugeLocation": { "latitude": 26.4, "longitude": 85.1 }
+    },
+    {
+      "gaugeId": "hybas_no_location",
+      "issuedTime": "2026-11-02T12:22:59Z",
+      "severity": "NO_FLOODING"
+    }
+  ],
+  "nextPageToken": "page-2"
+}

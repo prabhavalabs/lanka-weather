@@ -1,0 +1,14 @@
+{
+  "significantEvents": [
+    {
+      "areaKm2": 1210.5,
+      "gaugeIds": ["hybas_4121156400"],
+      "eventInterval": { "startTime": "2026-11-02T00:00:00Z", "endTime": "2026-11-06T00:00:00Z" },
+      "eventPolygonId": "event-lk",
+      "eventTrackingIds": ["track-1"],
+      "affectedPopulation": "120000",
+      "affectedCountryCodes": ["LK"]
+    },
+    { "eventPolygonId": "event-bd", "affectedCountryCodes": ["BD"], "affectedPopulation": 5 }
+  ]
+}
