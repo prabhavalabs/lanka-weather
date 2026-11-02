@@ -39,3 +39,14 @@ func TestByID(t *testing.T) {
 		t.Fatal("missing should not exist")
 	}
 }
+
+func TestAdminRegionsLayerIsAvailableAsTiles(t *testing.T) {
+	layer, ok := ByID("admin-regions")
+	if !ok || layer.Status != StatusAvailable || layer.TilePath != "/v1/tiles/regions/{z}/{x}/{y}.pbf" || layer.MaxZoom != 14 {
+		t.Fatalf("admin-regions = %+v", layer)
+	}
+	layer.TilePath = ""
+	if err := Validate([]Layer{layer}); err == nil {
+		t.Fatal("expected an error for an available vector layer without a tile path")
+	}
+}
