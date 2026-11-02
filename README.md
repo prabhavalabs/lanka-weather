@@ -35,7 +35,8 @@ Planned data layers include:
 |---|---|
 | `cmd/lankaweather/` | Go entry point: `serve` (HTTP API); `worker` and `migrate` follow |
 | `internal/` | Go packages: layer catalogue, HTTP API, and later connectors, ingest and store |
-| `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre |
+| `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre, shadcn/ui |
+| `brand/` | Logo, wordmark and icon sources, with usage and colours |
 | `packages/` | Shared TypeScript packages, when needed |
 | `docs/` | Architecture overview, data-source catalogue and decision records |
 | `.github/` | Pull-request template and CI workflow |
@@ -70,6 +71,11 @@ make dev-web           # terminal 3: web app on http://localhost:5173
 The Vite dev server proxies `/v1` and `/healthz` to the API. Set
 `LANKAWEATHER_API_URL` to point it elsewhere, and `LANKAWEATHER_ADDR` to
 change the API's listen address.
+
+In development, `http://localhost:5173/?kit` shows the design kit: every
+component in the current theme with placeholder data. After changing the
+artwork in `brand/`, regenerate the icons with
+`pnpm --filter @lanka-weather/web icons`.
 
 ### Commands
 

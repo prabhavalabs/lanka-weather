@@ -1,4 +1,11 @@
-import { groupByCategory } from "../../lib/layers"
+import { useId, type ReactNode } from "react"
+import { IconTile } from "@/components/IconTile"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
+import { groupByCategory } from "@/lib/layers"
+import { cn } from "@/lib/utils"
+import { layerIcon } from "./layerIcons"
 import { useLayers } from "./useLayers"
 
 interface LayerPanelProps {
@@ -6,75 +13,116 @@ interface LayerPanelProps {
   onToggle: (id: string) => void
   /** One-line status per layer id, shown while the layer is on. */
   summaries?: Record<string, string>
+  /** Extra content per layer id under a layer that is on, e.g. a status bar or legend. */
+  details?: Record<string, ReactNode>
+  className?: string
 }
 
-/** Lists the layer catalogue grouped by category, with a switch per layer. */
-export function LayerPanel({ enabled, onToggle, summaries = {} }: LayerPanelProps) {
-  const { data, error, isPending, isFetching, dataUpdatedAt } = useLayers()
+/** The layer catalogue grouped by category, with a switch per layer. */
+export function LayerPanel({
+  enabled,
+  onToggle,
+  summaries = {},
+  details = {},
+  className,
+}: LayerPanelProps) {
+  const { data, error, isPending } = useLayers()
+  // The panel can be mounted twice (sidebar and phone sheet), so ids are unique per instance.
+  const uid = useId()
 
   return (
-    <aside className="pointer-events-auto flex max-h-full w-72 flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950/85 text-slate-100 shadow-xl backdrop-blur">
-      <header className="border-b border-white/10 px-4 py-3">
-        <h1 className="text-base font-semibold">Lanka Weather</h1>
-        <p className="text-xs text-slate-400">Weather and hazard map of Sri Lanka</p>
-      </header>
-
-      <div className="flex-1 overflow-y-auto px-2 py-2">
-        {isPending && <p className="px-2 py-3 text-sm text-slate-400">Loading layers…</p>}
-        {error && !data && (
-          <p className="px-2 py-3 text-sm text-amber-300" role="alert">
-            Layers are unavailable: {error.message}
-          </p>
-        )}
-        {data &&
-          groupByCategory(data).map((group) => (
-            <section key={group.category} className="mb-3">
-              <h2 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-                {group.label}
-              </h2>
-              <ul>
-                {group.layers.map((layer) => {
-                  const planned = layer.status === "planned"
-                  return (
-                    <li key={layer.id}>
+    <div className={cn("flex flex-col gap-5", className)}>
+      {isPending && (
+        <div className="flex flex-col gap-3" role="status" aria-label="Loading layers">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <Skeleton className="size-10 rounded-xl" />
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Skeleton className="h-3.5 w-28" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {error && !data && (
+        <p
+          className="rounded-xl border border-border bg-inset px-3 py-3 text-sm text-foreground"
+          role="alert"
+        >
+          Layers are unavailable: {error.message}
+        </p>
+      )}
+      {data &&
+        groupByCategory(data).map((group) => (
+          <section key={group.category} aria-labelledby={`${uid}-group-${group.category}`}>
+            <h2
+              id={`${uid}-group-${group.category}`}
+              className="mb-1.5 px-1 text-xs font-medium text-muted-foreground"
+            >
+              {group.label}
+            </h2>
+            <ul className="flex flex-col">
+              {group.layers.map((layer) => {
+                const planned = layer.status === "planned"
+                const on = enabled.includes(layer.id)
+                const Icon = layerIcon(layer)
+                const switchId = `${uid}-switch-${layer.id}`
+                const detail = on && !planned ? details[layer.id] : undefined
+                return (
+                  <li
+                    key={layer.id}
+                    className={cn("rounded-2xl transition-colors", on && !planned && "bg-accent")}
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center gap-3 rounded-2xl px-1 py-2",
+                        !planned && !on && "hover:bg-accent/60",
+                      )}
+                      title={layer.description || undefined}
+                    >
+                      <IconTile className={cn(planned && "text-muted-foreground")}>
+                        <Icon />
+                      </IconTile>
                       <label
-                        className={`flex items-start gap-3 rounded-lg px-2 py-2 ${planned ? "opacity-60" : "cursor-pointer hover:bg-white/5"}`}
-                        title={layer.description}
+                        htmlFor={switchId}
+                        className={cn(
+                          "min-w-0 flex-1",
+                          planned ? "cursor-default" : "cursor-pointer",
+                        )}
                       >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 accent-sky-400"
-                          checked={enabled.includes(layer.id)}
-                          disabled={planned}
-                          onChange={() => onToggle(layer.id)}
-                        />
-                        <span className="flex-1">
-                          <span className="block text-sm">{layer.title}</span>
-                          <span className="block text-xs text-slate-400">
-                            {planned
-                              ? "Coming soon"
-                              : enabled.includes(layer.id) && summaries[layer.id]
-                                ? summaries[layer.id]
-                                : layer.attribution}
-                          </span>
+                        <span
+                          className={cn(
+                            "block truncate text-sm font-medium",
+                            planned && "text-muted-foreground",
+                          )}
+                        >
+                          {layer.title}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {on && summaries[layer.id] ? summaries[layer.id] : layer.attribution}
                         </span>
                       </label>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          ))}
-      </div>
-
-      <footer className="border-t border-white/10 px-4 py-2 text-[11px] text-slate-500">
-        {isFetching
-          ? "Updating…"
-          : dataUpdatedAt > 0
-            ? `Catalogue updated ${new Date(dataUpdatedAt).toLocaleTimeString()}`
-            : null}
-        <span className="block">Official warnings: Department of Meteorology and DMC.</span>
-      </footer>
-    </aside>
+                      {planned ? (
+                        <Badge variant="chip" className="mr-1">
+                          Soon
+                        </Badge>
+                      ) : (
+                        <Switch
+                          id={switchId}
+                          checked={on}
+                          onCheckedChange={() => onToggle(layer.id)}
+                          className="mr-1"
+                        />
+                      )}
+                    </div>
+                    {detail && <div className="px-3 pt-1 pb-3">{detail}</div>}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ))}
+    </div>
   )
 }

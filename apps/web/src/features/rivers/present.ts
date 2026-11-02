@@ -1,12 +1,26 @@
 import type { RiverStatus, RiverTrend, StationProperties } from "./types"
 
-/** Colours by status, from calm to severe; chosen to stay distinct for common colour-vision deficiencies. */
+/**
+ * Theme tokens by status, from calm to severe (src/styles/theme.css): blue,
+ * yellow, orange, red and grey, distinct in lightness as well as hue so they
+ * stay apart for common colour-vision deficiencies. Each has a matching
+ * `-foreground` token for text on it.
+ */
+export const statusTokens: Record<RiverStatus, `--${string}`> = {
+  normal: "--status-normal",
+  alert: "--status-alert",
+  minor_flood: "--status-minor-flood",
+  major_flood: "--status-major-flood",
+  unknown: "--status-unknown",
+}
+
+/** CSS colours by status, for styles and SVG; they follow the theme. */
 export const statusColors: Record<RiverStatus, string> = {
-  normal: "#0ea5e9",
-  alert: "#facc15",
-  minor_flood: "#f97316",
-  major_flood: "#dc2626",
-  unknown: "#94a3b8",
+  normal: "var(--status-normal)",
+  alert: "var(--status-alert)",
+  minor_flood: "var(--status-minor-flood)",
+  major_flood: "var(--status-major-flood)",
+  unknown: "var(--status-unknown)",
 }
 
 export const statusLabels: Record<RiverStatus, string> = {
