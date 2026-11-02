@@ -1,0 +1,307 @@
+{
+ "generatedAt": "2026-11-02T19:39:21.997Z",
+ "newestReading": "2026-11-02T19:37:55.537Z",
+ "count": 9,
+ "nextHourReady": true,
+ "source": "Department of Irrigation, Sri Lanka (river gauges); compiled by Sri Lanka Water Levels",
+ "license": "https://waterlevels.lk/about#data-sources",
+ "notes": [
+  "level and marks are in feet (metre gauges are converted); published.level is the figure as the agency released it, in published.unit."
+ ],
+ "docs": "https://waterlevels.lk/data",
+ "rainReady": true,
+ "nextHourNote": "",
+ "stations": [
+  {
+   "id": "aththanagalu-oya/dunamale",
+   "station": "Dunamale",
+   "river": "Aththanagalu Oya",
+   "latitude": 7.116416,
+   "longitude": 80.084085,
+   "level": 5.77,
+   "unit": "ft",
+   "published": {
+    "level": 1.76,
+    "unit": "m"
+   },
+   "marks": {
+    "alert": 10.83,
+    "minor": 14.44,
+    "major": 18.04
+   },
+   "status": "normal",
+   "statusLabel": "Normal",
+   "statusNote": null,
+   "trend": "rising slowly",
+   "changePerHour3h": 0.09,
+   "observedAt": "2026-11-02T19:37:32.631Z",
+   "ageMinutes": 2,
+   "url": "https://waterlevels.lk/aththanagalu-oya/dunamale",
+   "nextHour": {
+    "level_ft": 5.92,
+    "low_ft": 5.79,
+    "high_ft": 6.06,
+    "change_ft": 0.08,
+    "direction": "rising",
+    "slow": true,
+    "crossing": null,
+    "issuedAt": "2026-11-02T18:32:46.199Z",
+    "method": "model",
+    "experimental": false,
+    "rainRisk": null
+   }
+  },
+  {
+   "id": "gal-oya/ampara",
+   "station": "Ampara",
+   "river": "Gal Oya",
+   "latitude": 7.290711,
+   "longitude": 81.670343,
+   "level": 0,
+   "unit": null,
+   "published": {
+    "level": 0,
+    "unit": "unknown"
+   },
+   "marks": {
+    "alert": null,
+    "minor": null,
+    "major": null
+   },
+   "status": "none",
+   "statusLabel": "No flood levels set",
+   "statusNote": null,
+   "trend": "steady",
+   "changePerHour3h": 0,
+   "observedAt": "2026-11-02T19:31:13.148Z",
+   "ageMinutes": 8,
+   "url": "https://waterlevels.lk/gal-oya/ampara",
+   "nextHour": null
+  },
+  {
+   "id": "kalu-ganga/rathnapura",
+   "station": "Ratnapura",
+   "river": "Kalu Ganga",
+   "latitude": 6.679067,
+   "longitude": 80.397235,
+   "level": 12.96,
+   "unit": "ft",
+   "published": {
+    "level": 3.95,
+    "unit": "m"
+   },
+   "marks": {
+    "alert": 17.06,
+    "minor": 24.61,
+    "major": 31.17
+   },
+   "status": "normal",
+   "statusLabel": "Normal",
+   "statusNote": null,
+   "trend": "falling",
+   "changePerHour3h": -0.15,
+   "observedAt": "2026-11-02T19:34:18.710Z",
+   "ageMinutes": 5,
+   "url": "https://waterlevels.lk/kalu-ganga/rathnapura",
+   "nextHour": {
+    "level_ft": 12.76,
+    "low_ft": 12.52,
+    "high_ft": 13.07,
+    "change_ft": -0.2,
+    "direction": "falling",
+    "slow": false,
+    "crossing": null,
+    "issuedAt": "2026-11-02T19:34:18.710Z",
+    "method": "model",
+    "experimental": false,
+    "rainRisk": null
+   }
+  },
+  {
+   "id": "kelani-ganga/nagalagam-street",
+   "station": "Nagalagam Street",
+   "river": "Kelani Ganga",
+   "latitude": 6.958265,
+   "longitude": 79.878642,
+   "level": 1.6,
+   "unit": "ft",
+   "published": {
+    "level": 1.6,
+    "unit": "ft"
+   },
+   "marks": {
+    "alert": 4,
+    "minor": 5,
+    "major": 7
+   },
+   "status": "normal",
+   "statusLabel": "Normal",
+   "statusNote": null,
+   "trend": "falling",
+   "changePerHour3h": -0.13,
+   "observedAt": "2026-11-02T18:43:35.536Z",
+   "ageMinutes": 56,
+   "url": "https://waterlevels.lk/kelani-ganga/nagalagam-street",
+   "nextHour": {
+    "level_ft": 1.62,
+    "low_ft": 1.49,
+    "high_ft": 1.75,
+    "change_ft": 0.02,
+    "direction": "steady",
+    "slow": true,
+    "crossing": null,
+    "issuedAt": "2026-11-02T18:43:35.536Z",
+    "method": "model",
+    "experimental": false,
+    "rainRisk": null
+   }
+  },
+  {
+   "id": "mahaweli-ganga/calidonia",
+   "station": "Calidonia",
+   "river": "Mahaweli Ganga",
+   "latitude": 6.901996,
+   "longitude": 80.697581,
+   "level": null,
+   "unit": null,
+   "published": {
+    "level": null,
+    "unit": "unknown"
+   },
+   "marks": {
+    "alert": null,
+    "minor": null,
+    "major": null
+   },
+   "status": "stale",
+   "statusLabel": "Not reporting",
+   "statusNote": null,
+   "trend": null,
+   "changePerHour3h": null,
+   "observedAt": null,
+   "ageMinutes": null,
+   "url": "https://waterlevels.lk/mahaweli-ganga/calidonia",
+   "nextHour": null
+  },
+  {
+   "id": "kelani-ganga/karawanella-bridge",
+   "station": "Karawanella Bridge",
+   "river": "Kelani Ganga",
+   "latitude": 7.02016,
+   "longitude": 80.2624,
+   "level": 8.53,
+   "unit": "ft",
+   "published": {
+    "level": 2.6000000000000014,
+    "unit": "m"
+   },
+   "marks": {
+    "alert": 9.84,
+    "minor": 13.12,
+    "major": 19.69
+   },
+   "status": "watch",
+   "statusLabel": "Normal",
+   "statusNote": "Near alert",
+   "trend": "rising",
+   "changePerHour3h": 0.21,
+   "observedAt": "2026-11-02T19:25:48.000Z",
+   "ageMinutes": 14,
+   "url": "https://waterlevels.lk/kelani-ganga/karawanella-bridge",
+   "nextHour": null
+  },
+  {
+   "id": "kalu-ganga/kuru-ganga-kuruvita",
+   "station": "Kuru Ganga (Kuruvita)",
+   "river": "Kalu Ganga",
+   "latitude": 6.79874,
+   "longitude": 80.36843,
+   "level": 7.35,
+   "unit": "ft",
+   "published": {
+    "level": 2.24,
+    "unit": "m"
+   },
+   "marks": {
+    "alert": null,
+    "minor": null,
+    "major": null
+   },
+   "status": "none",
+   "statusLabel": "No flood levels set",
+   "statusNote": null,
+   "trend": "falling",
+   "changePerHour3h": -0.91,
+   "observedAt": "2026-11-02T19:34:00.000Z",
+   "ageMinutes": 5,
+   "url": "https://waterlevels.lk/kalu-ganga/kuru-ganga-kuruvita",
+   "nextHour": null
+  },
+  {
+   "id": "kelani-ganga/pugoda",
+   "station": "Pugoda",
+   "river": "Kelani Ganga",
+   "latitude": 6.9742,
+   "longitude": 80.12328,
+   "level": 13,
+   "unit": "ft",
+   "published": {
+    "level": 3.963,
+    "unit": "m"
+   },
+   "marks": {
+    "alert": 26.25,
+    "minor": 32.81,
+    "major": 37.73
+   },
+   "status": "normal",
+   "statusLabel": "Normal",
+   "statusNote": null,
+   "trend": "rising",
+   "changePerHour3h": 0.78,
+   "observedAt": "2026-11-02T19:34:00.000Z",
+   "ageMinutes": 5,
+   "url": "https://waterlevels.lk/kelani-ganga/pugoda",
+   "nextHour": null
+  },
+  {
+   "id": "wattala-kalu-ela/wattala",
+   "station": "Wattala",
+   "river": "Wattala Kalu Ela",
+   "latitude": 6.99119,
+   "longitude": 79.89219,
+   "level": 7.71,
+   "unit": "ft",
+   "published": {
+    "level": 2.35,
+    "unit": "m"
+   },
+   "marks": {
+    "alert": null,
+    "minor": null,
+    "major": null
+   },
+   "status": "none",
+   "statusLabel": "No flood levels set",
+   "statusNote": null,
+   "trend": "rising slowly",
+   "changePerHour3h": 0.03,
+   "observedAt": "2026-11-02T19:35:00.000Z",
+   "ageMinutes": 4,
+   "url": "https://waterlevels.lk/wattala-kalu-ela/wattala",
+   "nextHour": {
+    "level_ft": 7.71,
+    "low_ft": null,
+    "high_ft": null,
+    "change_ft": 0,
+    "direction": "steady",
+    "slow": true,
+    "crossing": null,
+    "issuedAt": "2026-11-02T19:30:00.000Z",
+    "method": "trend",
+    "experimental": true,
+    "rainRisk": null
+   }
+  }
+ ]
+}
