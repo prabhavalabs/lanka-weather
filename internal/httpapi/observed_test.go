@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
 	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/stations"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
@@ -156,6 +158,54 @@ func TestObservedEndpointsAnswerWhenNotConfigured(t *testing.T) {
 	for _, path := range []string{"/v1/stations", "/v1/stations/x", "/v1/rain/observed", "/v1/rain/steps", "/v1/rain/tiles/x/6/1/1.png", "/v1/air/current", "/v1/sea/current"} {
 		if response := observedGet(router, path); response.Code != http.StatusServiceUnavailable {
 			t.Errorf("%s: %d", path, response.Code)
+		}
+	}
+}
+
+type fakeRainGauges struct{}
+
+func (fakeRainGauges) Layer(context.Context) (raingauges.FeatureCollection, error) {
+	return raingauges.FeatureCollection{Type: "FeatureCollection", Features: []raingauges.Feature{}}, nil
+}
+
+func (fakeRainGauges) Gauge(_ context.Context, id string) (*raingauges.Detail, error) {
+	if id != "r47" {
+		return nil, raingauges.ErrNotFound
+	}
+	return &raingauges.Detail{Series: []raingauges.SeriesPoint{}}, nil
+}
+
+type fakeCanals struct{}
+
+func (fakeCanals) Current(context.Context) (*canals.Document, error) {
+	return &canals.Document{Gauges: []canals.Gauge{}}, nil
+}
+
+func TestRainGaugeAndCanalRoutes(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler := NewRouter(Dependencies{Logger: logger, RainGauges: fakeRainGauges{}, Canals: fakeCanals{}})
+	cases := []struct {
+		path, contentType string
+		status            int
+	}{
+		{"/v1/rain/gauges", "application/geo+json; charset=utf-8", http.StatusOK},
+		{"/v1/rain/gauges/r47", "application/json", http.StatusOK},
+		{"/v1/rain/gauges/none", "application/json", http.StatusNotFound},
+		{"/v1/rivers/canals", "application/json", http.StatusOK},
+	}
+	for _, c := range cases {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, c.path, nil))
+		if recorder.Code != c.status {
+			t.Errorf("%s: status %d, body %s", c.path, recorder.Code, recorder.Body)
+		}
+	}
+	unconfigured := NewRouter(Dependencies{Logger: logger})
+	for _, path := range []string{"/v1/rain/gauges", "/v1/rain/gauges/r47", "/v1/rivers/canals"} {
+		recorder := httptest.NewRecorder()
+		unconfigured.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s unconfigured: status %d", path, recorder.Code)
 		}
 	}
 }

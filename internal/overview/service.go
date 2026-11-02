@@ -7,6 +7,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
@@ -53,6 +54,11 @@ type RainSource interface {
 	ObservedRainfall(ctx context.Context) (*stations.RainCollection, error)
 }
 
+// RainGaugeSource serves the live rain gauges.
+type RainGaugeSource interface {
+	Layer(ctx context.Context) (raingauges.FeatureCollection, error)
+}
+
 // EnvironmentSource serves the air-quality and sea grids' extremes.
 type EnvironmentSource interface {
 	WorstAir(ctx context.Context) (*environment.Located[environment.AirPoint], error)
@@ -74,6 +80,7 @@ type Service struct {
 	Hazards     HazardSource
 	Weather     WeatherSource
 	Rain        RainSource
+	RainGauges  RainGaugeSource
 	Environment EnvironmentSource
 	Regions     RegionLookup
 	// WeatherStaleAfter is how old region weather may be.
@@ -151,6 +158,13 @@ func (service *Service) Overview(ctx context.Context) (*Overview, error) {
 			service.warn("gauge rainfall", err)
 		} else {
 			in.Rain = value
+		}
+	}
+	if service.RainGauges != nil {
+		if value, err := service.RainGauges.Layer(ctx); err != nil {
+			service.warn("rain gauges", err)
+		} else {
+			in.RainGauges = &value
 		}
 	}
 	if service.Environment != nil {

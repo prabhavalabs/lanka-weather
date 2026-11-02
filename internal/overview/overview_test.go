@@ -7,6 +7,7 @@ import (
 
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
@@ -341,5 +342,28 @@ func TestDirectionWords(t *testing.T) {
 		if got := direction(c.lon, c.lat); got != c.want {
 			t.Errorf("(%v, %v) = %s, want %s", c.lon, c.lat, got, c.want)
 		}
+	}
+}
+
+func TestRainPrefersTheLiveGaugesWhenEnoughReport(t *testing.T) {
+	in := quiet()
+	gauge := func(id string, rain float64) raingauges.Feature {
+		value, at := rain, now.Add(-20*time.Minute)
+		return raingauges.Feature{ID: id, Properties: raingauges.Properties{ID: id, Name: id, Institution: "NBRO", Rain24hMm: &value,
+			Band: raingauges.BandOf(rain), ObservedAt: &at}}
+	}
+	in.RainGauges = &raingauges.FeatureCollection{Features: []raingauges.Feature{gauge("dry", 0), gauge("wet", 12), gauge("wettest", 120)},
+		Meta: raingauges.Meta{Fresh: 250, Total: 275}}
+	rain := section(t, Build(in, now), SectionRain)
+	if rain.Source != sourceRainGauges || len(rain.Items) != 2 || rain.Items[0].ID != "wettest" || rain.Items[0].Badge != "Very heavy" || rain.Items[0].Tone != ToneHigh {
+		t.Fatalf("rain = %+v", rain)
+	}
+	if rain.Items[0].Target.Kind != "raingauge" || rain.Items[0].Target.Layer != "rain-gauges" {
+		t.Fatalf("target = %+v", rain.Items[0].Target)
+	}
+
+	in.RainGauges.Meta.Fresh = 3
+	if fallback := section(t, Build(in, now), SectionRain); fallback.Source != sourceGauges {
+		t.Fatalf("a few current gauges should not speak for the country: %+v", fallback)
 	}
 }

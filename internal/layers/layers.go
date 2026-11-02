@@ -109,7 +109,7 @@ var catalogue = []Layer{
 	{
 		ID:                "flood-forecast",
 		Title:             "Flood forecast",
-		Description:       "Forecast flood status at river gauges and expected inundation areas.",
+		Description:       "Forecast flood status at river gauges, flash-flood areas, significant flood events and inundation probability.",
 		Category:          CategoryHydrology,
 		Kind:              KindGeoJSON,
 		Status:            StatusAvailable,
@@ -191,6 +191,20 @@ var catalogue = []Layer{
 		StaleAfterSeconds: seconds(10 * time.Hour),
 		Attribution:       "NASA GIBS, GPM IMERG; Department of Meteorology; Irrigation Department",
 		DataPath:          "/v1/rain/steps",
+	},
+	{
+		ID:    "rain-gauges",
+		Title: "Rain gauges",
+		Description: "Rain measured over the last 24 hours at about 275 live gauges of NBRO, the Department of " +
+			"Meteorology, the Irrigation Department and ACCIMT. Wetter gauges show first; zoom in for the rest.",
+		Category:          CategoryWeather,
+		Kind:              KindGeoJSON,
+		Status:            StatusAvailable,
+		Sources:           []string{"hmis-rain-live"},
+		RefreshSeconds:    seconds(30 * time.Minute),
+		StaleAfterSeconds: seconds(3 * time.Hour),
+		Attribution:       "HMIS, via Sri Lanka Water Levels (waterlevels.lk)",
+		DataPath:          "/v1/rain/gauges",
 	},
 	{
 		ID:                "weather-stations",

@@ -25,11 +25,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/dmcbulletins"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/gdacs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/gfs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/googleflood"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/hmisrain"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrobasins"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrorivers"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/imerg"
@@ -53,6 +55,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
 	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
@@ -155,6 +158,8 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 		&osmplaces.Collector{Pool: pool, Fetcher: client},
 		&waterlevels.GaugeCollector{Pool: pool, Fetcher: client, Logger: logger},
 		&waterlevels.ReservoirCollector{Pool: pool, Fetcher: client},
+		&waterlevels.CanalCollector{Pool: pool, Fetcher: client},
+		&hmisrain.Collector{Pool: pool, Client: client, Logger: logger},
 		&osmreservoirs.Collector{Pool: pool, Fetcher: client, Logger: logger},
 		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindCurrent, Logger: logger},
 		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindForecast, Logger: logger},
@@ -234,6 +239,8 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 		BulletinStaleAfter: staleAfter("official-warnings")}
 	stationService := &stations.Service{Pool: pool, StaleAfter: staleAfter("weather-stations")}
 	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
+	rainGaugeService := &raingauges.Service{Pool: pool, StaleAfter: staleAfter("rain-gauges")}
+	canalService := &canals.Service{Pool: pool}
 	hazardService := &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")}
 	server := &http.Server{
 		Addr: addr,
@@ -246,17 +253,20 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Floods:  floodService,
 			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
 				Regions: regionService, RiverRisk: riverRiskService, Official: warningService,
-				Stations: stationService, Environment: environmentService, Reservoirs: reservoirService, Logger: logger},
+				Stations: stationService, Environment: environmentService, Reservoirs: reservoirService,
+				RainGauges: rainGaugeService, Canals: canalService, Logger: logger},
 			RiverRisk: riverRiskService,
 			Warnings:  warningService,
 			Overview: &overview.Service{Warnings: warningService, Risk: riverRiskService, Gauges: riverService,
-				Reservoirs: reservoirService, Hazards: hazardService, Weather: weatherService, Rain: stationService,
+				Reservoirs: reservoirService, Hazards: hazardService, Weather: weatherService, Rain: stationService, RainGauges: rainGaugeService,
 				Environment: environmentService, Regions: regionService, WeatherStaleAfter: staleAfter("temperature"), Logger: logger},
 			Hazards:     hazardService,
 			Stations:    stationService,
 			Rain:        &rainfall.Service{Pool: pool, StaleAfter: staleAfter("rainfall")},
 			Environment: environmentService,
 			Reservoirs:  reservoirService,
+			RainGauges:  rainGaugeService,
+			Canals:      canalService,
 			Ready:       pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,

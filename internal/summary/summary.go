@@ -12,8 +12,10 @@ import (
 	"sort"
 	"time"
 
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
@@ -71,6 +73,16 @@ type ReservoirSource interface {
 	Layer(ctx context.Context) (reservoirs.FeatureCollection, error)
 }
 
+// RainGaugeSource finds the live rain gauge nearest a place.
+type RainGaugeSource interface {
+	Nearest(ctx context.Context, lon, lat float64) (*raingauges.Nearby, error)
+}
+
+// CanalSource says what the Colombo canals read, for a place in the Colombo area.
+type CanalSource interface {
+	BriefAt(ctx context.Context, lon, lat float64) (*canals.Brief, error)
+}
+
 // Service builds summaries. Any source may be nil.
 type Service struct {
 	Weather    WeatherSource
@@ -84,6 +96,8 @@ type Service struct {
 	// sea state; without them those parts are simply null.
 	Stations    StationSource
 	Environment EnvironmentSource
+	RainGauges  RainGaugeSource
+	Canals      CanalSource
 	Logger      *slog.Logger
 	Now         func() time.Time
 }
@@ -127,6 +141,12 @@ type Summary struct {
 	// Observed is the nearest station's latest reading, measured rather than
 	// modelled; null when no station is within 75 km.
 	Observed *stations.Nearby `json:"observed"`
+	// RainGauge is the nearest live rain gauge with its rolling 24-hour total,
+	// measured; null when none is within 30 km.
+	RainGauge *raingauges.Nearby `json:"rainGauge"`
+	// Canals says how Colombo's canals read, as context and never a warning, for a
+	// place in the Colombo area; null elsewhere.
+	Canals *canals.Brief `json:"canals"`
 	// AirQuality is the model estimate here; null outside its grid.
 	AirQuality *environment.AirPoint `json:"airQuality"`
 	// Sea is the model sea state on the water or at a coast; null inland.
@@ -136,7 +156,8 @@ type Summary struct {
 	// bulletins naming its district and the latest general bulletins.
 	Official *warnings.OfficialAt `json:"official"`
 	// Unavailable lists the parts that could not be filled: weather, regions,
-	// rivers, nearbyRivers, floodForecast, official, observed, airQuality, sea or reservoirs.
+	// rivers, nearbyRivers, floodForecast, official, observed, rainGauge, canals,
+	// airQuality, sea or reservoirs.
 	Unavailable []string `json:"unavailable"`
 }
 
@@ -324,6 +345,24 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 			summary.Unavailable = append(summary.Unavailable, "observed")
 		} else {
 			summary.Observed = observed
+		}
+	}
+	if service.RainGauges != nil {
+		gauge, err := service.RainGauges.Nearest(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary rain gauge", err)
+			summary.Unavailable = append(summary.Unavailable, "rainGauge")
+		} else {
+			summary.RainGauge = gauge
+		}
+	}
+	if service.Canals != nil {
+		brief, err := service.Canals.BriefAt(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary canals", err)
+			summary.Unavailable = append(summary.Unavailable, "canals")
+		} else {
+			summary.Canals = brief
 		}
 	}
 	if service.Environment != nil {

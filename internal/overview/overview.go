@@ -15,6 +15,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/dmcbulletins"
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
@@ -57,8 +58,8 @@ const (
 
 // Target says what a line opens.
 type Target struct {
-	// Kind is warnings, landslide, river, station, reservoir, reservoirs, cyclone,
-	// quake, region, place or layer.
+	// Kind is warnings, landslide, river, station, raingauge, reservoir, reservoirs,
+	// cyclone, quake, region, place or layer.
 	Kind string `json:"kind"`
 	ID   string `json:"id,omitempty"`
 	// Reach is a stretch of a river.
@@ -147,8 +148,10 @@ type Inputs struct {
 	// WeatherStale says the region weather is too old to speak for now.
 	WeatherStale bool
 	Rain         *stations.RainCollection
-	Air          *AirWorst
-	Sea          *SeaHighest
+	// RainGauges are the live gauges, preferred for the wettest of the last 24 hours.
+	RainGauges *raingauges.FeatureCollection
+	Air        *AirWorst
+	Sea        *SeaHighest
 }
 
 // AirWorst is the highest air quality index on the grid, and where.
@@ -169,7 +172,7 @@ const (
 	maxWorstRivers  = 5
 	maxDivisions    = 5
 	maxWettest      = 3
-	maxRainGauges   = 3
+	maxRainGauges   = 5
 	maxQuakes       = 3
 	significantDays = 7
 	// A quake is worth a line if it is large anywhere in the list, moderate and
@@ -187,6 +190,7 @@ const (
 	sourceCyclones   = "GDACS"
 	sourceQuakes     = "USGS"
 	sourceWeather    = "Open-Meteo"
+	sourceRainGauges = "HMIS, via Sri Lanka Water Levels (waterlevels.lk)"
 	sourceAir        = "CAMS via Open-Meteo"
 	sourceSea        = "Open-Meteo marine model"
 	// spillNoticeCusecs is the figure below which a spill is a trickle: the river
@@ -758,7 +762,14 @@ func weatherSection(in Inputs) Section {
 	return section
 }
 
+// liveGaugesCurrent is how many gauges must report before the live gauges speak for
+// the country rather than the river gauges' rain.
+const liveGaugesCurrent = 20
+
 func rainSection(in Inputs) Section {
+	if in.RainGauges != nil && in.RainGauges.Meta.Fresh >= liveGaugesCurrent {
+		return liveRainSection(*in.RainGauges)
+	}
 	into := &Target{Kind: "layer", Layer: "rainfall"}
 	if in.Rain == nil {
 		return unavailable(SectionRain, GroupNow, "Rain at gauges, last 24 hours", sourceGauges, false, false, into)
@@ -792,6 +803,47 @@ func rainSection(in Inputs) Section {
 		section.Summary = fmt.Sprintf("The wettest of %d gauges with a total.", len(fresh))
 	}
 	return section
+}
+
+// liveRainSection names the wettest live gauges. These are rolling 24-hour totals at
+// up to 275 gauges across the country, measured rather than modelled.
+func liveRainSection(layer raingauges.FeatureCollection) Section {
+	section := Section{ID: SectionRain, Group: GroupNow, Title: "Wettest gauges, last 24 hours", Available: true, Source: sourceRainGauges,
+		Counts: []Count{
+			{Key: "reporting", Label: "Reporting", Value: layer.Meta.Fresh},
+			{Key: "total", Label: "Gauges", Value: layer.Meta.Total},
+		},
+		Items: []Item{}, Target: &Target{Kind: "layer", Layer: "rain-gauges"},
+		Note: "Measured at NBRO, Department of Meteorology, Irrigation Department and ACCIMT gauges. Not an official warning."}
+	for _, feature := range raingauges.Wettest(layer, maxRainGauges) {
+		properties := feature.Properties
+		section.Items = append(section.Items, Item{ID: properties.ID, Title: properties.Name,
+			Detail: fmt.Sprintf("%.1f mm · %s", *properties.Rain24hMm, properties.Institution), Tone: rainTone(properties.Band),
+			Badge: rainBadges[properties.Band], At: properties.ObservedAt, Source: sourceRainGauges,
+			Target: &Target{Kind: "raingauge", ID: properties.ID, Layer: "rain-gauges"}})
+	}
+	if len(section.Items) > 0 {
+		section.At = section.Items[0].At
+		section.Summary = fmt.Sprintf("The wettest of %d gauges reporting.", layer.Meta.Fresh)
+	} else {
+		section.At = layer.Meta.FetchedAt
+		section.Summary = fmt.Sprintf("No rain recorded at the %d gauges reporting.", layer.Meta.Fresh)
+	}
+	return section
+}
+
+var rainBadges = map[string]string{raingauges.BandHeavy: "Heavy", raingauges.BandVeryHeavy: "Very heavy"}
+
+// rainTone keeps a line quiet unless its total is heavy. It is a measurement, so it
+// asks for attention and says nothing of what will happen.
+func rainTone(band string) string {
+	switch band {
+	case raingauges.BandVeryHeavy:
+		return ToneHigh
+	case raingauges.BandHeavy:
+		return ToneWatch
+	}
+	return ToneNeutral
 }
 
 func airSection(in Inputs) Section {

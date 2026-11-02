@@ -113,6 +113,9 @@ type Dependencies struct {
 
 	// Reservoirs serves the reservoirs layer.
 	Reservoirs Reservoirs
+	// RainGauges serves the live rain gauges, and Canals Colombo's canal levels.
+	RainGauges RainGauges
+	Canals     Canals
 	// Overview composes the others into one first look.
 	Overview Overviews
 	// Now is the clock for requests without an explicit time; nil is
@@ -170,6 +173,9 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/stations/{id}", api.stationDetail)
 		r.Get("/rain/steps", api.rainSteps)
 		r.Get("/rain/observed", api.rainObserved)
+		r.Get("/rain/gauges", api.rainGauges)
+		r.Get("/rain/gauges/{id}", api.rainGauge)
+		r.Get("/rivers/canals", api.canals)
 		r.Get("/rain/tiles/{time}/{z}/{x}/{y}.png", api.rainTile)
 		r.Get("/air/current", api.airCurrent)
 		r.Get("/sea/current", api.seaCurrent)

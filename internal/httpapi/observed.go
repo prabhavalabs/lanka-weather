@@ -9,7 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
 	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/stations"
 )
 
@@ -24,6 +26,17 @@ type Stations interface {
 type Rain interface {
 	Steps(ctx context.Context) (*rainfall.Steps, error)
 	Tile(ctx context.Context, timeID string, z, x, y int) ([]byte, error)
+}
+
+// RainGauges serves the live rain gauges.
+type RainGauges interface {
+	Layer(ctx context.Context) (raingauges.FeatureCollection, error)
+	Gauge(ctx context.Context, id string) (*raingauges.Detail, error)
+}
+
+// Canals serves Colombo's canal levels.
+type Canals interface {
+	Current(ctx context.Context) (*canals.Document, error)
 }
 
 // Environment serves the air-quality and sea grids.
@@ -91,6 +104,54 @@ func (api *api) rainObserved(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeCachedGeoJSON(w, collection, "public, max-age=300")
+}
+
+// rainGauges returns the live rain gauges as GeoJSON.
+func (api *api) rainGauges(w http.ResponseWriter, r *http.Request) {
+	if api.deps.RainGauges == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "rain gauges are not configured")
+		return
+	}
+	collection, err := api.deps.RainGauges.Layer(r.Context())
+	if err != nil {
+		api.internalError(w, "rain gauges", err)
+		return
+	}
+	writeCachedGeoJSON(w, collection, "public, max-age=120")
+}
+
+// rainGauge returns one rain gauge with its recent readings.
+func (api *api) rainGauge(w http.ResponseWriter, r *http.Request) {
+	if api.deps.RainGauges == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "rain gauges are not configured")
+		return
+	}
+	detail, err := api.deps.RainGauges.Gauge(r.Context(), chi.URLParam(r, "id"))
+	if errors.Is(err, raingauges.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "gauge_not_found", "unknown rain gauge")
+		return
+	}
+	if err != nil {
+		api.internalError(w, "rain gauge", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=120")
+	writeJSON(w, http.StatusOK, Envelope{Data: detail})
+}
+
+// canals returns Colombo's canal levels, with the credit their source asks for.
+func (api *api) canals(w http.ResponseWriter, r *http.Request) {
+	if api.deps.Canals == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "canal levels are not configured")
+		return
+	}
+	document, err := api.deps.Canals.Current(r.Context())
+	if err != nil {
+		api.internalError(w, "canal levels", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=120")
+	writeJSON(w, http.StatusOK, Envelope{Data: document})
 }
 
 // rainSteps lists the satellite images there are, bare like other map data.
