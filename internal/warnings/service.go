@@ -2,6 +2,7 @@ package warnings
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -42,8 +43,8 @@ type Service struct {
 	Now                 func() time.Time
 }
 
-// LandslideLayer is the landslide-warnings layer as GeoJSON points at each
-// division's label point. Fills come from the region vector tiles, keyed by id.
+// LandslideLayer is the landslide-warnings layer: the named divisions'
+// simplified boundaries as GeoJSON, with their label points.
 type LandslideLayer struct {
 	Type     string            `json:"type"`
 	Features []DivisionFeature `json:"features"`
@@ -52,16 +53,10 @@ type LandslideLayer struct {
 
 // DivisionFeature is a division named in the report shown.
 type DivisionFeature struct {
-	Type       string     `json:"type"`
-	ID         string     `json:"id"`
-	Geometry   Point      `json:"geometry"`
-	Properties DivisionAt `json:"properties"`
-}
-
-// Point is a GeoJSON point.
-type Point struct {
-	Type        string     `json:"type"`
-	Coordinates [2]float64 `json:"coordinates"`
+	Type       string          `json:"type"`
+	ID         string          `json:"id"`
+	Geometry   json.RawMessage `json:"geometry"`
+	Properties DivisionAt      `json:"properties"`
 }
 
 // DivisionAt is a division's level in the report shown.
@@ -71,6 +66,9 @@ type DivisionAt struct {
 	NameSi     *string `json:"nameSi"`
 	DistrictID string  `json:"districtId"`
 	District   string  `json:"district"`
+	// LabelLon and LabelLat are a point inside the division.
+	LabelLon float64 `json:"labelLon"`
+	LabelLat float64 `json:"labelLat"`
 	LevelWords
 }
 
@@ -195,9 +193,9 @@ func (service *Service) loadLandslides(ctx context.Context) (loaded, error) {
 			district = *row.DistrictName
 		}
 		result.divisions = append(result.divisions, DivisionFeature{
-			Type: "Feature", ID: row.DsID, Geometry: Point{Type: "Point", Coordinates: [2]float64{row.Lon, row.Lat}},
+			Type: "Feature", ID: row.DsID, Geometry: json.RawMessage(row.Geojson),
 			Properties: DivisionAt{ID: row.DsID, Name: *row.DsName, NameSi: row.DsNameSi, DistrictID: row.DistrictID,
-				District: district, LevelWords: WordsFor(int(row.Level))},
+				District: district, LabelLon: row.Lon, LabelLat: row.Lat, LevelWords: WordsFor(int(row.Level))},
 		})
 	}
 	return result, nil

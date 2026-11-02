@@ -216,7 +216,8 @@ func (q *Queries) LandslideBulletinsBetween(ctx context.Context, since time.Time
 const landslideReportLevels = `-- name: LandslideReportLevels :many
 SELECT l.ds_id, l.district_id, l.level,
        r.name AS ds_name, r.name_si AS ds_name_si, d.name AS district_name,
-       COALESCE(ST_X(r.label_point), 0)::float8 AS lon, COALESCE(ST_Y(r.label_point), 0)::float8 AS lat
+       COALESCE(ST_X(r.label_point), 0)::float8 AS lon, COALESCE(ST_Y(r.label_point), 0)::float8 AS lat,
+       COALESCE(ST_AsGeoJSON(r.geom_simple, 4), '')::text AS geojson
 FROM landslide_levels l
 LEFT JOIN regions r ON r.id = l.ds_id
 LEFT JOIN regions d ON d.id = l.district_id
@@ -233,10 +234,13 @@ type LandslideReportLevelsRow struct {
 	DistrictName *string `json:"district_name"`
 	Lon          float64 `json:"lon"`
 	Lat          float64 `json:"lat"`
+	Geojson      string  `json:"geojson"`
 }
 
-// One report's divisions with their names and label points. A code that
-// matches no region comes back without a name, so it can be reported.
+// One report's divisions with their names, label points and boundaries. The
+// region tiles carry DS divisions only from zoom 8, so the layer draws these
+// boundaries itself and is visible at country scale. A code that matches no
+// region comes back without a name, so it can be reported.
 func (q *Queries) LandslideReportLevels(ctx context.Context, reportDate pgtype.Date) ([]LandslideReportLevelsRow, error) {
 	rows, err := q.db.Query(ctx, landslideReportLevels, reportDate)
 	if err != nil {
@@ -255,6 +259,7 @@ func (q *Queries) LandslideReportLevels(ctx context.Context, reportDate pgtype.D
 			&i.DistrictName,
 			&i.Lon,
 			&i.Lat,
+			&i.Geojson,
 		); err != nil {
 			return nil, err
 		}
