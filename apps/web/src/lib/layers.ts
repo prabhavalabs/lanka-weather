@@ -1,6 +1,10 @@
 /** Mirrors internal/layers.Layer in the Go service. */
 export type LayerCategory = "hydrology" | "weather" | "hazard" | "geography"
-export type LayerKind = "geojson" | "raster" | "vector" | "wind"
+/**
+ * How a layer is drawn: GeoJSON features, raster image tiles, vector tiles,
+ * the animated wind particles, or values on a regular grid (colour field).
+ */
+export type LayerKind = "geojson" | "raster" | "vector" | "wind" | "grid"
 export type LayerStatus = "planned" | "available"
 
 export interface Layer {
@@ -16,6 +20,11 @@ export interface Layer {
   attribution: string
   /** API path serving the layer's data, for layers whose data comes from the API. */
   dataPath?: string
+  /** URL template of a vector layer's tiles, with {z}, {x} and {y} placeholders. */
+  tilePath?: string
+  /** Zooms the tiles are served at; clients overzoom beyond maxZoom. */
+  minZoom?: number
+  maxZoom?: number
 }
 
 export const categoryOrder: LayerCategory[] = ["hazard", "hydrology", "weather", "geography"]
