@@ -1,161 +1,161 @@
 {
- "generatedAt": "2026-11-02T19:39:21.448Z",
- "irrigationSheetDay": "2026-11-02",
- "mahaweliReportDay": "2026-11-02",
- "count": 9,
- "source": "Department of Irrigation reservoir sheet; Mahaweli Authority daily report; compiled by Sri Lanka Water Levels",
- "license": "https://waterlevels.lk/about#data-sources",
- "notes": [
-  "flow.cusecs is cubic feet per second over the spillway or outlets. null means unknown, never zero.",
-  "status: spilling (over the spillway), releasing (through gates or outlets), holding, nodata.",
-  "Not an official warning service. In an emergency call 117."
- ],
- "reservoirs": [
-  {
-   "id": "akathimuruppu",
-   "name": "Akathimuruppu",
-   "river": null,
-   "district": "Mannar",
-   "type": "major",
-   "status": "holding",
-   "storagePercent": 44.6,
-   "storageFresh": true,
-   "flow": null,
-   "readingDay": "2026-11-02",
-   "source": "Irrigation Department",
-   "url": "https://waterlevels.lk/reservoirs/akathimuruppu"
-  },
-  {
-   "id": "alikota-ara",
-   "name": "Alikota Ara",
-   "river": null,
-   "district": "Moneragala",
-   "type": "major",
-   "status": "nodata",
-   "storagePercent": 68.4,
-   "storageFresh": false,
-   "flow": null,
-   "readingDay": "2026-10-29",
-   "source": "Irrigation Department",
-   "url": "https://waterlevels.lk/reservoirs/alikota-ara"
-  },
-  {
-   "id": "ambakolawewa",
-   "name": "Ambakolawewa",
-   "river": null,
-   "district": "Kurunegala",
-   "type": "major",
-   "status": "holding",
-   "storagePercent": 79.5,
-   "storageFresh": true,
-   "flow": {
-    "kind": "outlets",
-    "cusecs": 9,
-    "source": "Irrigation Department",
-    "day": "2026-11-02"
-   },
-   "readingDay": "2026-11-02",
-   "source": "Irrigation Department",
-   "url": "https://waterlevels.lk/reservoirs/ambakolawewa"
-  },
-  {
-   "id": "ambewela",
-   "name": "Ambewela",
-   "river": null,
-   "district": "Nuwara Eliya",
-   "type": "major",
-   "status": "spilling",
-   "storagePercent": 89.3,
-   "storageFresh": true,
-   "flow": null,
-   "readingDay": "2026-11-01",
-   "source": "Irrigation Department",
-   "url": "https://waterlevels.lk/reservoirs/ambewela"
-  },
-  {
-   "id": "denagama",
-   "name": "Denagama",
-   "river": null,
-   "district": "Galle",
-   "type": "medium",
-   "status": "spilling",
-   "storagePercent": 100,
-   "storageFresh": true,
-   "flow": {
-    "kind": "spill",
-    "cusecs": 17.22,
-    "source": "Irrigation Department",
-    "day": "2026-11-02"
-   },
-   "readingDay": "2026-11-02",
-   "source": "Irrigation Department",
-   "url": "https://waterlevels.lk/reservoirs/denagama"
-  },
-  {
-   "id": "kandiyapita-right-bank",
-   "name": "Kandiyapita (Right Bank)",
-   "river": null,
-   "district": "Moneragala",
-   "type": "medium",
-   "status": "nodata",
-   "storagePercent": null,
-   "storageFresh": null,
-   "flow": null,
-   "readingDay": "2026-10-29",
-   "source": null,
-   "url": "https://waterlevels.lk/reservoirs/kandiyapita-right-bank"
-  },
-  {
-   "id": "minneriya",
-   "name": "Minneriya",
-   "river": "Mahaweli Ganga",
-   "district": "Polonnaruwa",
-   "type": "major",
-   "status": "releasing",
-   "storagePercent": 67,
-   "storageFresh": true,
-   "flow": {
-    "kind": "downstream",
-    "cusecs": 690,
-    "source": "Mahaweli Authority",
-    "day": "2026-11-02"
-   },
-   "readingDay": "2026-11-02",
-   "source": "Irrigation Department",
-   "url": "https://waterlevels.lk/reservoirs/minneriya"
-  },
-  {
-   "id": "polgolla",
-   "name": "Polgolla",
-   "river": "Mahaweli Ganga",
-   "district": null,
-   "type": "mahaweli",
-   "status": "releasing",
-   "storagePercent": 97,
-   "storageFresh": true,
-   "flow": {
-    "kind": "downstream",
-    "cusecs": 3225,
-    "source": "Mahaweli Authority",
-    "day": "2026-11-02"
-   },
-   "readingDay": "2026-11-02",
-   "source": "Mahaweli Authority",
-   "url": "https://waterlevels.lk/reservoirs/polgolla"
-  },
-  {
-   "id": "victoria",
-   "name": "Victoria",
-   "river": "Mahaweli Ganga",
-   "district": null,
-   "type": "mahaweli",
-   "status": "nodata",
-   "storagePercent": 100,
-   "storageFresh": true,
-   "flow": null,
-   "readingDay": "2026-11-02",
-   "source": "Mahaweli Authority",
-   "url": "https://waterlevels.lk/reservoirs/victoria"
-  }
- ]
+  "generatedAt": "2026-11-02T19:39:21.448Z",
+  "irrigationSheetDay": "2026-11-02",
+  "mahaweliReportDay": "2026-11-02",
+  "count": 9,
+  "source": "Department of Irrigation reservoir sheet; Mahaweli Authority daily report; compiled by Sri Lanka Water Levels",
+  "license": "https://waterlevels.lk/about#data-sources",
+  "notes": [
+    "flow.cusecs is cubic feet per second over the spillway or outlets. null means unknown, never zero.",
+    "status: spilling (over the spillway), releasing (through gates or outlets), holding, nodata.",
+    "Not an official warning service. In an emergency call 117."
+  ],
+  "reservoirs": [
+    {
+      "id": "akathimuruppu",
+      "name": "Akathimuruppu",
+      "river": null,
+      "district": "Mannar",
+      "type": "major",
+      "status": "holding",
+      "storagePercent": 44.6,
+      "storageFresh": true,
+      "flow": null,
+      "readingDay": "2026-11-02",
+      "source": "Irrigation Department",
+      "url": "https://waterlevels.lk/reservoirs/akathimuruppu"
+    },
+    {
+      "id": "alikota-ara",
+      "name": "Alikota Ara",
+      "river": null,
+      "district": "Moneragala",
+      "type": "major",
+      "status": "nodata",
+      "storagePercent": 68.4,
+      "storageFresh": false,
+      "flow": null,
+      "readingDay": "2026-10-29",
+      "source": "Irrigation Department",
+      "url": "https://waterlevels.lk/reservoirs/alikota-ara"
+    },
+    {
+      "id": "ambakolawewa",
+      "name": "Ambakolawewa",
+      "river": null,
+      "district": "Kurunegala",
+      "type": "major",
+      "status": "holding",
+      "storagePercent": 79.5,
+      "storageFresh": true,
+      "flow": {
+        "kind": "outlets",
+        "cusecs": 9,
+        "source": "Irrigation Department",
+        "day": "2026-11-02"
+      },
+      "readingDay": "2026-11-02",
+      "source": "Irrigation Department",
+      "url": "https://waterlevels.lk/reservoirs/ambakolawewa"
+    },
+    {
+      "id": "ambewela",
+      "name": "Ambewela",
+      "river": null,
+      "district": "Nuwara Eliya",
+      "type": "major",
+      "status": "spilling",
+      "storagePercent": 89.3,
+      "storageFresh": true,
+      "flow": null,
+      "readingDay": "2026-11-01",
+      "source": "Irrigation Department",
+      "url": "https://waterlevels.lk/reservoirs/ambewela"
+    },
+    {
+      "id": "denagama",
+      "name": "Denagama",
+      "river": null,
+      "district": "Galle",
+      "type": "medium",
+      "status": "spilling",
+      "storagePercent": 100,
+      "storageFresh": true,
+      "flow": {
+        "kind": "spill",
+        "cusecs": 17.22,
+        "source": "Irrigation Department",
+        "day": "2026-11-02"
+      },
+      "readingDay": "2026-11-02",
+      "source": "Irrigation Department",
+      "url": "https://waterlevels.lk/reservoirs/denagama"
+    },
+    {
+      "id": "kandiyapita-right-bank",
+      "name": "Kandiyapita (Right Bank)",
+      "river": null,
+      "district": "Moneragala",
+      "type": "medium",
+      "status": "nodata",
+      "storagePercent": null,
+      "storageFresh": null,
+      "flow": null,
+      "readingDay": "2026-10-29",
+      "source": null,
+      "url": "https://waterlevels.lk/reservoirs/kandiyapita-right-bank"
+    },
+    {
+      "id": "minneriya",
+      "name": "Minneriya",
+      "river": "Mahaweli Ganga",
+      "district": "Polonnaruwa",
+      "type": "major",
+      "status": "releasing",
+      "storagePercent": 67,
+      "storageFresh": true,
+      "flow": {
+        "kind": "downstream",
+        "cusecs": 690,
+        "source": "Mahaweli Authority",
+        "day": "2026-11-02"
+      },
+      "readingDay": "2026-11-02",
+      "source": "Irrigation Department",
+      "url": "https://waterlevels.lk/reservoirs/minneriya"
+    },
+    {
+      "id": "polgolla",
+      "name": "Polgolla",
+      "river": "Mahaweli Ganga",
+      "district": null,
+      "type": "mahaweli",
+      "status": "releasing",
+      "storagePercent": 97,
+      "storageFresh": true,
+      "flow": {
+        "kind": "downstream",
+        "cusecs": 3225,
+        "source": "Mahaweli Authority",
+        "day": "2026-11-02"
+      },
+      "readingDay": "2026-11-02",
+      "source": "Mahaweli Authority",
+      "url": "https://waterlevels.lk/reservoirs/polgolla"
+    },
+    {
+      "id": "victoria",
+      "name": "Victoria",
+      "river": "Mahaweli Ganga",
+      "district": null,
+      "type": "mahaweli",
+      "status": "nodata",
+      "storagePercent": 100,
+      "storageFresh": true,
+      "flow": null,
+      "readingDay": "2026-11-02",
+      "source": "Mahaweli Authority",
+      "url": "https://waterlevels.lk/reservoirs/victoria"
+    }
+  ]
 }
