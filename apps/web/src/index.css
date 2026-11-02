@@ -80,6 +80,14 @@
   --color-status-major-flood-foreground: var(--status-major-flood-foreground);
   --color-status-unknown: var(--status-unknown);
   --color-status-unknown-foreground: var(--status-unknown-foreground);
+  --color-reservoir-spilling: var(--reservoir-spilling);
+  --color-reservoir-spilling-foreground: var(--reservoir-spilling-foreground);
+  --color-reservoir-releasing: var(--reservoir-releasing);
+  --color-reservoir-releasing-foreground: var(--reservoir-releasing-foreground);
+  --color-reservoir-holding: var(--reservoir-holding);
+  --color-reservoir-holding-foreground: var(--reservoir-holding-foreground);
+  --color-reservoir-nodata: var(--reservoir-nodata);
+  --color-reservoir-nodata-foreground: var(--reservoir-nodata-foreground);
 
   --radius-xs: 0.375rem;
   --radius-sm: 0.5rem;

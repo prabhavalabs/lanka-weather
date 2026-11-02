@@ -36,6 +36,7 @@ function contrast(a: string, b: string) {
 const text = 4.5
 const nonText = 3
 const statuses = ["normal", "alert", "minor-flood", "major-flood", "unknown"]
+const reservoirStatuses = ["spilling", "releasing", "holding", "nodata"]
 
 /** [foreground token, background token, minimum ratio] */
 const pairs: [string, string, number][] = [
@@ -63,6 +64,10 @@ const pairs: [string, string, number][] = [
     (status) =>
       [`status-${status}-foreground`, `status-${status}`, text] as [string, string, number],
   ),
+  ...reservoirStatuses.map(
+    (status) =>
+      [`reservoir-${status}-foreground`, `reservoir-${status}`, text] as [string, string, number],
+  ),
   // Map labels on land and water.
   ["map-label", "map-land"],
   ["map-label-strong", "map-land"],
@@ -79,6 +84,9 @@ const nonTextPairs: [string, string][] = [
   // Map symbols stand off their outline; the selected outline stands off the land.
   ...statuses.map((status) => [`status-${status}`, "status-stroke"] as [string, string]),
   ["status-stroke-selected", "map-land"],
+  ...reservoirStatuses.map(
+    (status) => [`reservoir-${status}`, "status-stroke"] as [string, string],
+  ),
 ]
 
 for (const [name, tokens] of Object.entries(themes)) {
