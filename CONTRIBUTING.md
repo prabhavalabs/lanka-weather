@@ -115,10 +115,10 @@ Refs: #12
 ## 5. Before opening a pull request
 
 ```bash
-pnpm lint          # ESLint
-pnpm typecheck     # TypeScript, all workspaces
-pnpm test          # unit tests
-pnpm build         # production builds
+make ci                  # everything CI runs, in order:
+                         #   gofmt, go vet, Prettier, ESLint, tsc
+                         #   go test, Vitest
+                         #   Go and Vite production builds
 git status --porcelain   # nothing unintended staged
 ```
 

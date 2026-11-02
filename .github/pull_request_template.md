@@ -16,9 +16,7 @@
 
 <!-- Commands run, data sources exercised, screenshots of map changes, measured results. -->
 
-- [ ] Lint and type checks pass (`pnpm lint && pnpm typecheck`)
-- [ ] Tests pass (`pnpm test`)
-- [ ] Build succeeds (`pnpm build`)
+- [ ] `make ci` passes (format, lint, type checks, Go and web tests, builds)
 
 ## Risks and rollback
 
