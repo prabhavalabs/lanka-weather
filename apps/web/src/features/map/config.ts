@@ -1,6 +1,9 @@
 import type { LngLatBoundsLike } from "maplibre-gl"
 
-/** Keyless OpenFreeMap vector styles (OpenStreetMap data). */
+/**
+ * Keyless OpenFreeMap vector styles (OpenStreetMap data). Land, water and
+ * labels are retuned to the theme tokens as each style loads (basemap.ts).
+ */
 export const mapStyles = {
   light: "https://tiles.openfreemap.org/styles/positron",
   dark: "https://tiles.openfreemap.org/styles/dark",

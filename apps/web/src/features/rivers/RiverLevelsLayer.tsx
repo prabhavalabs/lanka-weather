@@ -6,8 +6,9 @@ import type {
 } from "maplibre-gl"
 import type { FeatureCollection } from "geojson"
 import { useEffect, useRef } from "react"
+import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
-import { statusColors } from "./present"
+import { statusTokens } from "./present"
 import type { RiverLevelsCollection } from "./types"
 
 const SOURCE = "river-levels"
@@ -21,19 +22,34 @@ const empty: RiverLevelsCollection = {
   meta: { source: "", attribution: "", fetchedAt: null, generatedAt: "" },
 }
 
-const statusColor: ExpressionSpecification = [
-  "match",
-  ["get", "status"],
-  "alert",
-  statusColors.alert,
-  "minor_flood",
-  statusColors.minor_flood,
-  "major_flood",
-  statusColors.major_flood,
-  "unknown",
-  statusColors.unknown,
-  statusColors.normal,
-]
+/** Theme colours for the layer, read when the layers are added (on every style load). */
+function readPalette() {
+  return readTokens({
+    ...statusTokens,
+    stroke: "--status-stroke",
+    strokeSelected: "--status-stroke-selected",
+    label: "--map-label-strong",
+    halo: "--map-label-halo",
+  })
+}
+
+type Palette = ReturnType<typeof readPalette>
+
+function statusColor(palette: Palette): ExpressionSpecification {
+  return [
+    "match",
+    ["get", "status"],
+    "alert",
+    palette.alert,
+    "minor_flood",
+    palette.minor_flood,
+    "major_flood",
+    palette.major_flood,
+    "unknown",
+    palette.unknown,
+    palette.normal,
+  ]
+}
 
 /** Draws severe stations above calm ones. */
 const severity: ExpressionSpecification = [
@@ -51,6 +67,8 @@ const severity: ExpressionSpecification = [
 ]
 
 function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
+  const palette = readPalette()
+  const selected: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false]
   if (!map.getSource(SOURCE)) {
     map.addSource(SOURCE, {
       type: "geojson",
@@ -67,8 +85,8 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
       filter: ["all", ["==", ["get", "trend"], "rising"], ["!", ["get", "stale"]]],
       paint: {
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 10, 10, 16],
-        "circle-color": statusColor,
-        "circle-opacity": 0.28,
+        "circle-color": statusColor(palette),
+        "circle-opacity": 0.3,
       },
     })
   }
@@ -79,16 +97,19 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
       source: SOURCE,
       layout: { "circle-sort-key": severity },
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 9],
-        "circle-color": statusColor,
-        "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
-        "circle-stroke-width": ["case", ["boolean", ["feature-state", "selected"], false], 3, 1.5],
-        "circle-stroke-color": [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          "#0f172a",
-          "#ffffff",
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          6,
+          ["case", selected, 7, 5],
+          10,
+          ["case", selected, 11, 9],
         ],
+        "circle-color": statusColor(palette),
+        "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
+        "circle-stroke-width": ["case", selected, 3, 1.25],
+        "circle-stroke-color": ["case", selected, palette.strokeSelected, palette.stroke],
       },
     })
   }
@@ -106,7 +127,11 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
         "text-anchor": "top",
         "text-optional": true,
       },
-      paint: { "text-color": "#0f172a", "text-halo-color": "#ffffff", "text-halo-width": 1.5 },
+      paint: {
+        "text-color": palette.label,
+        "text-halo-color": palette.halo,
+        "text-halo-width": 1.5,
+      },
     })
   }
 }

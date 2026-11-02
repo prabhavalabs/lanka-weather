@@ -2,6 +2,8 @@ import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { readTokens } from "@/lib/tokens"
+import { basemapTokens, tuneBasemap } from "./basemap"
 import { mapStyles, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
 
@@ -9,6 +11,14 @@ import { MapContext } from "./MapContext"
 // module into its dependency cache (and the production build into assets/),
 // where no worker file exists, so the worker is emitted and named explicitly.
 maplibregl.setWorkerUrl(workerUrl)
+
+/**
+ * Tunes each fetched basemap to the theme in effect. The `dark` class is set
+ * before a theme change reaches React, so the tokens read here already
+ * belong to the new theme.
+ */
+const transformStyle: maplibregl.TransformStyleFunction = (_previous, next) =>
+  tuneBasemap(next, readTokens(basemapTokens))
 
 interface MapViewProps {
   theme: MapTheme
@@ -26,6 +36,7 @@ export function MapView({ theme, children }: MapViewProps) {
     const instance = new maplibregl.Map({
       container: container.current,
       style: mapStyles[theme],
+      transformStyle,
       bounds: sriLankaBounds,
       fitBoundsOptions: { padding: 24 },
       maxBounds: panLimit,
@@ -48,9 +59,13 @@ export function MapView({ theme, children }: MapViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const loadedTheme = useRef(theme)
   useEffect(() => {
-    // Data layers re-add themselves on "style.load" after a style change.
-    map?.setStyle(mapStyles[theme])
+    if (!map || loadedTheme.current === theme) return
+    loadedTheme.current = theme
+    // A full reload rather than a diff, so "style.load" fires and data layers
+    // re-add themselves with the new theme's colours.
+    map.setStyle(mapStyles[theme], { diff: false, transformStyle })
   }, [map, theme])
 
   return (
