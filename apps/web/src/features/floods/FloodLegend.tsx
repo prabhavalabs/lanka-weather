@@ -59,7 +59,7 @@ function BasinSwatch({ state }: { state: BasinState }) {
       className="inline-block h-2.5 w-3.5 shrink-0 rounded-[2px] border"
       style={{
         borderColor: color,
-        borderStyle: state === "no_forecast" ? "dashed" : "solid",
+        borderStyle: "dashed",
         backgroundColor: `color-mix(in srgb, ${color} ${basinFillOpacity[state] * 100}%, transparent)`,
       }}
     />
@@ -253,7 +253,7 @@ export function FloodLegend({
         )}
       </Group>
 
-      <Group title="River basins" note="The worst forecast or gauge in each">
+      <Group title="River basins" note="Dashed: the worst forecast or gauge in each">
         <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
           {basinStateOrder.map((state) => (
             <li key={state} className="flex items-center justify-between gap-2">
@@ -266,7 +266,8 @@ export function FloodLegend({
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">
-          No forecast means nothing is known there, not that it is calm.
+          A basin is not a flood area: solid shapes are the areas Google publishes. No forecast
+          means nothing is known there, not that it is calm.
           {unverified && " Some rest only on lower-confidence gauges; each basin's panel says so."}
         </p>
       </Group>

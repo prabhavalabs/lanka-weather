@@ -17,6 +17,8 @@ describe("basin tints", () => {
     expect(basinFillOpacity.above_normal).toBeGreaterThan(basinFillOpacity.no_flooding)
     expect(basinFillOpacity.severe).toBeGreaterThan(basinFillOpacity.above_normal)
     expect(basinFillOpacity.extreme).toBeGreaterThan(basinFillOpacity.severe)
+    // Faint at every state, so a basin never reads as one of Google's filled areas.
+    expect(basinFillOpacity.extreme).toBeLessThan(0.1)
   })
 })
 

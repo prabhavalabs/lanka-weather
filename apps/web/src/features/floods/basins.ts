@@ -50,13 +50,15 @@ export const basinBadge = {
 /**
  * Tint strength by state. A calm country reads as Flood Hub's does, green dots and
  * no heavy shapes, so a calm basin has barely a tint and a basin with no forecast
- * none at all, so it cannot be mistaken for a calm one. A tint only grows for a
- * warning or above, and stays under Google's own polygons, which say more.
+ * none at all, so it cannot be mistaken for a calm one. Even at a warning the tint
+ * stays faint and the outline dashed: a filled, solid-edged shape on this map always
+ * means an area Google published, and a basin is not one. Its state may rest on a
+ * single gauge.
  */
 export const basinFillOpacity: Record<BasinState, number> = {
-  extreme: 0.3,
-  severe: 0.24,
-  above_normal: 0.18,
+  extreme: 0.09,
+  severe: 0.07,
+  above_normal: 0.05,
   no_flooding: 0.035,
   no_forecast: 0,
 }

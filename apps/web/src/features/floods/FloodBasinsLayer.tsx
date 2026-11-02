@@ -194,6 +194,8 @@ function addLayers(map: MapLibreMap, layer: Layer, state: State) {
           "line-color": lineColor(state.basins),
           "line-opacity": byState(state.basins, basinLineOpacity),
           "line-width": lineWidth(state.basins, 0.5, 1),
+          // Dashed, so a basin is never taken for one of Google's solid flood areas.
+          "line-dasharray": [3, 2],
         },
       } as Parameters<MapLibreMap["addLayer"]>[0],
       lines,
