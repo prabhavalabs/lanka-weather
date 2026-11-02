@@ -64,7 +64,7 @@ export function App() {
         </div>
       )}
       {riversOn && (
-        <div className="pointer-events-none absolute bottom-10 left-3 hidden md:block">
+        <div className="pointer-events-none absolute bottom-3 left-[19.5rem] hidden md:block">
           <RiverLegend />
         </div>
       )}

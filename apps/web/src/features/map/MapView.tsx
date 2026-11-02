@@ -1,8 +1,14 @@
 import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { mapStyles, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
+
+// MapLibre finds its worker next to its own module. Vite pre-bundles the
+// module into its dependency cache (and the production build into assets/),
+// where no worker file exists, so the worker is emitted and named explicitly.
+maplibregl.setWorkerUrl(workerUrl)
 
 interface MapViewProps {
   theme: MapTheme
@@ -28,7 +34,7 @@ export function MapView({ theme, children }: MapViewProps) {
       attributionControl: { compact: true },
     })
     instance.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right")
-    instance.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left")
+    instance.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right")
     instance.addControl(
       new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: false } }),
       "bottom-right",
@@ -49,12 +55,17 @@ export function MapView({ theme, children }: MapViewProps) {
 
   return (
     <>
-      <div
-        ref={container}
-        className="absolute inset-0"
-        aria-label="Map of Sri Lanka"
-        role="region"
-      />
+      {/* MapLibre's stylesheet gives its container `position: relative`, which
+          outranks Tailwind's layered utilities, so the positioning lives on a
+          wrapper and the map container only fills it. */}
+      <div className="absolute inset-0">
+        <div
+          ref={container}
+          className="h-full w-full"
+          aria-label="Map of Sri Lanka"
+          role="region"
+        />
+      </div>
       <MapContext.Provider value={map}>{children}</MapContext.Provider>
     </>
   )
