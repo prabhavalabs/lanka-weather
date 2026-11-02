@@ -93,6 +93,9 @@ type Flow struct {
 	Cusecs *float64 `json:"cusecs"`
 	Agency *string  `json:"agency"`
 	Day    *string  `json:"day"`
+	// Stale says the figure's day is too old to use, which can differ from the
+	// day the reservoir's status was read.
+	Stale bool `json:"stale"`
 }
 
 // Properties are a reservoir's properties.
@@ -179,8 +182,9 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 		feature := Feature{Type: "Feature", ID: row.ID, Properties: Properties{
 			ID: row.ID, Name: row.Name, District: row.District, River: row.River, Type: row.Kind,
 			Status: row.Status, StoragePercent: row.StoragePercent, StorageFresh: row.StorageFresh,
-			Flow: flow(row.FlowKind, row.FlowCusecs, row.FlowAgency, day(row.FlowDay)), ReadingDay: day(row.ReadingDay),
-			Agency: row.Agency, Source: row.Source, SourceURL: row.SourceUrl, FetchedAt: row.FetchedAt,
+			Flow:       flow(row.FlowKind, row.FlowCusecs, row.FlowAgency, day(row.FlowDay), flowStale(row.FlowDay, row.ReadingDay, now, service.StaleAfter)),
+			ReadingDay: day(row.ReadingDay),
+			Agency:     row.Agency, Source: row.Source, SourceURL: row.SourceUrl, FetchedAt: row.FetchedAt,
 			Stale: IsStale(row.ReadingDay, now, service.StaleAfter), OSMName: row.OsmName, OSMKind: row.OsmKind,
 			AltNames: osmreservoirs.Aliases[row.ID],
 		}}
@@ -211,11 +215,20 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 	return collection, nil
 }
 
-func flow(kind *string, cusecs *float64, agency, flowDay *string) *Flow {
+func flow(kind *string, cusecs *float64, agency, flowDay *string, stale bool) *Flow {
 	if kind == nil {
 		return nil
 	}
-	return &Flow{Kind: *kind, Cusecs: cusecs, Agency: agency, Day: flowDay}
+	return &Flow{Kind: *kind, Cusecs: cusecs, Agency: agency, Day: flowDay, Stale: stale}
+}
+
+// flowStale says whether a flow figure is too old: by its own day, or the
+// reading's when it gives none.
+func flowStale(flowDay, readingDay pgtype.Date, now time.Time, limit time.Duration) bool {
+	if flowDay.Valid {
+		return IsStale(flowDay, now, limit)
+	}
+	return IsStale(readingDay, now, limit)
 }
 
 // Areas is a GeoJSON feature collection of the mapped water bodies.
@@ -308,8 +321,9 @@ func (service *Service) History(ctx context.Context, id string, days int) (Histo
 		Reservoir: Properties{
 			ID: row.ID, Name: row.Name, District: row.District, River: row.River, Type: row.Kind,
 			Status: row.Status, StoragePercent: row.StoragePercent, StorageFresh: row.StorageFresh,
-			Flow: flow(row.FlowKind, row.FlowCusecs, row.FlowAgency, day(row.FlowDay)), ReadingDay: day(row.ReadingDay),
-			Agency: row.Agency, Source: row.Source, SourceURL: row.SourceUrl, FetchedAt: row.FetchedAt,
+			Flow:       flow(row.FlowKind, row.FlowCusecs, row.FlowAgency, day(row.FlowDay), flowStale(row.FlowDay, row.ReadingDay, now, service.StaleAfter)),
+			ReadingDay: day(row.ReadingDay),
+			Agency:     row.Agency, Source: row.Source, SourceURL: row.SourceUrl, FetchedAt: row.FetchedAt,
 			Stale: IsStale(row.ReadingDay, now, service.StaleAfter), Mapped: row.Lon != nil,
 			OSMName: row.OsmName, OSMKind: row.OsmKind, AltNames: osmreservoirs.Aliases[row.ID],
 		},
@@ -319,7 +333,7 @@ func (service *Service) History(ctx context.Context, id string, days int) (Histo
 		history.Readings = append(history.Readings, Reading{
 			Day: reading.ReadingDay.Time.Format(time.DateOnly), Status: reading.Status,
 			StoragePercent: reading.StoragePercent, StorageFresh: reading.StorageFresh,
-			Flow: flow(reading.FlowKind, reading.FlowCusecs, reading.FlowAgency, nil), Agency: reading.Agency,
+			Flow: flow(reading.FlowKind, reading.FlowCusecs, reading.FlowAgency, nil, false), Agency: reading.Agency,
 		})
 	}
 	return history, nil

@@ -86,6 +86,13 @@ Every river and stretch, worst first, recomputed at most once a minute.
 ```
 
 - `level` and `reasons` on a river are those of its worst stretch.
+- A reason's `kind` is `gauge`, `forecast`, `rain`, `reservoir` or `coverage`. A `reservoir` reason
+  names a reservoir directly upstream, and a level of `unknown` on one means it did not raise the
+  stretch (ADR 0010).
+- `meta.reservoirLinks` has `byPosition`, `byRiver` and `unlinked`: those not placed on the network,
+  each with `id`, `name`, `reason` (`no_place`, `too_far`, `conflict`, `no_stretch` or `ambiguous`)
+  and `detail`. They count for nothing. `meta.reservoirsFetchedAt` is null when no readings could be
+  used, so spills upstream are not known.
 - A gauge's `role` is `upstream` (its water reaches this stretch), `downstream` (the gauge at the
   stretch's lower end) or `next` (the first gauge below an ungauged stretch: named, not used as
   evidence).

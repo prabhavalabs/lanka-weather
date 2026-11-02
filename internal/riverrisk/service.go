@@ -22,6 +22,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/grid"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/store"
@@ -51,10 +52,10 @@ const (
 )
 
 // Note is said with every estimate.
-const Note = "Estimate from gauge readings, Google flood forecasts and forecast rain. Thresholds are the Irrigation Department's. Follow official warnings from the Irrigation Department, the Department of Meteorology and the Disaster Management Centre."
+const Note = "Estimate from gauge readings, Google flood forecasts, forecast rain and reported reservoir spills. Thresholds are the Irrigation Department's. Follow official warnings from the Irrigation Department, the Department of Meteorology and the Disaster Management Centre."
 
 // Attribution credits what the estimate and the map are built from.
-const Attribution = irrigationgis.Attribution + "; " + hydrorivers.Attribution + "; " + hydrobasins.Attribution + "; " + googleflood.Attribution + "; weather data by Open-Meteo.com (CC BY 4.0)"
+const Attribution = irrigationgis.Attribution + "; " + hydrorivers.Attribution + "; " + hydrobasins.Attribution + "; " + googleflood.Attribution + "; weather data by Open-Meteo.com (CC BY 4.0); reservoir figures from " + reservoirs.Attribution
 
 // RiverSource serves gauge readings.
 type RiverSource interface {
@@ -72,17 +73,26 @@ type WeatherSource interface {
 	Snapshot(ctx context.Context) (*weather.Snapshot, error)
 }
 
+// ReservoirSource serves the latest reservoir readings.
+type ReservoirSource interface {
+	Layer(ctx context.Context) (reservoirs.FeatureCollection, error)
+}
+
 // Service computes the risk documents at request time from fresh tables.
 type Service struct {
 	Pool    *pgxpool.Pool
 	Rivers  RiverSource
 	Floods  FloodSource
 	Weather WeatherSource
-	Logger  *slog.Logger
-	Now     func() time.Time
+	// Reservoirs adds spills upstream; without it, or when it fails, a stretch
+	// simply has no such evidence.
+	Reservoirs ReservoirSource
+	Logger     *slog.Logger
+	Now        func() time.Time
 
 	mu       sync.Mutex
 	network  *network
+	links    *linkState
 	current  *assessed
 	computed time.Time
 
@@ -138,7 +148,13 @@ type RiskMeta struct {
 	ForecastFetchedAt *time.Time `json:"forecastFetchedAt"`
 	RainFetchedAt     *time.Time `json:"rainFetchedAt"`
 	RainStale         bool       `json:"rainStale"`
-	Attribution       string     `json:"attribution"`
+	// ReservoirsFetchedAt is when the readings used were read; null when none
+	// were available, so spills upstream are not known.
+	ReservoirsFetchedAt *time.Time `json:"reservoirsFetchedAt"`
+	// ReservoirLinks says how many reservoirs are placed on the network, and why
+	// the others are not. Those count for nothing.
+	ReservoirLinks LinkReport `json:"reservoirLinks"`
+	Attribution    string     `json:"attribution"`
 	// Seeded means local test data is in the tables; never true in production.
 	Seeded bool `json:"seeded"`
 }
@@ -287,7 +303,9 @@ func (service *Service) compute(ctx context.Context) (*assessed, error) {
 	if err != nil {
 		return nil, fmt.Errorf("check for seeded data: %w", err)
 	}
-	result := assemble(net, layer, google, rain, rainMeta, now, seeded)
+	spills, links, reservoirsAt := service.reservoirEvidence(ctx, queries, net)
+	result := assemble(net, layer, google, rain, rainMeta, spills, now, seeded)
+	result.risk.Meta.ReservoirLinks, result.risk.Meta.ReservoirsFetchedAt = links, reservoirsAt
 	basins, err := service.buildBasins(ctx, queries, net, layer, google, now, seeded)
 	if err != nil {
 		return nil, err
@@ -295,6 +313,26 @@ func (service *Service) compute(ctx context.Context) (*assessed, error) {
 	result.basins = basins
 	service.current, service.computed = result, now
 	return result, nil
+}
+
+// reservoirEvidence reads each stretch's reservoirs. A failure leaves no such
+// evidence and is logged: the estimate carries on with what it has.
+func (service *Service) reservoirEvidence(ctx context.Context, queries *store.Queries, net *network) (map[int64][]Reservoir, LinkReport, *time.Time) {
+	report := LinkReport{Unlinked: []UnlinkedReservoir{}}
+	if service.Reservoirs == nil || len(net.topology) == 0 {
+		return nil, report, nil
+	}
+	layer, err := service.Reservoirs.Layer(ctx)
+	if err != nil {
+		service.warn("reservoirs", err)
+		return nil, report, nil
+	}
+	state, err := service.loadLinks(ctx, queries, net, layer)
+	if err != nil {
+		service.warn("reservoir links", err)
+		return nil, report, nil
+	}
+	return reachReservoirs(state.links, layer), state.report, layer.Meta.FetchedAt
 }
 
 // rainMeta is when the rain forecast was fetched.
@@ -451,11 +489,12 @@ func AccumulateRain(segments []CatchmentSegment) map[int64]RainSummary {
 func round1(value float64) float64 { return math.Round(value*10) / 10 }
 
 // assemble turns the inputs into the risk document. Pure.
-func assemble(net *network, layer rivers.FeatureCollection, google []floods.Gauge, rain map[int64]RainSummary, meta rainMeta, now time.Time, seeded bool) *assessed {
+func assemble(net *network, layer rivers.FeatureCollection, google []floods.Gauge, rain map[int64]RainSummary, meta rainMeta, spills map[int64][]Reservoir, now time.Time, seeded bool) *assessed {
 	stations := make(map[string]rivers.StationProperties, len(layer.Features))
 	document := &RiskDocument{Estimate: true, Note: Note, Rivers: []RiverRisk{}, Meta: RiskMeta{
 		GeneratedAt: now, NetworkVersion: net.version, Attribution: Attribution, Seeded: seeded,
 		GaugesTotal: len(layer.Features), RainFetchedAt: meta.fetchedAt, RainStale: meta.stale,
+		ReservoirLinks: LinkReport{Unlinked: []UnlinkedReservoir{}},
 	}}
 	if !net.builtAt.IsZero() {
 		built := net.builtAt
@@ -480,7 +519,7 @@ func assemble(net *network, layer rivers.FeatureCollection, google []floods.Gaug
 	result := &assessed{risk: document, reach: map[int64]*ReachRisk{}, river: map[string]*RiverRisk{}}
 	byRiver := map[string][]ReachRisk{}
 	for _, reach := range net.reaches {
-		risk := assessReach(reach, net.gauges[reach.Fid], stations, forecasts, rain)
+		risk := assessReach(reach, net.gauges[reach.Fid], stations, forecasts, rain, spills[reach.Fid])
 		byRiver[reach.RiverID] = append(byRiver[reach.RiverID], risk)
 	}
 	for _, river := range net.rivers {
@@ -544,7 +583,7 @@ func later(a, b *time.Time) *time.Time {
 
 // assessReach gathers a stretch's evidence and assesses it. Only verified
 // Google gauges are placed on reaches, by the network build.
-func assessReach(reach store.ListRiverReachesRow, gauges []store.RiverReachGauge, stations map[string]rivers.StationProperties, forecasts map[string]floods.Gauge, rain map[int64]RainSummary) ReachRisk {
+func assessReach(reach store.ListRiverReachesRow, gauges []store.RiverReachGauge, stations map[string]rivers.StationProperties, forecasts map[string]floods.Gauge, rain map[int64]RainSummary, spills []Reservoir) ReachRisk {
 	risk := ReachRisk{FID: reach.Fid, RiverID: reach.RiverID, Name: reach.Name, Gauged: reach.Gauged,
 		LengthKM: math.Round(reach.LengthKm*10) / 10, Gauges: []ReachGauge{}}
 	inputs := Inputs{}
@@ -587,6 +626,7 @@ func assessReach(reach store.ListRiverReachesRow, gauges []store.RiverReachGauge
 		risk.Rain = &copied
 		inputs.Rain = &Rain{Next24hMM: summary.Next24hMM, Next72hMM: summary.Next72hMM, Stale: summary.Stale}
 	}
+	inputs.Reservoirs = spills
 	assessment := Assess(inputs)
 	risk.Level, risk.Reasons = assessment.Level, assessment.Reasons
 	return risk

@@ -203,12 +203,12 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	floodService := &floods.Service{Pool: pool, Configured: os.Getenv("LANKAWEATHER_GOOGLE_API_KEY") != "",
 		StaleAfter: staleAfter("flood-forecast")}
 	regionService := &regions.Service{Pool: pool}
-	riverRiskService := &riverrisk.Service{Pool: pool, Rivers: riverService, Floods: floodService, Weather: weatherService, Logger: logger}
+	reservoirService := &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")}
+	riverRiskService := &riverrisk.Service{Pool: pool, Rivers: riverService, Floods: floodService, Weather: weatherService, Reservoirs: reservoirService, Logger: logger}
 	warningService := &warnings.Service{Pool: pool, LandslideStaleAfter: staleAfter("landslide-warnings"),
 		BulletinStaleAfter: staleAfter("official-warnings")}
 	stationService := &stations.Service{Pool: pool, StaleAfter: staleAfter("weather-stations")}
 	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
-	reservoirService := &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{

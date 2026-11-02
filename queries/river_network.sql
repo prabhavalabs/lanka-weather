@@ -54,11 +54,30 @@ SELECT riv_id, name FROM river_source_names ORDER BY riv_id;
 -- name: ListSegmentTopology :many
 -- Everything the network build and the rain accumulation need, without the
 -- lines. The midpoint places a segment's local catchment on the weather grid.
-SELECT hyriv_id, next_down, main_riv, length_km, catch_km2, upland_km2, hybas_l12,
+SELECT hyriv_id, next_down, main_riv, length_km, catch_km2, upland_km2, hybas_l12, discharge_cms, reach_fid,
        ST_X(ST_LineInterpolatePoint(geom, 0.5))::float8 AS mid_lon,
        ST_Y(ST_LineInterpolatePoint(geom, 0.5))::float8 AS mid_lat
 FROM river_segments
 ORDER BY upland_km2, hyriv_id;
+
+-- name: ReservoirSegmentCandidates :many
+-- The river segments a mapped reservoir's water touches or lies near, measured
+-- from its polygon or, for a dam, its point.
+SELECT r.id AS reservoir_id, s.hyriv_id, s.upland_km2,
+       (r.area IS NOT NULL AND ST_Intersects(r.area, s.geom))::bool AS inside,
+       ST_Distance(coalesce(r.area, ST_SetSRID(ST_MakePoint(r.lon, r.lat), 4326))::geography, s.geom::geography)::float8 AS distance_m
+FROM reservoirs r
+JOIN river_segments s ON ST_DWithin(coalesce(r.area, ST_SetSRID(ST_MakePoint(r.lon, r.lat), 4326)), s.geom, @degrees::float8)
+WHERE r.lon IS NOT NULL
+ORDER BY r.id, distance_m, s.hyriv_id;
+
+-- name: ReachDistrictNames :many
+-- The districts each stretch passes through, to place a reservoir known only by
+-- its river and district.
+SELECT q.fid::bigint AS reach_fid, r.name
+FROM river_reaches q
+JOIN regions r ON r.level = 'district' AND ST_Intersects(r.geom, q.geom)
+ORDER BY q.fid, r.name;
 
 -- name: SegmentsNearPoint :many
 -- Segments within a distance of a point, nearest first.

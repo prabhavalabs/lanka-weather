@@ -102,7 +102,7 @@ func TestAssembleRanksRiversAndStaysHonestAboutCoverage(t *testing.T) {
 		stationFeature("baddegama", 2, rivers.StatusNormal, true, now.Add(-9*time.Hour)),
 	}}
 	google := []floods.Gauge{{GaugeID: "hybas_1", Severity: "no_flooding", Trend: "rise", IssuedAt: now.Add(-2 * time.Hour), FetchedAt: now}}
-	result := assemble(testNetwork(), layer, google, nil, rainMeta{}, now, false)
+	result := assemble(testNetwork(), layer, google, nil, rainMeta{}, nil, now, false)
 	document := result.risk
 	if !document.Estimate || document.Note == "" {
 		t.Fatalf("every document must say it is an estimate: %+v", document)
@@ -145,7 +145,7 @@ func TestAStationFromAnotherSourceWithNoThresholdsIsTolerated(t *testing.T) {
 	layer := rivers.FeatureCollection{Features: []rivers.Feature{{Properties: rivers.StationProperties{
 		ID: "hanwella", Name: "Other source", Unit: "m", WaterLevel: &level, Status: rivers.StatusUnknown, ObservedAt: &observed,
 	}}}}
-	result := assemble(testNetwork(), layer, nil, nil, rainMeta{}, now, false)
+	result := assemble(testNetwork(), layer, nil, nil, rainMeta{}, nil, now, false)
 	if reach := result.reach[2]; reach.Level != LevelUnknown {
 		t.Fatalf("a gauge with no thresholds proves nothing: %+v", reach)
 	}
@@ -154,7 +154,7 @@ func TestAStationFromAnotherSourceWithNoThresholdsIsTolerated(t *testing.T) {
 func TestAssembleCarriesRainToTheStretch(t *testing.T) {
 	now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
 	layer := rivers.FeatureCollection{Features: []rivers.Feature{stationFeature("hanwella", 2, rivers.StatusNormal, false, now)}}
-	result := assemble(testNetwork(), layer, nil, map[int64]RainSummary{2: {Next24hMM: 120, Next72hMM: 150, CatchmentKM2: 1800}}, rainMeta{}, now, false)
+	result := assemble(testNetwork(), layer, nil, map[int64]RainSummary{2: {Next24hMM: 120, Next72hMM: 150, CatchmentKM2: 1800}}, rainMeta{}, nil, now, false)
 	reach := result.reach[2]
 	if reach.Rain == nil || reach.Rain.Next24hMM != 120 || reach.Level != LevelHigh {
 		t.Fatalf("reach = %+v", reach)

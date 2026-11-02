@@ -81,11 +81,38 @@ type Rain struct {
 	Stale                bool
 }
 
+// Reservoir is a reservoir whose water reaches this stretch (see LinkReservoirs).
+type Reservoir struct {
+	Name string
+	// Status is the source's word: spilling, releasing, holding or nodata.
+	Status string
+	// FlowKind is spill, outlets or downstream as the source writes it, or "".
+	FlowKind string
+	// Cusecs is the flow figure; nil means no figure, never zero.
+	Cusecs *float64
+	// FlowStale means the flow figure is too old to use, whatever the status.
+	FlowStale bool
+	// Kind is the source's major, medium or mahaweli.
+	Kind string
+	// Stale means the reading is too old to count as evidence.
+	Stale bool
+	// Into says the reservoir empties into this stretch rather than one above it.
+	Into bool
+	// Listed says it was placed only by the river the source names, so where
+	// along the stretch it lies is not known.
+	Listed bool
+	// RiverCMS and RiverUplandKM2 describe the river where this water enters
+	// the stretch: its long-term mean natural flow and its catchment so far.
+	RiverCMS, RiverUplandKM2 float64
+}
+
 // Inputs is everything known about one stretch.
 type Inputs struct {
 	Gauges    []Gauge
 	Forecasts []Forecast
 	Rain      *Rain
+	// Reservoirs are those whose water reaches this stretch directly.
+	Reservoirs []Reservoir
 	// NextGauge names the first gauge below an ungauged stretch.
 	NextGauge string
 }
@@ -93,7 +120,7 @@ type Inputs struct {
 // Reason is one thing said about a stretch.
 type Reason struct {
 	Level Level `json:"level"`
-	// Kind is gauge, forecast, rain or coverage.
+	// Kind is gauge, forecast, rain, reservoir or coverage.
 	Kind string `json:"kind"`
 	Text string `json:"text"`
 }
@@ -122,11 +149,11 @@ type Finding struct {
 // Rule turns one kind of evidence into findings.
 type Rule func(Inputs) []Finding
 
-// rules are the evidence an assessment weighs. To add an input (an upstream
-// reservoir spilling, say): add a field to Inputs and a Rule here that returns
-// a Finding with Compounds set, and capped as the evidence deserves. Nothing
-// else changes; see TestANewRuleNeedsOnlyAFinding.
-var rules = []Rule{gaugeRule, forecastRule, rainRule}
+// rules are the evidence an assessment weighs. To add an input: add a field to
+// Inputs and a Rule here that returns a Finding with Compounds set, and capped
+// as the evidence deserves. Nothing else changes; see
+// TestANewRuleNeedsOnlyAFinding.
+var rules = []Rule{gaugeRule, forecastRule, rainRule, reservoirRule}
 
 // Assess estimates a stretch's level from every rule.
 func Assess(inputs Inputs) Assessment { return assessWith(rules, inputs) }
@@ -208,6 +235,21 @@ const (
 	rainHigh24h  = 100
 	rainWatch72h = 100
 	rainHigh72h  = 200
+	// spillMinCusecs is the smallest spill or release that can raise a stretch.
+	// Under it a spill is a trickle over a sill, about 3 m³/s (ADR 0010).
+	spillMinCusecs = 100
+	// spillHighCusecs raises to high: about 140 m³/s, above the mean flow of
+	// every river in the country bar the lower Mahaweli and Kalu (ADR 0010).
+	spillHighCusecs = 5000
+	// spillMinShare is the share of a river's mean natural flow that a spill must
+	// reach to matter there, so that a figure enough to fill a stream does not
+	// paint a great river it joins.
+	spillMinShare = 0.25
+	// statusOnlyMaxUpland is the largest catchment a spill with no figure can
+	// raise. With no figure the spill may be small, so it counts only on a
+	// stream a small spill could change.
+	statusOnlyMaxUpland    = 250
+	cubicFeetPerCubicMetre = 35.3147
 )
 
 // gaugeLevel reads a level against whichever thresholds a station has.
@@ -385,4 +427,104 @@ func rainRule(inputs Inputs) []Finding {
 		return finding(LevelWatch, fmt.Sprintf("Fairly heavy rain is forecast over the catchment: %s on average.", amounts))
 	}
 	return []Finding{{Reason: Reason{Level: LevelUnknown, Kind: "rain", Text: fmt.Sprintf("Forecast rain over the catchment is %s on average.", amounts)}}}
+}
+
+// reservoirRule reads spills from reservoirs directly upstream. Only a spill or
+// release figure and the spilling status count; a downstream flow can include
+// power-station flow, and water issued through outlets while a reservoir holds
+// is irrigation supply, so neither is evidence. A reservoir alone never reads
+// severe. It adds to high water already measured.
+func reservoirRule(inputs Inputs) []Finding {
+	var findings []Finding
+	note := func(text string) {
+		findings = append(findings, Finding{Reason: Reason{Level: LevelUnknown, Kind: "reservoir", Text: text}})
+	}
+	raises := func(level Level, text string) {
+		findings = append(findings, Finding{Compounds: true, Cap: level, Reason: Reason{Level: level, Kind: "reservoir", Text: text}})
+	}
+	for _, reservoir := range inputs.Reservoirs {
+		name := reservoir.Name + " reservoir"
+		if reservoir.Status == reservoirNoData {
+			continue
+		}
+		if reservoir.Stale {
+			if reservoir.Status == reservoirSpilling || reservoir.Status == reservoirReleasing {
+				note(name + "'s last reading is out of date, so it is not used.")
+			}
+			continue
+		}
+		figure, verb := spillFigure(reservoir)
+		if figure == nil {
+			switch {
+			case reservoir.Status != reservoirSpilling:
+				if reservoir.Status == reservoirReleasing && reservoir.FlowKind == flowDownstream && reservoir.Cusecs != nil && !reservoir.FlowStale {
+					note(fmt.Sprintf("%s reports %s downstream, which can include power-station flow, so it does not raise this estimate.", name, formatCusecs(*reservoir.Cusecs)))
+				}
+			case reservoir.Kind == reservoirMedium || reservoir.RiverUplandKM2 >= statusOnlyMaxUpland:
+				note(name + " is reported spilling with no figure, which says too little to raise a river of this size.")
+			default:
+				raises(LevelWatch, name+" is reported spilling "+where(reservoir)+", with no figure.")
+			}
+			continue
+		}
+		amount := formatCusecs(*figure)
+		switch {
+		case *figure < spillMinCusecs:
+			note(fmt.Sprintf("%s is %s %s %s, too little to raise it.", name, verb, amount, where(reservoir)))
+		case reservoir.RiverCMS > 0 && *figure/cubicFeetPerCubicMetre < spillMinShare*reservoir.RiverCMS:
+			note(fmt.Sprintf("%s is %s %s %s, small beside this river's usual flow of about %.0f m³/s.", name, verb, amount, where(reservoir), reservoir.RiverCMS))
+		case *figure >= spillHighCusecs:
+			raises(LevelHigh, fmt.Sprintf("%s is %s %s %s.", name, verb, amount, where(reservoir)))
+		default:
+			raises(LevelWatch, fmt.Sprintf("%s is %s %s %s.", name, verb, amount, where(reservoir)))
+		}
+	}
+	return findings
+}
+
+const (
+	reservoirSpilling  = "spilling"
+	reservoirReleasing = "releasing"
+	reservoirNoData    = "nodata"
+	reservoirMedium    = "medium"
+	flowSpill          = "spill"
+	flowDownstream     = "downstream"
+)
+
+// spillFigure is the flow that may count as evidence and the word for it. A
+// spill figure always counts. Any other figure counts only while the source says
+// the reservoir is releasing, and never a downstream flow.
+func spillFigure(reservoir Reservoir) (*float64, string) {
+	if reservoir.Cusecs == nil || reservoir.FlowStale {
+		return nil, ""
+	}
+	switch {
+	case reservoir.FlowKind == flowSpill:
+		return reservoir.Cusecs, "spilling"
+	case reservoir.Status == reservoirReleasing && reservoir.FlowKind != flowDownstream:
+		return reservoir.Cusecs, "releasing"
+	}
+	return nil, ""
+}
+
+func where(reservoir Reservoir) string {
+	switch {
+	case reservoir.Listed:
+		return "on this river, at a place not mapped"
+	case reservoir.Into:
+		return "into this stretch"
+	}
+	return "upstream"
+}
+
+// formatCusecs writes a flow as the source does, with thousands marked.
+func formatCusecs(value float64) string {
+	rounded := int(value + 0.5)
+	if rounded >= 1000 {
+		return fmt.Sprintf("%d,%03d cusecs", rounded/1000, rounded%1000)
+	}
+	if value < 10 && value != float64(int(value)) {
+		return fmt.Sprintf("%.1f cusecs", value)
+	}
+	return fmt.Sprintf("%d cusecs", rounded)
 }

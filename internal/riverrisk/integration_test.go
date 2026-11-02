@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrobasins"
@@ -23,6 +24,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigationgis"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
 	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
@@ -373,6 +375,94 @@ func TestCollectorsAndRiskEndToEnd(t *testing.T) {
 	}
 	if len(near) == 0 || near[0].ID != "kelani-ganga" || !near[0].Estimate {
 		t.Fatalf("near = %+v", near)
+	}
+}
+
+// addReservoir stores a reservoir on the day's reading, at a place or none.
+func addReservoir(t *testing.T, pool *pgxpool.Pool, id, name, river, status, flowKind string, cusecs float64, lon, lat *float64) {
+	t.Helper()
+	ctx := context.Background()
+	queries := store.New(pool)
+	var listed *string
+	if river != "" {
+		listed = &river
+	}
+	if err := queries.UpsertReservoir(ctx, store.UpsertReservoirParams{ID: id, Name: name, River: listed, Kind: "major", Source: "test", UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	day := pgtype.Date{Time: time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC), Valid: true}
+	params := store.UpsertReservoirReadingParams{ReservoirID: id, SnapshotDay: day, ReadingDay: day, Status: status, Source: "test", SourceTime: now, FetchedAt: now}
+	if flowKind != "" {
+		params.FlowKind, params.FlowCusecs, params.FlowDay = &flowKind, &cusecs, day
+	}
+	if err := queries.UpsertReservoirReading(ctx, params); err != nil {
+		t.Fatal(err)
+	}
+	if lon != nil {
+		if _, err := pool.Exec(ctx, `UPDATE reservoirs SET lon = $1, lat = $2 WHERE id = $3`, *lon, *lat, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestAReservoirSpillReachesTheStretchesBelowIt(t *testing.T) {
+	pool := open(t)
+	load(t, pool)
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `DELETE FROM reservoirs`); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM reservoirs`) })
+	// On the tributary above the Kelani's gauge; on the other system; far from
+	// anything; known only by a river of one stretch; and a large downstream flow.
+	addReservoir(t, pool, "wak", "Wak Tank", "", "spilling", "spill", 1551, f(80.10), f(7.00))
+	addReservoir(t, pool, "lonely", "Lonely Tank", "", "spilling", "spill", 1551, f(80.60), f(7.60))
+	addReservoir(t, pool, "listed", "Listed Tank", "Wak Oya", "spilling", "spill", 2000, nil, nil)
+	addReservoir(t, pool, "unknown", "Unknown Tank", "Nowhere Aru", "spilling", "spill", 2000, nil, nil)
+	addReservoir(t, pool, "power", "Power Tank", "", "releasing", "downstream", 9000, f(80.05), f(6.95))
+
+	clock := func() time.Time { return now }
+	risk := service(pool)
+	risk.Reservoirs = &reservoirs.Service{Pool: pool, StaleAfter: 48 * time.Hour, Now: clock}
+	document, err := risk.Risk(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := document.Meta.ReservoirLinks
+	if report.ByPosition != 2 || report.ByRiver != 1 || len(report.Unlinked) != 2 {
+		t.Fatalf("report = %+v", report)
+	}
+	reasons := map[string]string{}
+	for _, entry := range report.Unlinked {
+		reasons[entry.ID] = entry.Reason
+	}
+	if reasons["lonely"] != riverrisk.UnlinkedTooFar || reasons["unknown"] != riverrisk.UnlinkedNoPlace {
+		t.Fatalf("unlinked = %+v", report.Unlinked)
+	}
+	said := map[string][]string{}
+	levels := map[int64]riverrisk.Level{}
+	for _, river := range document.Rivers {
+		for _, reach := range river.Reaches {
+			levels[reach.FID] = reach.Level
+			for _, reason := range reach.Reasons {
+				if reason.Kind == "reservoir" {
+					said[reason.Text] = append(said[reason.Text], river.ID)
+				}
+			}
+		}
+	}
+	if len(said["Wak Tank reservoir is spilling 1,551 cusecs into this stretch."]) != 1 {
+		t.Fatalf("reasons = %v", said)
+	}
+	if levels[105] != riverrisk.LevelWatch {
+		t.Fatalf("Wak Oya = %s; levels %v", levels[105], levels)
+	}
+	power := false
+	for text := range said {
+		power = power || strings.Contains(text, "Power Tank") && strings.Contains(text, "power-station")
+	}
+	if !power {
+		t.Fatalf("a downstream flow should be named and not counted: %v", said)
 	}
 }
 

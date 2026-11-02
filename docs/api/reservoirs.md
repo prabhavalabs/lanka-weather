@@ -60,6 +60,8 @@ placed on the map are included with `"geometry": null`.
 - `storagePercent` is the last figure the source has. `storageFresh` false means
   it is not current. Null is unknown, never zero. `nodata` can come with a fresh
   figure: storage was reported, spill status was not.
+- `flow.stale` says the figure's own day is too old to use, which can differ from
+  the day the status was read.
 - `flow` is null when unknown. `kind` is `spill`, `outlets` or `downstream`. A
   Mahaweli Authority `downstream` flow can include power-station flow, so do not
   describe it as a flood release.

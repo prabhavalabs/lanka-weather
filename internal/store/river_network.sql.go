@@ -650,7 +650,7 @@ func (q *Queries) ListRivers(ctx context.Context) ([]ListRiversRow, error) {
 }
 
 const listSegmentTopology = `-- name: ListSegmentTopology :many
-SELECT hyriv_id, next_down, main_riv, length_km, catch_km2, upland_km2, hybas_l12,
+SELECT hyriv_id, next_down, main_riv, length_km, catch_km2, upland_km2, hybas_l12, discharge_cms, reach_fid,
        ST_X(ST_LineInterpolatePoint(geom, 0.5))::float8 AS mid_lon,
        ST_Y(ST_LineInterpolatePoint(geom, 0.5))::float8 AS mid_lat
 FROM river_segments
@@ -658,15 +658,17 @@ ORDER BY upland_km2, hyriv_id
 `
 
 type ListSegmentTopologyRow struct {
-	HyrivID   int64   `json:"hyriv_id"`
-	NextDown  int64   `json:"next_down"`
-	MainRiv   int64   `json:"main_riv"`
-	LengthKm  float64 `json:"length_km"`
-	CatchKm2  float64 `json:"catch_km2"`
-	UplandKm2 float64 `json:"upland_km2"`
-	HybasL12  int64   `json:"hybas_l12"`
-	MidLon    float64 `json:"mid_lon"`
-	MidLat    float64 `json:"mid_lat"`
+	HyrivID      int64   `json:"hyriv_id"`
+	NextDown     int64   `json:"next_down"`
+	MainRiv      int64   `json:"main_riv"`
+	LengthKm     float64 `json:"length_km"`
+	CatchKm2     float64 `json:"catch_km2"`
+	UplandKm2    float64 `json:"upland_km2"`
+	HybasL12     int64   `json:"hybas_l12"`
+	DischargeCms float64 `json:"discharge_cms"`
+	ReachFid     *int64  `json:"reach_fid"`
+	MidLon       float64 `json:"mid_lon"`
+	MidLat       float64 `json:"mid_lat"`
 }
 
 // Everything the network build and the rain accumulation need, without the
@@ -688,6 +690,8 @@ func (q *Queries) ListSegmentTopology(ctx context.Context) ([]ListSegmentTopolog
 			&i.CatchKm2,
 			&i.UplandKm2,
 			&i.HybasL12,
+			&i.DischargeCms,
+			&i.ReachFid,
 			&i.MidLon,
 			&i.MidLat,
 		); err != nil {
@@ -768,6 +772,40 @@ func (q *Queries) NameUnnamedRivers(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const reachDistrictNames = `-- name: ReachDistrictNames :many
+SELECT q.fid::bigint AS reach_fid, r.name
+FROM river_reaches q
+JOIN regions r ON r.level = 'district' AND ST_Intersects(r.geom, q.geom)
+ORDER BY q.fid, r.name
+`
+
+type ReachDistrictNamesRow struct {
+	ReachFid int64  `json:"reach_fid"`
+	Name     string `json:"name"`
+}
+
+// The districts each stretch passes through, to place a reservoir known only by
+// its river and district.
+func (q *Queries) ReachDistrictNames(ctx context.Context) ([]ReachDistrictNamesRow, error) {
+	rows, err := q.db.Query(ctx, reachDistrictNames)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReachDistrictNamesRow{}
+	for rows.Next() {
+		var i ReachDistrictNamesRow
+		if err := rows.Scan(&i.ReachFid, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reachRegions = `-- name: ReachRegions :many
 SELECT q.fid::bigint AS reach_fid, r.id, r.level, r.name, r.name_si
 FROM river_reaches q
@@ -800,6 +838,52 @@ func (q *Queries) ReachRegions(ctx context.Context, fids []int64) ([]ReachRegion
 			&i.Level,
 			&i.Name,
 			&i.NameSi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const reservoirSegmentCandidates = `-- name: ReservoirSegmentCandidates :many
+SELECT r.id AS reservoir_id, s.hyriv_id, s.upland_km2,
+       (r.area IS NOT NULL AND ST_Intersects(r.area, s.geom))::bool AS inside,
+       ST_Distance(coalesce(r.area, ST_SetSRID(ST_MakePoint(r.lon, r.lat), 4326))::geography, s.geom::geography)::float8 AS distance_m
+FROM reservoirs r
+JOIN river_segments s ON ST_DWithin(coalesce(r.area, ST_SetSRID(ST_MakePoint(r.lon, r.lat), 4326)), s.geom, $1::float8)
+WHERE r.lon IS NOT NULL
+ORDER BY r.id, distance_m, s.hyriv_id
+`
+
+type ReservoirSegmentCandidatesRow struct {
+	ReservoirID string  `json:"reservoir_id"`
+	HyrivID     int64   `json:"hyriv_id"`
+	UplandKm2   float64 `json:"upland_km2"`
+	Inside      bool    `json:"inside"`
+	DistanceM   float64 `json:"distance_m"`
+}
+
+// The river segments a mapped reservoir's water touches or lies near, measured
+// from its polygon or, for a dam, its point.
+func (q *Queries) ReservoirSegmentCandidates(ctx context.Context, degrees float64) ([]ReservoirSegmentCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, reservoirSegmentCandidates, degrees)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReservoirSegmentCandidatesRow{}
+	for rows.Next() {
+		var i ReservoirSegmentCandidatesRow
+		if err := rows.Scan(
+			&i.ReservoirID,
+			&i.HyrivID,
+			&i.UplandKm2,
+			&i.Inside,
+			&i.DistanceM,
 		); err != nil {
 			return nil, err
 		}

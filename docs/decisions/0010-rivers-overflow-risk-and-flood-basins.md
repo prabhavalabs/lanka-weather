@@ -122,10 +122,9 @@ Bay near Trincomalee; Nagalagam Street is on the Kelani.
 ### The risk estimate
 
 `Assess` is a pure, table-tested function. It weighs a list of rules, one per kind
-of evidence, each returning findings. **To add an input**, such as an upstream
-reservoir spilling: add a field to `Inputs` and a rule to `rules` that returns a
-finding with `Compounds` set and capped as the evidence deserves. Nothing else
-changes; `TestANewRuleNeedsOnlyAFinding` shows it.
+of evidence, each returning findings. **To add an input:** add a field to `Inputs`
+and a rule to `rules` that returns a finding with `Compounds` set and capped as the
+evidence deserves. Nothing else changes; `TestANewRuleNeedsOnlyAFinding` shows it.
 
 | Evidence | Level |
 |---|---|
@@ -139,6 +138,10 @@ changes; `TestANewRuleNeedsOnlyAFinding` shows it.
 | Catchment rain of 50 mm in 24 h or 100 mm in 72 h | watch |
 | Catchment rain of 100 mm in 24 h or 200 mm in 72 h | high |
 | Rain or similar on a river already at watch or above | one step up |
+| A reservoir directly upstream spilling at least 100 cusecs | watch |
+| The same, at least 5,000 cusecs | high |
+| A reservoir spilling with no figure, on a stream under 250 km² | watch |
+| A spill or a release on a river already at watch or above | one step up |
 
 Why these values:
 
@@ -179,6 +182,78 @@ Rain reaches a stretch by accumulation, not a stored join: each segment's foreca
 rain is sampled at its midpoint and weighted by its local catchment (`CATCH_SKM`), then
 accumulated down `NEXT_DOWN`, so each segment knows the mean over everything draining
 through it. This takes no polygons and no per-reach lists.
+
+### Reservoir spills
+
+A reservoir spilling above a stretch is evidence about that stretch, added to `Assess` as one
+more rule. The readings are the ones the reservoir layer already holds (ADR 0013), so this
+fetches nothing new. The link is rebuilt when the network or the reservoir map changes, and what
+it could not place is logged and returned as `meta.reservoirLinks`.
+
+**Where a reservoir goes.** Never guessed. `LinkReservoirs` is pure and table-tested:
+
+- **By position.** The largest segment of at least 15 km² that its polygon touches, or failing
+  that the nearest such segment within 1,500 m of its polygon or dam, with the gauge snap's 500 m
+  tie. Three cells of the 15 arc-second grid is the most that grid's error explains. On the real
+  data, nothing further out reads as being on the river rather than beside it: Thissa Wewa is
+  2.7 km from the Malwathu Oya and Mapakada 2.8 km from the Mahaweli.
+- **The source's `river`, if it names a known river, must agree.** A polygon on another river
+  system is a conflict and is left out. Giant's Tank is the real case: it is listed on Malwathu
+  Oya, the river that feeds it through a canal, and its polygon drains elsewhere.
+- **With no position,** the `river` field places a reservoir only if that leaves exactly one
+  stretch: the river's only one, or its only one in the reservoir's district. The field is often
+  a basin or a managing agency's system (17 reservoirs say Mahaweli Ganga), so it cannot pick a
+  stretch by itself, and the reason then says the place is not mapped.
+
+**Which stretches it reaches.** Down `NEXT_DOWN` for 30 km, which a flood wave of 1 to 2 m/s
+covers in about the six hours that are the estimate's lead time. The walk ends at a stretch that
+starts at a gauge, since that gauge measures the spill. A stream joining part way down a gauged
+stretch is below that gauge, so the gauge cannot speak for it and the stretch still counts.
+
+**What counts.** A spill figure, a release figure while the source says `releasing`, and the
+`spilling` status. These do not:
+
+- `downstream` flow from the Mahaweli Authority, which can include power-station flow. Polgolla
+  read 3,225 cusecs on 2 November. The stretch names it and says it is not counted.
+- `outlets` flow while the source says `holding`: 35 reservoirs that day, up to 1,400 cusecs, and
+  this is water issued to irrigation.
+- Anything `nodata`, a stale reading (ADR 0013's 48 hours), or a figure whose own day is stale.
+
+**Why these values.**
+
+- **100 cusecs** (about 3 m³/s) is the line for a tiny spill. Six of the eight figures on
+  2 November were under it, from 1.46 to 60 cusecs, on tanks at or near full trickling over a sill.
+  A stretch below one names it and says it is too little.
+- **5,000 cusecs** (about 140 m³/s) reads high. A third-party note suggests this figure as an
+  "alert" trigger without saying where it comes from. We use it as the point above which a spill
+  alone deserves more than watch, because it exceeds the long-term mean flow at any point of every
+  Sri Lankan river except the lower Mahaweli (up to 235 m³/s in HydroRIVERS) and Kalu (up to
+  158 m³/s), so nearly any river taking it is far outside its usual range. It is one input to an
+  estimate, not a flood level.
+- **A quarter of the river's mean flow.** A figure must also reach a quarter of the river's
+  long-term mean natural flow (HydroRIVERS' `DIS_AV_CMS`) where the water enters, so that a spill
+  that fills a stream does not paint the great river it joins. 356 cusecs is 10 m³/s: most of the
+  Malwathu Oya's 13 m³/s, and under a tenth of the Mahaweli's 122 m³/s at Mapakada. A mean is not
+  the state of the river today, so this cannot read safe: it only declines to raise.
+- **No figure.** The status alone may be a trickle, so it counts only for a reservoir the source
+  calls major or Mahaweli, and only on a stream under 250 km². It stops there.
+- **Never severe from a reservoir.** A spill is capped at high however large. A reservoir is a
+  report about a dam rather than a measurement of the river, so only a gauge or Google's forecast
+  can reach severe, as with rain. Spills do add to high water already measured, as rain does.
+
+**Result on 2 November 2026** (10 reservoirs spilling; 233 stretches): 109 of 142 reservoirs
+linked, 107 by position and 2 by river; 33 not linked. Of those 33, 23 have no position and no
+river the network knows, 3 lie too far from any line, 4 drain to streams with no stretch drawn
+within 30 km, 2 are on a long river with no place along it, and 1 is the conflict above.
+Three reservoirs raised four stretches to watch, all of which had no other evidence at watch:
+Kimbulwana Oya at 1,551 cusecs (the Kimbulwana Oya, and the Deduru Oya above Moragaswewa), Thuruwila
+at 356 cusecs (the Malwathu Oya from the Flood Hub point to Thanthirimale) and Ambewela with no
+figure (the Dambagastalawa Oya). Thanthirimale, at the lower end of its stretch, reads normal, and
+the panel shows both facts. Of the other seven, six report under 100 cusecs and Kande Ela reports no
+figure on the much larger Uma Oya; where placed, their stretches say so. Nothing reached high. That
+is four stretches of 233, each directly below a dam reported spilling, so it is not alarmist. The
+limit of the method is that a stretch colours whole: the Deduru Oya's is 95 km, reaching above the
+point the Kimbulwana Oya joins it.
 
 ### Compute at request, with no risk table
 

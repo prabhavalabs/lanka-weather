@@ -7,7 +7,7 @@ export type RiskLevel = "normal" | "watch" | "high" | "severe" | "unknown"
 
 export interface RiskReason {
   level: RiskLevel
-  /** gauge, forecast, rain or coverage. */
+  /** gauge, forecast, rain, reservoir or coverage. */
   kind: string
   text: string
 }
@@ -74,6 +74,13 @@ export interface RiskMeta {
   forecastFetchedAt: string | null
   rainFetchedAt: string | null
   rainStale: boolean
+  reservoirsFetchedAt: string | null
+  /** How many reservoirs are placed on the network, and why the others are not. */
+  reservoirLinks: {
+    byPosition: number
+    byRiver: number
+    unlinked: { id: string; name: string; reason: string; detail: string }[]
+  }
   attribution: string
   /** Local test data is in the tables; never true in production. */
   seeded: boolean
