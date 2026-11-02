@@ -1,4 +1,4 @@
-import { CheckIcon, InfoIcon } from "lucide-react"
+import { CheckIcon, ExternalLinkIcon, InfoIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { formatDayTime } from "@/lib/format"
@@ -74,14 +74,26 @@ export function AlertList({
                 </Badge>
               )}
               <Badge variant={severityBadge[alert.severity]}>
-                {alert.estimate ? estimateLabels[alert.severity] : severityLabels[alert.severity]}
+                {alert.badgeLabel ??
+                  (alert.estimate
+                    ? estimateLabels[alert.severity]
+                    : severityLabels[alert.severity])}
               </Badge>
             </div>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {alert.issuer} · {alert.area}
           </p>
-          {alert.summary && <p className="mt-2 text-sm text-foreground/90">{alert.summary}</p>}
+          {alert.summary && (
+            <p className="mt-2 line-clamp-6 text-sm whitespace-pre-line text-foreground/90">
+              {alert.summary}
+            </p>
+          )}
+          {alert.excerpt && (
+            <p className="mt-1 text-[0.6875rem] text-muted-foreground">
+              Excerpt, copied unchanged from the bulletin&apos;s English text.
+            </p>
+          )}
           {alert.basis && (
             <p className="mt-1.5 text-xs text-muted-foreground">Derived from: {alert.basis}</p>
           )}
@@ -94,6 +106,18 @@ export function AlertList({
               </>
             )}
           </p>
+          {alert.link && (
+            <a
+              href={alert.link.href}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1.5 inline-flex items-center gap-1 rounded-sm text-xs font-medium text-brand-text underline underline-offset-2 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {alert.link.label}
+              <ExternalLinkIcon className="size-3" aria-hidden="true" />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          )}
         </li>
       ))}
     </ul>

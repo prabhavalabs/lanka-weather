@@ -16,11 +16,23 @@ import type { RegionWeather } from "../regions/types"
 import { sampleWind, windText, type WindField } from "../wind/field"
 import { useMap } from "./MapContext"
 
+/** Other layers the chip can name, and how. */
+export interface HoverLayers {
+  /** Small points, hit with a little slack, drawn over gauges and regions. */
+  points: string[]
+  /** Areas, hit exactly, drawn over regions. */
+  areas: string[]
+  describe: (
+    feature: MapGeoJSONFeature,
+  ) => { title: string; local?: string; lines: string[] } | null
+}
+
 interface HoverChipProps {
   /** Region weather by region id, and what the choropleth shows. */
   regions?: { variable: RegionVariable | null; lookup: Map<string, RegionWeather> } | null
   /** The wind field on the map, read under the pointer. */
   wind?: WindField | null
+  hazards?: HoverLayers | null
 }
 
 interface Chip {
@@ -40,15 +52,15 @@ const pointSlack = 5
  * wind there when the wind layer is on. Hovered regions are outlined. Only
  * on devices with a mouse; on touch, a tap opens the panel instead.
  */
-export function HoverChip({ regions, wind }: HoverChipProps) {
+export function HoverChip({ regions, wind, hazards }: HoverChipProps) {
   const map = useMap()
   const canHover = useMediaQuery("(hover: hover) and (pointer: fine)")
   const [chip, setChip] = useState<Chip | null>(null)
-  const props = useRef({ regions, wind })
+  const props = useRef({ regions, wind, hazards })
 
   useEffect(() => {
-    props.current = { regions, wind }
-  }, [regions, wind])
+    props.current = { regions, wind, hazards }
+  }, [regions, wind, hazards])
 
   useEffect(() => {
     if (!map || !canHover) return
@@ -79,7 +91,7 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
       const event = pending
       if (!event) return
       const { x, y } = event.point
-      const { regions: regionInfo, wind: field } = props.current
+      const { regions: regionInfo, wind: field, hazards: hazardLayers } = props.current
       const lines: string[] = []
 
       const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES].filter((id) => map.getLayer(id))
@@ -92,8 +104,24 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
             { layers: pointLayers },
           )[0]
         : undefined
+      const hazardPoints = (hazardLayers?.points ?? []).filter((id) => map.getLayer(id))
+      const hazardAreas = (hazardLayers?.areas ?? []).filter((id) => map.getLayer(id))
+      const hazard: MapGeoJSONFeature | undefined = point
+        ? undefined
+        : ((hazardPoints.length
+            ? map.queryRenderedFeatures(
+                [
+                  [x - pointSlack, y - pointSlack],
+                  [x + pointSlack, y + pointSlack],
+                ],
+                { layers: hazardPoints },
+              )[0]
+            : undefined) ??
+          (hazardAreas.length
+            ? map.queryRenderedFeatures(event.point, { layers: hazardAreas })[0]
+            : undefined))
       const region: MapGeoJSONFeature | undefined =
-        !point && map.getLayer(REGIONS_FILL)
+        !point && !hazard && map.getLayer(REGIONS_FILL)
           ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
           : undefined
 
@@ -102,7 +130,7 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
           ? { sourceLayer: region.sourceLayer, id: region.id }
           : null,
       )
-      map.getCanvas().style.cursor = point || region ? "pointer" : ""
+      map.getCanvas().style.cursor = point || hazard || region ? "pointer" : ""
 
       let title = ""
       let local: string | undefined
@@ -123,6 +151,13 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
         lines.push(
           `Flood forecast: ${floodSeverityLabels[point.properties.severity as FloodSeverity] ?? "unknown"}`,
         )
+      } else if (hazard) {
+        const described = hazardLayers?.describe(hazard)
+        if (described) {
+          title = described.title
+          local = described.local
+          lines.push(...described.lines)
+        }
       } else if (region) {
         const level = region.properties.level as RegionLevel
         title = regionLabel({ level, name: String(region.properties.name ?? "") })

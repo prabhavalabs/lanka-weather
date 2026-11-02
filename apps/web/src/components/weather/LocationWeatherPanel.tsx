@@ -43,8 +43,10 @@ interface LocationWeatherPanelProps {
   alerts: WeatherAlert[]
   /** Official warnings (Department of Meteorology, DMC); authoritative, listed first. */
   officialAlerts?: WeatherAlert[]
-  /** Shown in place of official warnings while there are none. */
+  /** What can be said about official warnings here; never that a place is safe. */
   officialNote?: string
+  /** Latest official bulletins, for reading; not counted as warnings. */
+  officialBulletins?: WeatherAlert[]
   /**
    * `loading` shows placeholders; `unavailable` says weather is not
    * available here (yet), with `unavailableText`.
@@ -83,6 +85,7 @@ export function LocationWeatherPanel({
   alerts,
   officialAlerts = [],
   officialNote,
+  officialBulletins = [],
   status = current ? "ready" : "loading",
   unavailableText = "Weather is not available here yet.",
   highlight,
@@ -184,7 +187,10 @@ export function LocationWeatherPanel({
         >
           <TriangleAlertIcon className="size-4 shrink-0 text-brand-text" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-foreground">{top.title}</span>
+            <span className="block truncate font-medium text-foreground">
+              {top.title}
+              {top.badgeLabel && ` · ${top.badgeLabel}`}
+            </span>
             <span className="block truncate text-xs text-muted-foreground">
               {top.estimate
                 ? `Estimate · ${estimateLabels[top.severity].toLowerCase()}`
@@ -301,6 +307,17 @@ export function LocationWeatherPanel({
                 emptyText={officialNote ?? "No official warnings in force for this area."}
                 emptyIcon={officialNote ? "info" : "check"}
               />
+              {officialAlerts.length > 0 && officialNote && (
+                <p className="text-xs text-muted-foreground">{officialNote}</p>
+              )}
+              {officialBulletins.length > 0 && (
+                <>
+                  <h3 className="mt-2 text-xs font-medium text-muted-foreground">
+                    Latest bulletins
+                  </h3>
+                  <AlertList alerts={officialBulletins} label="Latest official bulletins" />
+                </>
+              )}
             </section>
             <section className="flex flex-col gap-2">
               <div>

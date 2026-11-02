@@ -93,3 +93,35 @@ describe("sameSelection", () => {
     expect(sameSelection(null, null)).toBe(true)
   })
 })
+
+describe("hazard selections", () => {
+  it("reads and writes each kind", () => {
+    const cases = [
+      ["?landslide=LK-2136", { kind: "landslide", id: "LK-2136" }],
+      ["?quake=us7000tty7", { kind: "quake", id: "us7000tty7" }],
+      ["?cyclone=1001346", { kind: "cyclone", id: "1001346" }],
+      ["?warnings=all", { kind: "warnings" }],
+      ["?warnings=water_level", { kind: "warnings", type: "water_level" }],
+      ["?warnings=all&district=LK-21", { kind: "warnings", district: "LK-21" }],
+    ] as const
+    for (const [search, selection] of cases) {
+      expect(parseSelection(search)).toEqual(selection)
+      expect(selectionSearch(selection)).toBe(search)
+    }
+  })
+
+  it("ignores what is malformed", () => {
+    expect(parseSelection("?landslide=javascript:alert(1)")).toBeNull()
+    expect(parseSelection("?quake=<script>")).toBeNull()
+    expect(parseSelection("?warnings=rumours")).toEqual({ kind: "warnings" })
+    expect(parseSelection("?warnings=all&district=kandy")).toEqual({ kind: "warnings" })
+  })
+
+  it("tells warning filters apart", () => {
+    expect(sameSelection({ kind: "warnings" }, { kind: "warnings" })).toBe(true)
+    expect(sameSelection({ kind: "warnings", type: "weather" }, { kind: "warnings" })).toBe(false)
+    expect(
+      sameSelection({ kind: "landslide", id: "LK-2136" }, { kind: "quake", id: "LK-2136" }),
+    ).toBe(false)
+  })
+})

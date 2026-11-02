@@ -6,18 +6,40 @@
  *   (a searched place);
  * - `?region=LK-21`: an administrative region, at its label point;
  * - `?station=peradeniya`: a river gauge;
- * - `?gauge=hybas_4121155030`: a Google flood forecast gauge.
+ * - `?gauge=hybas_4121155030`: a Google flood forecast gauge;
+ * - `?landslide=LK-2136`: a DS division's landslide warning;
+ * - `?quake=us7000tty7`: an earthquake;
+ * - `?cyclone=1001346`: a tropical cyclone;
+ * - `?warnings=all`, `?warnings=water_level`, optionally with `&district=LK-21`:
+ *   the official warnings, of one type or in one district.
  */
 export type Selection =
   | { kind: "point"; lat: number; lon: number; name?: string }
   | { kind: "region"; id: string }
   | { kind: "station"; id: string }
   | { kind: "gauge"; id: string }
+  | { kind: "landslide"; id: string }
+  | { kind: "quake"; id: string }
+  | { kind: "cyclone"; id: string }
+  | { kind: "warnings"; type?: string; district?: string }
 
 /** The area the API answers for (`/v1/summary`, `/v1/regions/lookup`). */
 export const pointBounds = { south: 5.5, north: 10.5, west: 79, east: 82.5 }
 
-const selectionKeys = ["at", "name", "region", "station", "gauge"]
+const selectionKeys = [
+  "at",
+  "name",
+  "region",
+  "station",
+  "gauge",
+  "landslide",
+  "quake",
+  "cyclone",
+  "warnings",
+  "district",
+]
+
+const warningTypes = ["landslide", "water_level", "weather", "situation"]
 const maxNameLength = 80
 
 /** Coordinates rounded to four decimals (about 11 m), enough for weather and short in URLs. */
@@ -84,6 +106,28 @@ export function parseSelection(search: string): Selection | null {
   const gauge = safeId(params.get("gauge"))
   if (gauge) return { kind: "gauge", id: gauge }
 
+  const landslide = params.get("landslide")
+  if (landslide) {
+    const id = normaliseRegionId(landslide)
+    if (id) return { kind: "landslide", id }
+  }
+
+  const quake = safeId(params.get("quake"))
+  if (quake) return { kind: "quake", id: quake }
+
+  const cyclone = safeId(params.get("cyclone"))
+  if (cyclone) return { kind: "cyclone", id: cyclone }
+
+  const warnings = params.get("warnings")
+  if (warnings) {
+    const district = normaliseRegionId(params.get("district") ?? "")
+    return {
+      kind: "warnings",
+      ...(warningTypes.includes(warnings) ? { type: warnings } : {}),
+      ...(district ? { district } : {}),
+    }
+  }
+
   return null
 }
 
@@ -106,6 +150,15 @@ export function selectionSearch(selection: Selection | null, current = ""): stri
     params.set("station", selection.id)
   } else if (selection?.kind === "gauge") {
     params.set("gauge", selection.id)
+  } else if (selection?.kind === "landslide") {
+    params.set("landslide", selection.id)
+  } else if (selection?.kind === "quake") {
+    params.set("quake", selection.id)
+  } else if (selection?.kind === "cyclone") {
+    params.set("cyclone", selection.id)
+  } else if (selection?.kind === "warnings") {
+    params.set("warnings", selection.type ?? "all")
+    if (selection.district) params.set("district", selection.district)
   }
   const text = params.toString().replace(/%2C/g, ",")
   return text ? `?${text}` : ""
@@ -121,6 +174,9 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
       roundCoordinate(a.lon) === roundCoordinate(b.lon) &&
       a.name === b.name
     )
+  }
+  if (a.kind === "warnings" && b.kind === "warnings") {
+    return a.type === b.type && a.district === b.district
   }
   return "id" in a && "id" in b && a.id === b.id
 }
