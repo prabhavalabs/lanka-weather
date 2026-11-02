@@ -23,11 +23,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
 	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 	"github.com/prabhavalabs/lanka-weather/internal/ingest"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
 )
@@ -91,8 +95,11 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 // collectors lists every data source the worker collects.
 func collectors(pool *pgxpool.Pool) []source.Collector {
 	client := source.NewClient(os.Getenv("LANKAWEATHER_CONTACT"))
+	// Regions load before places, so places can be placed in their regions.
 	return []source.Collector{
 		&irrigation.Collector{Pool: pool, Fetcher: client},
+		&adminregions.Collector{Pool: pool, Fetcher: client},
+		&osmplaces.Collector{Pool: pool, Fetcher: client},
 	}
 }
 
@@ -105,9 +112,11 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
-			Logger: logger,
-			Rivers: &rivers.Service{Pool: pool, StaleAfter: time.Duration(riverLayer.StaleAfterSeconds) * time.Second},
-			Ready:  pool.Ping,
+			Logger:  logger,
+			Rivers:  &rivers.Service{Pool: pool, StaleAfter: time.Duration(riverLayer.StaleAfterSeconds) * time.Second},
+			Regions: &regions.Service{Pool: pool},
+			Places:  &places.Service{Pool: pool},
+			Ready:   pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

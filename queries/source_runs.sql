@@ -30,3 +30,10 @@ WHERE status = 'running' AND started_at < $1;
 
 -- name: DeleteSourceRunsBefore :exec
 DELETE FROM source_runs WHERE started_at < $1;
+
+-- name: LastRun :one
+SELECT started_at, status
+FROM source_runs
+WHERE source = $1
+ORDER BY started_at DESC
+LIMIT 1;

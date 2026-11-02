@@ -68,7 +68,10 @@ Internal packages (planned):
 |---|---|
 | `internal/layers` | Catalogue of map layers: identifier, kind, source, refresh cadence, staleness limit, attribution |
 | `internal/source` | Contract every connector implements. Decoding is pure: no network or database, so recorded payloads can be replayed in tests |
-| `internal/connectors/<name>` | One package per source (irrigation, dmc, meteo, nbro, googleflood, gfs, gdacs, usgs) |
+| `internal/connectors/<name>` | One package per source (irrigation, adminregions, osmplaces; planned: dmc, meteo, nbro, googleflood, gfs, gdacs, usgs) |
+| `internal/regions` | Region codes and crosswalk; boundaries as GeoJSON and vector tiles, region detail, point lookup |
+| `internal/places` | Place and region search |
+| `internal/geo` | TopoJSON decoding, simplification along shared edges, well-known binary |
 | `internal/ingest` | Scheduler, leader election, retries, fetch log |
 | `internal/store` | Database access (pgx, sqlc) |
 | `internal/httpapi` | Routes, request validation, response envelopes, caching headers |
@@ -83,8 +86,9 @@ refreshed in the background. Each layer's `staleTime` and refetch
 interval come from the layer catalogue served by the API, so cadence is
 defined once.
 
-The map uses MapLibre GL with OpenFreeMap basemaps, PMTiles for static
-geography (administrative regions, rivers), GeoJSON sources for stations
+The map uses MapLibre GL with OpenFreeMap basemaps, vector tiles from the
+API for administrative regions, PMTiles for other static geography
+(rivers), GeoJSON sources for stations
 and warnings, raster tiles for imagery, and a canvas overlay for
 animated wind.
 
@@ -110,11 +114,37 @@ divisions are under a landslide warning) and bounding-box queries.
 
 ## Geography and identifiers
 
-Administrative regions come from `nuuuwan/lk_admin_regions` and the
-`prabhavalabs/lanka-data-layer` packages. The two use different code
-styles (`LK-11` and `LK11`); a crosswalk table maps them so every
-warning can be joined to a district and divisional secretariat
-division.
+Administrative regions come from `nuuuwan/lk_admin_regions` (ADR 0006):
+9 provinces, 25 districts, 340 divisional secretariat (DS) divisions and
+14,019 Grama Niladhari (GN) divisions, with 2024 census populations from
+`nuuuwan/lk_census_2024`. They are loaded weekly into the `regions`
+table, one row per region with its `level` and boundary
+(`geometry(MultiPolygon, 4326)`, GiST-indexed), so warnings, gauges and
+weather-grid cells can be joined to regions by code or by
+`ST_Intersects`.
+
+A region's id is its Department of Census and Statistics (DCS) code with
+one hyphen after the country prefix; each code starts with its parent's:
+
+| Level | DCS id | Compact (lanka-data-layer) | ISO 3166-2 |
+|---|---|---|---|
+| Province | `LK-1` | `LK1` | `LK-1` |
+| District | `LK-11` | `LK11` | `LK-11`, except Northern Province (below) |
+| DS division | `LK-1103` | `LK1103` | none |
+| GN division | `LK-1103005` | `LK1103005` | none |
+
+The crosswalk is in `internal/regions`: `ParseID` accepts the compact
+and fully hyphenated (`LK-1-1-03`) forms and returns the DCS id, and
+`ISOCode` maps DCS district codes to ISO 3166-2, which numbers the
+Northern Province's districts differently: DCS `LK-42` Mannar is ISO
+`LK-43`, `LK-43` Vavuniya is `LK-44`, `LK-44` Mullaitivu is `LK-45` and
+`LK-45` Kilinochchi is `LK-42`. The ISO code is stored on each province
+and district row (`iso_code`).
+
+Boundaries are served as vector tiles for every level and as GeoJSON for
+provinces, districts and DS divisions. Populated places come from
+OpenStreetMap; place and region names in English, Sinhala and Tamil are
+searchable with typo tolerance (`pg_trgm`).
 
 ## Non-goals for the first release
 

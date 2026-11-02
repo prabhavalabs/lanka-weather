@@ -1,0 +1,87 @@
+{
+  "type": "Topology",
+  "transform": { "scale": [0.001, 0.001], "translate": [79.8, 6.8] },
+  "objects": {
+    "data": {
+      "type": "GeometryCollection",
+      "geometries": [
+        {
+          "type": "Polygon",
+          "arcs": [[1, 0]],
+          "properties": {
+            "id": "LK-1103005",
+            "name": "Sammanthranapura",
+            "area_sqkm": 242.5,
+            "center_lat": 6.9,
+            "center_lng": 79.85,
+            "other_names": "සම්මන්ත්‍රණපුර",
+            "num": " ",
+            "dsd_id": "LK-1103"
+          }
+        },
+        {
+          "type": "Polygon",
+          "arcs": [[2, -1]],
+          "properties": {
+            "id": "LK-1103010",
+            "name": "Mattakkuliya",
+            "area_sqkm": 242.6,
+            "center_lat": 6.9,
+            "center_lng": 79.95,
+            "other_names": "මට්ටක්කුලිය",
+            "num": "520A",
+            "dsd_id": "LK-1103"
+          }
+        },
+        {
+          "type": "MultiPolygon",
+          "arcs": [[[3]]],
+          "properties": {
+            "id": "LK-2130120",
+            "name": "Mahanuwara",
+            "area_sqkm": null,
+            "center_lat": null,
+            "center_lng": null,
+            "other_names": "Acres  20,40,60,මහනුවර,மகாநுவர",
+            "num": "236",
+            "dsd_id": "LK-2130"
+          }
+        },
+        { "type": "Polygon", "arcs": [[3]], "properties": { "hum_id": "LK2130999" } },
+        {
+          "type": "Polygon",
+          "arcs": [[3]],
+          "properties": { "id": "LK-21", "name": "A district in the GN file" }
+        },
+        { "type": null, "properties": { "id": "LK-2130125", "name": "No shape" } }
+      ]
+    }
+  },
+  "arcs": [
+    [
+      [100, 0],
+      [0, 100],
+      [0, 100]
+    ],
+    [
+      [100, 200],
+      [-100, 0],
+      [0, -200],
+      [50, 1],
+      [50, -1]
+    ],
+    [
+      [100, 0],
+      [100, 0],
+      [0, 200],
+      [-100, 0]
+    ],
+    [
+      [750, 400],
+      [200, 0],
+      [0, 200],
+      [-200, 0],
+      [0, -200]
+    ]
+  ]
+}

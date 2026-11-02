@@ -118,16 +118,28 @@ func (scheduler *Scheduler) RunDue(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		last, err := queries.LastRunStart(ctx, collector.Name())
+		last, err := queries.LastRun(ctx, collector.Name())
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			scheduler.Logger.Warn("read last run failed", "source", collector.Name(), "error", err)
 			continue
 		}
-		if err == nil && scheduler.now().Sub(last) < collector.Interval() {
+		if err == nil && scheduler.now().Sub(last.StartedAt) < wait(collector, last.Status) {
 			continue
 		}
 		scheduler.RunOne(ctx, collector)
 	}
+}
+
+// wait is how long after a run's start the collector runs again: its
+// interval, or its retry delay when the run failed and it has one.
+func wait(collector source.Collector, status string) time.Duration {
+	interval := collector.Interval()
+	if retrier, ok := collector.(source.Retrier); ok && status == "error" {
+		if retry := retrier.RetryAfter(); retry > 0 && retry < interval {
+			return retry
+		}
+	}
+	return interval
 }
 
 // RunOne runs one collector now and records the run.

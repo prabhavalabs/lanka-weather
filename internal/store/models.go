@@ -8,6 +8,89 @@ import (
 	"time"
 )
 
+type Place struct {
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	NameSi     *string   `json:"name_si"`
+	NameTa     *string   `json:"name_ta"`
+	AltNames   []string  `json:"alt_names"`
+	Kind       string    `json:"kind"`
+	Population *int32    `json:"population"`
+	Lon        float64   `json:"lon"`
+	Lat        float64   `json:"lat"`
+	Geom       []byte    `json:"geom"`
+	GnID       *string   `json:"gn_id"`
+	Source     string    `json:"source"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type PlaceStaging struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	NameSi     *string  `json:"name_si"`
+	NameTa     *string  `json:"name_ta"`
+	AltNames   []string `json:"alt_names"`
+	Kind       string   `json:"kind"`
+	Population *int32   `json:"population"`
+	Lon        float64  `json:"lon"`
+	Lat        float64  `json:"lat"`
+}
+
+type Region struct {
+	ID             string    `json:"id"`
+	Fid            int64     `json:"fid"`
+	Level          string    `json:"level"`
+	Name           string    `json:"name"`
+	NameSi         *string   `json:"name_si"`
+	NameTa         *string   `json:"name_ta"`
+	ParentID       *string   `json:"parent_id"`
+	ProvinceID     string    `json:"province_id"`
+	DistrictID     *string   `json:"district_id"`
+	DsID           *string   `json:"ds_id"`
+	IsoCode        *string   `json:"iso_code"`
+	GnNumber       *string   `json:"gn_number"`
+	AreaKm2        float64   `json:"area_km2"`
+	Population     *int32    `json:"population"`
+	PopulationYear *int16    `json:"population_year"`
+	Centroid       []byte    `json:"centroid"`
+	LabelPoint     []byte    `json:"label_point"`
+	West           float64   `json:"west"`
+	South          float64   `json:"south"`
+	East           float64   `json:"east"`
+	North          float64   `json:"north"`
+	Geom           []byte    `json:"geom"`
+	GeomSimple     []byte    `json:"geom_simple"`
+	Geom3857       []byte    `json:"geom_3857"`
+	GeomSimple3857 []byte    `json:"geom_simple_3857"`
+	Source         string    `json:"source"`
+	SourceVersion  string    `json:"source_version"`
+	SourceTime     time.Time `json:"source_time"`
+	FetchedAt      time.Time `json:"fetched_at"`
+}
+
+type RegionStaging struct {
+	ID             string  `json:"id"`
+	Fid            int64   `json:"fid"`
+	Level          string  `json:"level"`
+	Name           string  `json:"name"`
+	NameSi         *string `json:"name_si"`
+	NameTa         *string `json:"name_ta"`
+	ParentID       *string `json:"parent_id"`
+	ProvinceID     string  `json:"province_id"`
+	DistrictID     *string `json:"district_id"`
+	DsID           *string `json:"ds_id"`
+	IsoCode        *string `json:"iso_code"`
+	GnNumber       *string `json:"gn_number"`
+	AreaKm2        float64 `json:"area_km2"`
+	Population     *int32  `json:"population"`
+	PopulationYear *int16  `json:"population_year"`
+	CenterLon      float64 `json:"center_lon"`
+	CenterLat      float64 `json:"center_lat"`
+	GeomWkb        []byte  `json:"geom_wkb"`
+	SimpleWkb      []byte  `json:"simple_wkb"`
+}
+
 type RiverReading struct {
 	StationID  string    `json:"station_id"`
 	ObservedAt time.Time `json:"observed_at"`
@@ -31,6 +114,15 @@ type RiverStation struct {
 	UpdatedAt       time.Time   `json:"updated_at"`
 }
 
+type SearchName struct {
+	TargetKind string  `json:"target_kind"`
+	TargetID   string  `json:"target_id"`
+	Name       string  `json:"name"`
+	Lang       string  `json:"lang"`
+	Folded     string  `json:"folded"`
+	Importance float32 `json:"importance"`
+}
+
 type SourceRun struct {
 	ID         int64      `json:"id"`
 	Source     string     `json:"source"`
@@ -39,4 +131,12 @@ type SourceRun struct {
 	Status     string     `json:"status"`
 	Records    int32      `json:"records"`
 	Error      *string    `json:"error"`
+}
+
+type SourceVersion struct {
+	Source     string    `json:"source"`
+	Version    string    `json:"version"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+	Records    int32     `json:"records"`
 }

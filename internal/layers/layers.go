@@ -29,7 +29,8 @@ const (
 	KindGeoJSON Kind = "geojson"
 	// KindRaster layers are image tiles loaded by the browser.
 	KindRaster Kind = "raster"
-	// KindVector layers are vector tiles (PMTiles).
+	// KindVector layers are Mapbox Vector Tiles, served by the API or as
+	// PMTiles.
 	KindVector Kind = "vector"
 	// KindWind is the animated particle overlay drawn from a wind field.
 	KindWind Kind = "wind"
@@ -61,6 +62,13 @@ type Layer struct {
 	// DataPath is the API path serving the layer's data, for available
 	// layers whose data comes from the API.
 	DataPath string `json:"dataPath,omitempty"`
+	// TilePath is the URL template of the layer's vector tiles, with {z},
+	// {x} and {y} placeholders, for available vector layers.
+	TilePath string `json:"tilePath,omitempty"`
+	// MinZoom and MaxZoom bound the zooms the tiles are served at; clients
+	// overzoom beyond MaxZoom.
+	MinZoom int `json:"minZoom,omitempty"`
+	MaxZoom int `json:"maxZoom,omitempty"`
 }
 
 func seconds(d time.Duration) int { return int(d / time.Second) }
@@ -188,16 +196,24 @@ var catalogue = []Layer{
 		Attribution:       "USGS",
 	},
 	{
-		ID:                "admin-regions",
-		Title:             "Administrative regions",
-		Description:       "Province, district and divisional secretariat boundaries.",
-		Category:          CategoryGeography,
-		Kind:              KindVector,
-		Status:            StatusPlanned,
-		Sources:           []string{"nuuuwan-lk-admin-regions", "lanka-data-layer"},
-		RefreshSeconds:    seconds(30 * 24 * time.Hour),
-		StaleAfterSeconds: seconds(365 * 24 * time.Hour),
-		Attribution:       "Survey Department of Sri Lanka via lk_admin_regions",
+		ID:    "admin-regions",
+		Title: "Administrative regions",
+		Description: "Province, district, divisional secretariat and Grama Niladhari division boundaries, " +
+			"with names in English, Sinhala and Tamil and 2024 census population.",
+		Category: CategoryGeography,
+		Kind:     KindVector,
+		Status:   StatusAvailable,
+		Sources:  []string{"nuuuwan-lk-admin-regions", "nuuuwan-lk-census-2024"},
+		// The collector checks weekly for a new upstream version; boundaries
+		// change a few times a year at most, so a month without a successful
+		// check is when the layer is shown as possibly out of date.
+		RefreshSeconds:    seconds(7 * 24 * time.Hour),
+		StaleAfterSeconds: seconds(30 * 24 * time.Hour),
+		Attribution:       "Survey Department of Sri Lanka and Department of Census and Statistics via OCHA HDX and lk_admin_regions",
+		DataPath:          "/v1/regions",
+		TilePath:          "/v1/tiles/regions/{z}/{x}/{y}.pbf",
+		MinZoom:           0,
+		MaxZoom:           14,
 	},
 }
 
@@ -241,6 +257,10 @@ func Validate(list []Layer) error {
 			return fmt.Errorf("layer %q: attribution is required", layer.ID)
 		case layer.Status == StatusAvailable && layer.Kind == KindGeoJSON && layer.DataPath == "":
 			return fmt.Errorf("layer %q: an available GeoJSON layer needs a data path", layer.ID)
+		case layer.Status == StatusAvailable && layer.Kind == KindVector && layer.TilePath == "":
+			return fmt.Errorf("layer %q: an available vector layer needs a tile path", layer.ID)
+		case layer.MaxZoom < layer.MinZoom:
+			return fmt.Errorf("layer %q: maximum zoom is below the minimum", layer.ID)
 		}
 		seen[layer.ID] = true
 	}
