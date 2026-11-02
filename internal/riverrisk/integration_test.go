@@ -193,7 +193,7 @@ func open(t *testing.T) *pgxpool.Pool {
 	t.Cleanup(pool.Close)
 	if _, err := pool.Exec(ctx, `TRUNCATE river_segments, river_source_names, official_basins, official_stream_names,
 		official_stations, river_subbasins, rivers, river_gauge_matches, past_flood_events, source_versions,
-		river_readings, river_stations, flood_gauges, flood_areas CASCADE`); err != nil {
+		river_readings, river_stations, flood_gauges, flood_areas, regions CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	return pool
