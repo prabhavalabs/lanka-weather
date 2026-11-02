@@ -118,16 +118,29 @@ func (scheduler *Scheduler) RunDue(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		last, err := queries.LastRunStart(ctx, collector.Name())
+		last, err := queries.LastRun(ctx, collector.Name())
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			scheduler.Logger.Warn("read last run failed", "source", collector.Name(), "error", err)
 			continue
 		}
-		if err == nil && scheduler.now().Sub(last) < collector.Interval() {
+		if err == nil && scheduler.now().Sub(last.StartedAt) < DueAfter(collector.Interval(), last.Status) {
 			continue
 		}
 		scheduler.RunOne(ctx, collector)
 	}
+}
+
+// retryAfterFailure is how soon a collector whose last run failed is tried
+// again, when its interval is longer: a three-hourly forecast should not
+// stay missing for three hours because its source was briefly down.
+const retryAfterFailure = 15 * time.Minute
+
+// DueAfter is how long after its last run a collector is due again.
+func DueAfter(interval time.Duration, lastStatus string) time.Duration {
+	if lastStatus == "error" {
+		return min(interval, retryAfterFailure)
+	}
+	return interval
 }
 
 // RunOne runs one collector now and records the run.
