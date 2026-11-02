@@ -14,8 +14,18 @@ export default defineConfig({
     __BUILD_ID__: JSON.stringify(process.env.GITHUB_SHA ?? new Date().toISOString()),
   },
   build: {
-    // MapLibre GL alone is about 1 MB minified; it is the map, so it is not split further.
+    // MapLibre GL alone is about 1.1 MB minified and is not split further.
     chunkSizeWarningLimit: 1600,
+    rolldownOptions: {
+      output: {
+        // MapLibre GL gets a chunk of its own: it changes only with upgrades, so browsers keep
+        // it cached across app releases, and the app's own chunk stays small. Search, the
+        // location panel, the wind renderer and the design kit load on demand (React.lazy).
+        codeSplitting: {
+          groups: [{ name: "maplibre", test: /[\\/]node_modules[\\/].*maplibre-gl[\\/]/ }],
+        },
+      },
+    },
   },
   server: {
     proxy: {
