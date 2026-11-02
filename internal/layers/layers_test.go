@@ -53,9 +53,13 @@ func TestAdminRegionsLayerIsAvailableAsTiles(t *testing.T) {
 
 func TestWeatherLayersAreAvailable(t *testing.T) {
 	cases := map[string]string{
-		"wind":           "/v1/weather/wind",
-		"flood-forecast": "/v1/floods/forecast",
-		"temperature":    "/v1/weather/current",
+		"wind":             "/v1/weather/wind",
+		"flood-forecast":   "/v1/floods/forecast",
+		"temperature":      "/v1/weather/current",
+		"rainfall":         "/v1/rain/steps",
+		"weather-stations": "/v1/stations",
+		"air-quality":      "/v1/air/current",
+		"sea-conditions":   "/v1/sea/current",
 	}
 	for id, path := range cases {
 		layer, ok := ByID(id)

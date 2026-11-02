@@ -12,9 +12,11 @@ import (
 	"sort"
 	"time"
 
+	"github.com/prabhavalabs/lanka-weather/internal/environment"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/stations"
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
@@ -39,14 +41,29 @@ type RegionLookup interface {
 	Lookup(ctx context.Context, lon, lat float64) (regions.Lookup, error)
 }
 
+// StationSource finds the observed reading nearest a place.
+type StationSource interface {
+	Nearest(ctx context.Context, lon, lat float64) (*stations.Nearby, error)
+}
+
+// EnvironmentSource reads the air-quality and sea grids at a place.
+type EnvironmentSource interface {
+	AirAt(ctx context.Context, lon, lat float64) (*environment.AirPoint, error)
+	SeaAt(ctx context.Context, lon, lat float64) (*environment.SeaPoint, error)
+}
+
 // Service builds summaries. Any source may be nil.
 type Service struct {
 	Weather WeatherSource
 	Rivers  RiverSource
 	Floods  FloodSource
 	Regions RegionLookup
-	Logger  *slog.Logger
-	Now     func() time.Time
+	// Stations and Environment add observed readings, air quality and the
+	// sea state; without them those parts are simply null.
+	Stations    StationSource
+	Environment EnvironmentSource
+	Logger      *slog.Logger
+	Now         func() time.Time
 }
 
 const (
@@ -75,11 +92,18 @@ type Summary struct {
 	FloodForecast FloodForecast  `json:"floodForecast"`
 	// Alerts are derived by lanka-weather and are estimates.
 	Alerts []Alert `json:"alerts"`
+	// Observed is the nearest station's latest reading, measured rather than
+	// modelled; null when no station is within 75 km.
+	Observed *stations.Nearby `json:"observed"`
+	// AirQuality is the model estimate here; null outside its grid.
+	AirQuality *environment.AirPoint `json:"airQuality"`
+	// Sea is the model sea state on the water or at a coast; null inland.
+	Sea *environment.SeaPoint `json:"sea"`
 	// Official will hold Department of Meteorology and DMC warnings, which
 	// are authoritative; they are not collected yet.
 	Official Official `json:"official"`
-	// Unavailable lists the parts that could not be filled: weather,
-	// regions, rivers or floodForecast.
+	// Unavailable lists the parts that could not be filled: weather, regions,
+	// rivers, floodForecast, observed, airQuality or sea.
 	Unavailable []string `json:"unavailable"`
 }
 
@@ -216,6 +240,32 @@ func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary
 		}
 	} else {
 		summary.Unavailable = append(summary.Unavailable, "floodForecast")
+	}
+
+	if service.Stations != nil {
+		observed, err := service.Stations.Nearest(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary observed", err)
+			summary.Unavailable = append(summary.Unavailable, "observed")
+		} else {
+			summary.Observed = observed
+		}
+	}
+	if service.Environment != nil {
+		air, err := service.Environment.AirAt(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary air quality", err)
+			summary.Unavailable = append(summary.Unavailable, "airQuality")
+		} else {
+			summary.AirQuality = air
+		}
+		sea, err := service.Environment.SeaAt(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary sea", err)
+			summary.Unavailable = append(summary.Unavailable, "sea")
+		} else {
+			summary.Sea = sea
+		}
 	}
 
 	summary.Alerts = Evaluate(inputs)
