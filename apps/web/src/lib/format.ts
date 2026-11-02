@@ -53,3 +53,14 @@ export function formatNumber(value: number, decimals = 0): string {
   const text = Math.abs(value).toFixed(decimals)
   return value < 0 && Number(text) !== 0 ? `−${text}` : text
 }
+
+/** How long ago a time was, in words: "just now", "12 min ago", "3 h ago", "2 days ago". */
+export function formatAge(iso: string | null, now: Date = new Date()): string {
+  if (!iso) return "never"
+  const minutes = Math.round((now.getTime() - new Date(iso).getTime()) / 60_000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `${hours} h ago`
+  return `${Math.round(hours / 24)} days ago`
+}

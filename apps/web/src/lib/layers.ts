@@ -1,3 +1,5 @@
+import { isNotReady } from "./api"
+
 /** Mirrors internal/layers.Layer in the Go service. */
 export type LayerCategory = "hydrology" | "weather" | "hazard" | "geography"
 /**
@@ -47,6 +49,23 @@ const minimumRefreshMs = 60_000
 export function queryTimings(layer: Pick<Layer, "refreshSeconds">) {
   const refreshMs = Math.max(layer.refreshSeconds * 1000, minimumRefreshMs)
   return { staleTime: Math.round(refreshMs / 2), refetchInterval: refreshMs }
+}
+
+/** How often to ask again while a layer's data has not been collected yet. */
+export const notReadyPollMs = 60_000
+
+/**
+ * Query options for a layer's data: the catalogue's timings, except that
+ * while the API answers "not collected yet" (503 no_data) the query asks
+ * again every minute, so data appears soon after the collectors run.
+ */
+export function layerQueryOptions(layer: Pick<Layer, "refreshSeconds">) {
+  const { staleTime, refetchInterval } = queryTimings(layer)
+  return {
+    staleTime,
+    refetchInterval: (query: { state: { error: unknown } }) =>
+      isNotReady(query.state.error) ? notReadyPollMs : refetchInterval,
+  }
 }
 
 /** Whether data observed at `observedAt` is too old to be shown as current. */

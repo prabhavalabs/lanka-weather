@@ -1,5 +1,7 @@
 import type { RiverStatus, RiverTrend, StationProperties } from "./types"
 
+export { formatAge } from "@/lib/format"
+
 /**
  * Theme tokens by status, from calm to severe (src/styles/theme.css): blue,
  * yellow, orange, red and grey, distinct in lightness as well as hue so they
@@ -65,17 +67,6 @@ export function formatRate(value: number | null, unit: "m" | "ft"): string {
   if (value === null) return "–"
   const sign = value > 0 ? "+" : value < 0 ? "−" : "±"
   return `${sign}${Math.abs(value).toFixed(2)} ${unit}/h`
-}
-
-/** How long ago a time was, in words: "just now", "12 min ago", "3 h ago", "2 days ago". */
-export function formatAge(iso: string | null, now: Date = new Date()): string {
-  if (!iso) return "never"
-  const minutes = Math.round((now.getTime() - new Date(iso).getTime()) / 60_000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 48) return `${hours} h ago`
-  return `${Math.round(hours / 24)} days ago`
 }
 
 /**
