@@ -5,6 +5,7 @@ import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
 import { polygonSdf, type Point } from "../map/sdf"
 import { slotBefore, styleReady } from "../map/slots"
+import { areaKinds, areaStyle } from "./basins"
 import { floodSeverityTokens } from "./present"
 import type { FloodForecastCollection } from "./types"
 
@@ -12,7 +13,9 @@ const SOURCE = "flood-forecast"
 /** The gauges: what clicks and hovers hit. */
 export const FLOOD_GAUGES = "flood-forecast-gauges"
 const TRENDS = "flood-forecast-trends"
-const AREAS = "flood-forecast-areas"
+/** Google's flood polygons: what clicks and hovers hit. */
+export const FLOOD_AREAS = "flood-forecast-areas"
+const AREAS = FLOOD_AREAS
 const AREA_LINES = "flood-forecast-area-lines"
 const DIAMOND = "flood-diamond"
 const RISE = "flood-trend-rise"
@@ -64,9 +67,20 @@ function addIcons(map: MapLibreMap) {
   }
 }
 
+function areaValue<T>(
+  pick: (kind: (typeof areaKinds)[number]) => T,
+  fallback: T,
+): ExpressionSpecification {
+  const expression: unknown[] = ["match", ["get", "kind"]]
+  for (const kind of areaKinds) expression.push(kind, pick(kind))
+  expression.push(fallback)
+  return expression as ExpressionSpecification
+}
+
 function readPalette() {
   return readTokens({
     ...floodSeverityTokens,
+    ...Object.fromEntries(areaKinds.map((kind) => [`area:${kind}`, areaStyle[kind].token])),
     stroke: "--status-stroke",
     strokeSelected: "--status-stroke-selected",
     label: "--map-label-strong",
@@ -128,7 +142,14 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
         type: "fill",
         source: SOURCE,
         filter: ["!", isGauge],
-        paint: { "fill-color": severityColor(palette), "fill-opacity": 0.28 },
+        layout: { "fill-sort-key": areaValue((kind) => areaStyle[kind].rank, 0) },
+        paint: {
+          "fill-color": areaValue(
+            (kind) => (palette as Record<string, string>)[`area:${kind}`]!,
+            palette.unknown,
+          ),
+          "fill-opacity": areaValue((kind) => areaStyle[kind].opacity, 0.3),
+        },
       },
       slotBefore(map, "areas"),
     )
@@ -140,10 +161,16 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
         type: "line",
         source: SOURCE,
         filter: ["!", isGauge],
+        layout: {
+          "line-join": "round",
+          "line-sort-key": areaValue((kind) => areaStyle[kind].rank, 0),
+        },
         paint: {
-          "line-color": severityColor(palette),
-          "line-width": 1.5,
-          "line-dasharray": [3, 2],
+          "line-color": areaValue(
+            (kind) => (palette as Record<string, string>)[`area:${kind}`]!,
+            palette.unknown,
+          ),
+          "line-width": areaValue((kind) => areaStyle[kind].width, 1.5),
         },
       },
       slotBefore(map, "areas"),
@@ -215,7 +242,8 @@ interface FloodForecastLayerProps {
 /**
  * Google flood forecast gauges as diamonds coloured by severity (the river
  * status colours), with an arrow when the forecast rises or falls, and
- * forecast flood areas as dashed outlines.
+ * forecast flood areas as solid fills with strong outlines: inundation graded
+ * by how likely the water is, the likeliest drawn on top.
  */
 export function FloodForecastLayer({ data, selectedId }: FloodForecastLayerProps) {
   const map = useMap()

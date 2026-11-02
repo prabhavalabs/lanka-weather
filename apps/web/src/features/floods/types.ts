@@ -30,6 +30,8 @@ export type FloodAreaKind =
   | "significant_event"
 
 export interface FloodAreaProperties {
+  /** The polygon's id, repeated for clicks: vector features keep only properties. */
+  id?: string
   kind: FloodAreaKind
   gaugeId?: string
   severity: FloodSeverity
@@ -61,6 +63,8 @@ export interface FloodForecastCollection {
     source: string
     attribution: string
     region: string
+    /** Local test data is in the tables; never true in production. */
+    seeded?: boolean
     configured: boolean
     fetchedAt: string | null
     generatedAt: string
