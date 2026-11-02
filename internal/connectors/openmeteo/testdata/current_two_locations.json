@@ -1,0 +1,77 @@
+[
+  {
+    "latitude": 7.205624,
+    "longitude": 80.55837,
+    "generationtime_ms": 0.28,
+    "utc_offset_seconds": 0,
+    "timezone": "GMT",
+    "timezone_abbreviation": "GMT",
+    "elevation": 545.0,
+    "current_units": {
+      "time": "unixtime",
+      "interval": "seconds",
+      "temperature_2m": "°C",
+      "relative_humidity_2m": "%",
+      "apparent_temperature": "°C",
+      "precipitation": "mm",
+      "weather_code": "wmo code",
+      "cloud_cover": "%",
+      "pressure_msl": "hPa",
+      "wind_speed_10m": "km/h",
+      "wind_direction_10m": "°",
+      "wind_gusts_10m": "km/h"
+    },
+    "current": {
+      "time": 1793627100,
+      "interval": 900,
+      "temperature_2m": 22.7,
+      "relative_humidity_2m": 99,
+      "apparent_temperature": 27.9,
+      "precipitation": 0.1,
+      "weather_code": 51,
+      "cloud_cover": 98,
+      "pressure_msl": 1014.8,
+      "wind_speed_10m": 0.7,
+      "wind_direction_10m": 346,
+      "wind_gusts_10m": 6.5
+    }
+  },
+  {
+    "latitude": 6.010545,
+    "longitude": 80.01668,
+    "generationtime_ms": 0.55,
+    "utc_offset_seconds": 0,
+    "timezone": "GMT",
+    "timezone_abbreviation": "GMT",
+    "elevation": 0.0,
+    "location_id": 1,
+    "current_units": {
+      "time": "unixtime",
+      "interval": "seconds",
+      "temperature_2m": "°C",
+      "relative_humidity_2m": "%",
+      "apparent_temperature": "°C",
+      "precipitation": "mm",
+      "weather_code": "wmo code",
+      "cloud_cover": "%",
+      "pressure_msl": "hPa",
+      "wind_speed_10m": "km/h",
+      "wind_direction_10m": "°",
+      "wind_gusts_10m": "km/h"
+    },
+    "current": {
+      "time": 1793627100,
+      "interval": 900,
+      "temperature_2m": 27.2,
+      "relative_humidity_2m": 79,
+      "apparent_temperature": 31.6,
+      "precipitation": 0.1,
+      "weather_code": 51,
+      "cloud_cover": 100,
+      "pressure_msl": null,
+      "wind_speed_10m": 7.6,
+      "wind_direction_10m": 273,
+      "wind_gusts_10m": 19.1
+    }
+  }
+]
