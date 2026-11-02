@@ -117,7 +117,7 @@ export interface AdminArea {
   parentName?: string
 }
 
-export type SearchResultKind = "place" | "station" | "area"
+export type SearchResultKind = "place" | "station" | "reservoir" | "area"
 
 export interface SearchResult {
   id: string

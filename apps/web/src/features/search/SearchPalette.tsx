@@ -9,8 +9,16 @@ import { SearchCommand } from "@/components/weather/SearchCommand"
 import { apiGet } from "@/lib/api"
 import { useDebouncedValue } from "@/lib/useDebouncedValue"
 import { useLocalStorage } from "@/lib/useLocalStorage"
+import type { ReservoirsCollection } from "../reservoirs/types"
 import type { RiverLevelsCollection } from "../rivers/types"
-import { addRecent, searchEntry, stationEntries, validRecent, type SearchEntry } from "./present"
+import {
+  addRecent,
+  reservoirEntries,
+  searchEntry,
+  stationEntries,
+  validRecent,
+  type SearchEntry,
+} from "./present"
 import type { PlaceSearchResponse, SearchChoice } from "./types"
 
 export interface SearchPaletteProps {
@@ -19,6 +27,8 @@ export interface SearchPaletteProps {
   onChoose: (choice: SearchChoice) => void
   /** River gauges, when loaded, to search by name. */
   rivers?: RiverLevelsCollection
+  /** Reservoirs, when loaded, to search by name. */
+  reservoirs?: ReservoirsCollection
 }
 
 const recentKey = "lanka-weather:recent-searches"
@@ -28,6 +38,7 @@ export default function SearchPalette({
   onOpenChange,
   onChoose,
   rivers,
+  reservoirs,
 }: SearchPaletteProps) {
   const [query, setQuery] = useState("")
   const [storedRecent, setRecent] = useLocalStorage<unknown>(recentKey, [])
@@ -52,8 +63,9 @@ export default function SearchPalette({
     if (!term) return []
     const places = (search.data?.results ?? []).map(searchEntry)
     const stations = rivers ? stationEntries(rivers.features, term) : []
-    return [...places, ...stations]
-  }, [search.data, rivers, term])
+    const dams = reservoirs ? reservoirEntries(reservoirs.features, term) : []
+    return [...places, ...stations, ...dams]
+  }, [search.data, rivers, reservoirs, term])
 
   const byId = useMemo(() => {
     const map = new Map<string, SearchEntry>()
@@ -88,7 +100,7 @@ export default function SearchPalette({
       footer={
         <>
           Places © OpenStreetMap contributors (ODbL). Regions: Survey Department and Department of
-          Census and Statistics.
+          Census and Statistics. Reservoirs: Sri Lanka Water Levels (waterlevels.lk).
         </>
       }
     />

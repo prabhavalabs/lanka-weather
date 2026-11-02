@@ -1,5 +1,6 @@
 /** Mirrors the location endpoints of the Go service (docs/api/weather-and-floods.md). */
-import type { RiverStatus, RiverTrend } from "../rivers/types"
+import type { ReservoirFlow, ReservoirStatus } from "../reservoirs/types"
+import type { LevelUnit, RiverStatus, RiverTrend } from "../rivers/types"
 
 export type RegionLevel = "province" | "district" | "ds" | "gn"
 
@@ -98,12 +99,27 @@ export interface NearbyRiver {
   status: RiverStatus
   trend: RiverTrend
   waterLevel: number | null
-  unit: "m" | "ft"
+  unit: LevelUnit
   alertLevel: number | null
   minorFloodLevel: number | null
   majorFloodLevel: number | null
   observedAt: string | null
   stale: boolean
+  lon: number
+  lat: number
+  source: string
+  attribution: string
+}
+
+/** A mapped reservoir near the place, spilling or releasing on a current reading. */
+export interface NearbyReservoir {
+  id: string
+  name: string
+  distanceKm: number
+  status: ReservoirStatus
+  storagePercent: number | null
+  flow: ReservoirFlow | null
+  readingDay: string | null
   lon: number
   lat: number
 }
@@ -185,6 +201,7 @@ export interface Summary {
   weather: PointForecast | null
   rivers: NearbyRiver[] | null
   floodForecast: { gauges: NearbyFloodGauge[]; areas: NearbyFloodArea[] } | null
+  reservoirs: NearbyReservoir[] | null
   alerts: DerivedAlert[]
   official: { status: string; warnings: OfficialWarning[]; note?: string }
   unavailable: string[]

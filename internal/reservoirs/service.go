@@ -125,6 +125,8 @@ type Properties struct {
 	Mapped  bool    `json:"mapped"`
 	OSMName *string `json:"osmName"`
 	OSMKind *string `json:"osmKind"`
+	// AltNames are other spellings of the name, for search.
+	AltNames []string `json:"altNames"`
 }
 
 // Active says the reservoir is spilling or releasing on a current reading.
@@ -180,6 +182,7 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 			Flow: flow(row.FlowKind, row.FlowCusecs, row.FlowAgency, day(row.FlowDay)), ReadingDay: day(row.ReadingDay),
 			Agency: row.Agency, Source: row.Source, SourceURL: row.SourceUrl, FetchedAt: row.FetchedAt,
 			Stale: IsStale(row.ReadingDay, now, service.StaleAfter), OSMName: row.OsmName, OSMKind: row.OsmKind,
+			AltNames: osmreservoirs.Aliases[row.ID],
 		}}
 		if row.Lon != nil && row.Lat != nil {
 			feature.Geometry = &Point{Type: "Point", Coordinates: [2]float64{*row.Lon, *row.Lat}}
@@ -308,7 +311,7 @@ func (service *Service) History(ctx context.Context, id string, days int) (Histo
 			Flow: flow(row.FlowKind, row.FlowCusecs, row.FlowAgency, day(row.FlowDay)), ReadingDay: day(row.ReadingDay),
 			Agency: row.Agency, Source: row.Source, SourceURL: row.SourceUrl, FetchedAt: row.FetchedAt,
 			Stale: IsStale(row.ReadingDay, now, service.StaleAfter), Mapped: row.Lon != nil,
-			OSMName: row.OsmName, OSMKind: row.OsmKind,
+			OSMName: row.OsmName, OSMKind: row.OsmKind, AltNames: osmreservoirs.Aliases[row.ID],
 		},
 		Readings: make([]Reading, 0, len(rows)),
 	}

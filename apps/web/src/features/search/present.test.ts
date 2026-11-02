@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 import type { StationFeature } from "../rivers/types"
-import { addRecent, maxRecent, searchEntry, stationEntries, validRecent } from "./present"
+import {
+  addRecent,
+  maxRecent,
+  reservoirEntries,
+  searchEntry,
+  stationEntries,
+  validRecent,
+} from "./present"
 import type { PlaceSearchResult } from "./types"
 
 const kandyCity: PlaceSearchResult = {
@@ -86,6 +93,10 @@ describe("stationEntries", () => {
       trend: "rising",
       ratePerHour: null,
       stale: false,
+      source: "irrigation-gauges",
+      attribution: "Irrigation Department of Sri Lanka",
+      sourceUrl: null,
+      nextHour: null,
     },
   })
   const stations = [
@@ -130,5 +141,97 @@ describe("recent searches", () => {
   it("drops malformed stored entries", () => {
     expect(validRecent("nope")).toEqual([])
     expect(validRecent([entry, { id: 1 }, { ...entry, choice: { lat: "x" } }])).toEqual([entry])
+  })
+})
+
+describe("reservoirEntries", () => {
+  const reservoirs = [
+    {
+      type: "Feature" as const,
+      id: "maussakele",
+      geometry: { type: "Point" as const, coordinates: [80.55, 6.82] as [number, number] },
+      properties: {
+        id: "maussakele",
+        name: "Maussakele",
+        district: null,
+        river: "Kelani Ganga",
+        type: "mahaweli",
+        status: "holding" as const,
+        storagePercent: 88,
+        storageFresh: true,
+        flow: null,
+        readingDay: "2026-11-02",
+        agency: "Mahaweli Authority",
+        source: "waterlevels-lk-reservoirs",
+        sourceUrl: null,
+        fetchedAt: "2026-11-02T19:45:00Z",
+        stale: false,
+        mapped: true,
+        osmName: "Maskeliya Reservoir",
+        osmKind: "water" as const,
+        altNames: ["Mousakelle"],
+      },
+    },
+    {
+      type: "Feature" as const,
+      id: "ellewela",
+      geometry: null,
+      properties: {
+        id: "ellewela",
+        name: "Ellewela",
+        district: "Matara",
+        river: null,
+        type: "major",
+        status: "spilling" as const,
+        storagePercent: 100,
+        storageFresh: true,
+        flow: null,
+        readingDay: "2026-11-02",
+        agency: "Irrigation Department",
+        source: "waterlevels-lk-reservoirs",
+        sourceUrl: null,
+        fetchedAt: "2026-11-02T19:45:00Z",
+        stale: false,
+        mapped: false,
+        osmName: null,
+        osmKind: null,
+        altNames: null,
+      },
+    },
+  ]
+
+  it("finds a reservoir by its name, other spellings and river", () => {
+    for (const query of ["maussa", "Mousakelle", "maskeliya", "kelani"]) {
+      expect(reservoirEntries(reservoirs, query).map((entry) => entry.choice.id)).toEqual([
+        "maussakele",
+      ])
+    }
+  })
+
+  it("flies to a mapped reservoir and opens one with no position without moving", () => {
+    const [mapped] = reservoirEntries(reservoirs, "maussa")
+    expect(mapped?.choice).toMatchObject({ type: "reservoir", lat: 6.82, lon: 80.55 })
+    const [unmapped] = reservoirEntries(reservoirs, "ellewela")
+    expect(unmapped?.choice).toMatchObject({ type: "reservoir", lat: null, lon: null })
+    expect(unmapped?.subtitle).toContain("not on the map")
+  })
+
+  it("needs at least two letters", () => {
+    expect(reservoirEntries(reservoirs, "m")).toEqual([])
+  })
+
+  it("keeps a recent reservoir with no position, and no other place without one", () => {
+    const entry = reservoirEntries(reservoirs, "ellewela")[0]!
+    expect(validRecent([entry])).toHaveLength(1)
+    expect(
+      validRecent([
+        {
+          id: "x",
+          title: "x",
+          kind: "place",
+          choice: { type: "place", id: "x", name: "x", kind: "city", lat: null, lon: null },
+        },
+      ]),
+    ).toHaveLength(0)
   })
 })

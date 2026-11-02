@@ -1,5 +1,5 @@
 import type { Map as MapLibreMap, MapMouseEvent, PointLike } from "maplibre-gl"
-import { MapPinIcon, WavesIcon, ZoomInIcon } from "lucide-react"
+import { ContainerIcon, ListIcon, MapPinIcon, WavesIcon, ZoomInIcon } from "lucide-react"
 import {
   lazy,
   Suspense,
@@ -61,6 +61,23 @@ import { RegionLegend } from "./features/regions/RegionLegend"
 import { RegionsLayer, REGIONS_FILL } from "./features/regions/RegionsLayer"
 import type { RegionLevel } from "./features/regions/types"
 import { countByStatus, statusColors, statusLabels, statusOrder } from "./features/rivers/present"
+import {
+  activeReservoirs,
+  hasCurrentFigures,
+  reservoirColors,
+  reservoirStatusLabels,
+  reservoirStatusOrder,
+  reservoirSummary,
+} from "./features/reservoirs/present"
+import { useReservoirAreas, useReservoirs } from "./features/reservoirs/queries"
+import { ReservoirLegend } from "./features/reservoirs/ReservoirLegend"
+import { ReservoirListPanel } from "./features/reservoirs/ReservoirListPanel"
+import { ReservoirPanel } from "./features/reservoirs/ReservoirPanel"
+import {
+  ReservoirsLayer,
+  RESERVOIR_AREAS,
+  RESERVOIR_POINTS,
+} from "./features/reservoirs/ReservoirsLayer"
 import { useRiverLevels } from "./features/rivers/queries"
 import { RiverLegend } from "./features/rivers/RiverLegend"
 import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsLayer"
@@ -90,9 +107,10 @@ const FLOOD_FORECAST = "flood-forecast"
 const TEMPERATURE = "temperature"
 const WIND = "wind"
 const ADMIN_REGIONS = "admin-regions"
+const RESERVOIRS = "reservoirs"
 
 /** Layers on at the first visit. */
-const defaultLayers = [ADMIN_REGIONS, RIVER_LEVELS, FLOOD_FORECAST, WIND]
+const defaultLayers = [ADMIN_REGIONS, RIVER_LEVELS, FLOOD_FORECAST, WIND, RESERVOIRS]
 
 type RegionFill = RegionVariable | "none"
 
@@ -142,12 +160,14 @@ export function App() {
   const gridLayer = available(TEMPERATURE)
   const windLayer = available(WIND)
   const regionsLayer = available(ADMIN_REGIONS)
+  const reservoirLayer = available(RESERVOIRS)
   const on = (id: string) => enabled.includes(id) && available(id) !== undefined
   const riversOn = on(RIVER_LEVELS)
   const floodsOn = on(FLOOD_FORECAST)
   const gridOn = on(TEMPERATURE)
   const windOn = on(WIND)
   const regionsOn = on(ADMIN_REGIONS)
+  const reservoirsOn = on(RESERVOIRS)
 
   // Region colours give way to the weather field, which shows the same weather in more detail.
   const fillVariable: RegionVariable | null =
@@ -158,6 +178,14 @@ export function App() {
     riversOn || selection?.kind === "station" || searchLoaded,
   )
   const floods = useFloodForecast(floodLayer, floodsOn || selection?.kind === "gauge")
+  const reservoirs = useReservoirs(
+    reservoirLayer,
+    reservoirsOn ||
+      selection?.kind === "reservoir" ||
+      selection?.kind === "reservoirs" ||
+      searchLoaded,
+  )
+  const reservoirAreas = useReservoirAreas(reservoirLayer, reservoirsOn)
   const grid = useCurrentGrid(gridLayer, gridOn)
   const wind = useWindForecast(windLayer, windOn)
   const levelWeather = useRegionWeather(level, {
@@ -198,6 +226,10 @@ export function App() {
     selection?.kind === "gauge"
       ? floods.data?.features.filter(isGauge).find((feature) => feature.id === selection.id)
       : undefined
+  const reservoir =
+    selection?.kind === "reservoir"
+      ? reservoirs.data?.features.find((feature) => feature.id === selection.id)
+      : undefined
 
   const enable = useCallback(
     (id: string) => setEnabled((current) => (current.includes(id) ? current : [...current, id])),
@@ -208,6 +240,13 @@ export function App() {
     const turningOn = !enabled.includes(id)
     if (!turningOn && id === RIVER_LEVELS && selection?.kind === "station") setSelection(null)
     if (!turningOn && id === FLOOD_FORECAST && selection?.kind === "gauge") setSelection(null)
+    if (
+      !turningOn &&
+      id === RESERVOIRS &&
+      (selection?.kind === "reservoir" || selection?.kind === "reservoirs")
+    ) {
+      setSelection(null)
+    }
     setEnabled((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     )
@@ -282,13 +321,17 @@ export function App() {
     } else if (selection.kind === "gauge") {
       if (!gauge) return
       lngLat = gauge.geometry.coordinates
+    } else if (selection.kind === "reservoir") {
+      if (!reservoir) return
+      // A reservoir with no known position opens without moving the map.
+      lngLat = reservoir.geometry?.coordinates ?? null
     }
     pending.current = null
     if (!lngLat) return
     if (move.target === "fit" && bbox) fitBox(bbox)
     else if (move.target === "fit" || move.target === "zoom") reveal(lngLat, { zoom: 10 })
     else reveal(lngLat)
-  }, [map, selection, regionDetail.data, station, gauge, reveal, fitBox])
+  }, [map, selection, regionDetail.data, station, gauge, reservoir, reveal, fitBox])
 
   const openStation = useCallback(
     (id: string) => {
@@ -309,7 +352,22 @@ export function App() {
     [enable, pendingCamera, setSelection],
   )
 
-  // Clicks: a gauge, else a region (weather at its label point), else the point itself.
+  const openReservoir = useCallback(
+    (id: string) => {
+      enable(RESERVOIRS)
+      const next: Selection = { kind: "reservoir", id }
+      pendingCamera(next, "reveal")
+      setSelection(next)
+    },
+    [enable, pendingCamera, setSelection],
+  )
+  const openReservoirList = useCallback(() => {
+    enable(RESERVOIRS)
+    pending.current = null
+    setSelection({ kind: "reservoirs" })
+  }, [enable, setSelection])
+
+  // Clicks: a gauge or reservoir, else a region (weather at its label point), else the point itself.
   useMapClick(map, (event: MapMouseEvent) => {
     if (!map) return
     const { x, y } = event.point
@@ -317,12 +375,20 @@ export function App() {
       [x - pointSlack, y - pointSlack],
       [x + pointSlack, y + pointSlack],
     ]
-    const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES].filter((id) => map.getLayer(id))
+    const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES, RESERVOIR_POINTS].filter((id) =>
+      map.getLayer(id),
+    )
     const hit = pointLayers.length
       ? map.queryRenderedFeatures(box, { layers: pointLayers })[0]
       : null
     if (hit?.layer.id === RIVER_STATIONS) return openStation(String(hit.properties.id))
     if (hit?.layer.id === FLOOD_GAUGES) return openGauge(String(hit.properties.gaugeId))
+    if (hit?.layer.id === RESERVOIR_POINTS) return openReservoir(String(hit.properties.id))
+
+    const water = map.getLayer(RESERVOIR_AREAS)
+      ? map.queryRenderedFeatures(event.point, { layers: [RESERVOIR_AREAS] })[0]
+      : null
+    if (water) return openReservoir(String(water.properties.id))
 
     const region = map.getLayer(REGIONS_FILL)
       ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
@@ -365,6 +431,13 @@ export function App() {
           pending.current = null
           fitBox(choice.bbox)
         } else pendingCamera(next, "fit")
+      } else if (choice.type === "reservoir") {
+        enable(RESERVOIRS)
+        pending.current = null
+        setSelection({ kind: "reservoir", id: choice.id })
+        if (choice.lat !== null && choice.lon !== null) {
+          reveal([choice.lon, choice.lat], { zoom: 11 })
+        }
       } else {
         enable(RIVER_LEVELS)
         pending.current = null
@@ -472,6 +545,55 @@ export function App() {
     }
   }
   if (floodCounts) details[FLOOD_FORECAST] = <FloodLegend bare counts={floodCounts} />
+
+  const reservoirCounts = reservoirs.data?.meta.counts
+  const activeCountOfReservoirs = activeReservoirs(reservoirs.data?.features ?? []).length
+  if (reservoirLayer) {
+    const status = layerStatus({
+      layer: reservoirLayer,
+      parts: [],
+      observedAt: reservoirs.data?.meta.fetchedAt,
+      error: reservoirs.error,
+      pending: reservoirs.isPending,
+    })
+    const outOfDate =
+      status.stale ||
+      (reservoirCounts !== undefined &&
+        reservoirCounts.total > 0 &&
+        !hasCurrentFigures(reservoirs.data?.features ?? []))
+    statuses[RESERVOIRS] = reservoirCounts
+      ? {
+          ...status,
+          stale: outOfDate,
+          summary: `${reservoirSummary(reservoirCounts, activeCountOfReservoirs, outOfDate)} · ${status.summary}`,
+        }
+      : status
+  }
+  if (reservoirCounts) {
+    details[RESERVOIRS] = (
+      <div className="flex flex-col gap-3">
+        <SegmentedBar
+          label="Reservoirs by status"
+          segments={reservoirStatusOrder.map((status) => ({
+            label: reservoirStatusLabels[status],
+            value: reservoirCounts[status],
+            color: reservoirColors[status],
+          }))}
+        />
+        <ReservoirLegend bare counts={reservoirCounts} />
+        <Button size="sm" variant="secondary" onClick={openReservoirList} className="w-full">
+          <ListIcon />
+          {activeCountOfReservoirs === 0
+            ? "Reservoir list"
+            : `Spilling or releasing (${activeCountOfReservoirs})`}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {reservoirCounts.mapped} of {reservoirCounts.total} are on the map. Not an official
+          warning. In an emergency call 117.
+        </p>
+      </div>
+    )
+  }
 
   if (gridLayer) {
     const values = grid.data?.values[gridVariables[gridVariable].key]
@@ -680,6 +802,7 @@ export function App() {
           onClose={close}
           onSelectStation={openStation}
           onSelectGauge={openGauge}
+          onSelectReservoir={openReservoir}
         />
       </Suspense>
     )
@@ -715,6 +838,33 @@ export function App() {
     )
   }
 
+  if (selection?.kind === "reservoir") {
+    detailLabel = "Reservoir"
+    detail = reservoir ? (
+      <ReservoirPanel reservoir={reservoir.properties} onClose={close} />
+    ) : (
+      <DetailPlaceholder
+        icon={<ContainerIcon />}
+        title="Reservoir"
+        message={
+          reservoirs.isPending ? undefined : "This reservoir is not in the latest reservoir data."
+        }
+        onClose={close}
+      />
+    )
+  } else if (selection?.kind === "reservoirs") {
+    detailLabel = "Reservoirs spilling or releasing"
+    detail = (
+      <ReservoirListPanel
+        data={reservoirs.data}
+        pending={reservoirs.isPending}
+        stale={statuses[RESERVOIRS]?.stale ?? false}
+        onSelect={openReservoir}
+        onClose={close}
+      />
+    )
+  }
+
   // Legends for the layers that are on (wide screens; phones show them in the layer sheet).
   // Gauge legends are in the sidebar while it is open.
   const legendClass = "w-60"
@@ -729,6 +879,7 @@ export function App() {
         <FloodLegend counts={floodCounts} />
       )}
       {sidebarCollapsed && riversOn && <RiverLegend counts={riverCounts} />}
+      {sidebarCollapsed && reservoirsOn && <ReservoirLegend counts={reservoirCounts} />}
     </>
   )
 
@@ -762,6 +913,13 @@ export function App() {
               <Suspense fallback={null}>
                 <WindLayer field={wind.field} />
               </Suspense>
+            )}
+            {reservoirsOn && (
+              <ReservoirsLayer
+                data={reservoirs.data}
+                areas={reservoirAreas.data}
+                selectedId={selection?.kind === "reservoir" ? selection.id : null}
+              />
             )}
             {riversOn && (
               <RiverLevelsLayer
@@ -824,6 +982,7 @@ export function App() {
             onOpenChange={setSearchOpen}
             onChoose={choose}
             rivers={rivers.data}
+            reservoirs={reservoirs.data}
           />
         </Suspense>
       )}

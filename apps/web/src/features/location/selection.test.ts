@@ -93,3 +93,36 @@ describe("sameSelection", () => {
     expect(sameSelection(null, null)).toBe(true)
   })
 })
+
+describe("reservoir selections", () => {
+  it("reads and writes a reservoir", () => {
+    const selection = parseSelection("?reservoir=minneriya")
+    expect(selection).toEqual({ kind: "reservoir", id: "minneriya" })
+    expect(selectionSearch(selection)).toBe("?reservoir=minneriya")
+  })
+
+  it("reads and writes the list of those spilling or releasing", () => {
+    expect(parseSelection("?reservoirs=active")).toEqual({ kind: "reservoirs" })
+    expect(selectionSearch({ kind: "reservoirs" })).toBe("?reservoirs=active")
+  })
+
+  it("clears the keys it owns when the selection changes", () => {
+    expect(selectionSearch(null, "?reservoir=minneriya&kit")).toBe("?kit=")
+    expect(selectionSearch({ kind: "station", id: "pugoda" }, "?reservoirs=active")).toBe(
+      "?station=pugoda",
+    )
+  })
+
+  it("compares them", () => {
+    expect(sameSelection({ kind: "reservoirs" }, { kind: "reservoirs" })).toBe(true)
+    expect(sameSelection({ kind: "reservoir", id: "a" }, { kind: "reservoir", id: "a" })).toBe(true)
+    expect(sameSelection({ kind: "reservoir", id: "a" }, { kind: "reservoir", id: "b" })).toBe(
+      false,
+    )
+    expect(sameSelection({ kind: "reservoirs" }, { kind: "reservoir", id: "a" })).toBe(false)
+  })
+
+  it("ignores a malformed identifier", () => {
+    expect(parseSelection("?reservoir=%3Cscript%3E")).toBeNull()
+  })
+})

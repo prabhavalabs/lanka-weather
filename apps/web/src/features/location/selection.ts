@@ -6,18 +6,22 @@
  *   (a searched place);
  * - `?region=LK-21`: an administrative region, at its label point;
  * - `?station=peradeniya`: a river gauge;
- * - `?gauge=hybas_4121155030`: a Google flood forecast gauge.
+ * - `?gauge=hybas_4121155030`: a Google flood forecast gauge;
+ * - `?reservoir=minneriya`: a reservoir;
+ * - `?reservoirs=active`: the list of reservoirs spilling or releasing.
  */
 export type Selection =
   | { kind: "point"; lat: number; lon: number; name?: string }
   | { kind: "region"; id: string }
   | { kind: "station"; id: string }
   | { kind: "gauge"; id: string }
+  | { kind: "reservoir"; id: string }
+  | { kind: "reservoirs" }
 
 /** The area the API answers for (`/v1/summary`, `/v1/regions/lookup`). */
 export const pointBounds = { south: 5.5, north: 10.5, west: 79, east: 82.5 }
 
-const selectionKeys = ["at", "name", "region", "station", "gauge"]
+const selectionKeys = ["at", "name", "region", "station", "gauge", "reservoir", "reservoirs"]
 const maxNameLength = 80
 
 /** Coordinates rounded to four decimals (about 11 m), enough for weather and short in URLs. */
@@ -84,6 +88,11 @@ export function parseSelection(search: string): Selection | null {
   const gauge = safeId(params.get("gauge"))
   if (gauge) return { kind: "gauge", id: gauge }
 
+  const reservoir = safeId(params.get("reservoir"))
+  if (reservoir) return { kind: "reservoir", id: reservoir }
+
+  if (params.has("reservoirs")) return { kind: "reservoirs" }
+
   return null
 }
 
@@ -106,6 +115,10 @@ export function selectionSearch(selection: Selection | null, current = ""): stri
     params.set("station", selection.id)
   } else if (selection?.kind === "gauge") {
     params.set("gauge", selection.id)
+  } else if (selection?.kind === "reservoir") {
+    params.set("reservoir", selection.id)
+  } else if (selection?.kind === "reservoirs") {
+    params.set("reservoirs", "active")
   }
   const text = params.toString().replace(/%2C/g, ",")
   return text ? `?${text}` : ""
@@ -122,5 +135,6 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
       a.name === b.name
     )
   }
+  if (a.kind === "reservoirs") return true
   return "id" in a && "id" in b && a.id === b.id
 }

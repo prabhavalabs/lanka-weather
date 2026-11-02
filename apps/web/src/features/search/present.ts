@@ -5,6 +5,9 @@
 import type { SearchResult } from "@/components/weather/types"
 import { levelWords, regionLabel } from "../location/present"
 import type { RegionLevel } from "../location/types"
+import { reservoirStatusLabels } from "../reservoirs/present"
+import type { ReservoirFeature } from "../reservoirs/types"
+import { formatLevel } from "../rivers/present"
 import type { StationFeature } from "../rivers/types"
 import type { PlaceKind, PlaceSearchResult, SearchChoice } from "./types"
 
@@ -116,8 +119,61 @@ export function stationEntries(
         meta:
           station.properties.waterLevel === null
             ? undefined
-            : `${station.properties.waterLevel.toFixed(station.properties.unit === "ft" ? 1 : 2)} ${station.properties.unit}`,
+            : formatLevel(station.properties.waterLevel, station.properties.unit),
         choice: { type: "station", id: station.id, name: station.properties.name, lat, lon },
+      }
+    })
+}
+
+/**
+ * Reservoirs with a name, other spelling, river or district that has a word
+ * starting with the query, or whose name without spaces starts with it. Those
+ * spilling or releasing come first. Includes reservoirs with no position.
+ */
+export function reservoirEntries(
+  reservoirs: ReservoirFeature[],
+  query: string,
+  limit = 5,
+): SearchEntry[] {
+  const folded = query.trim().toLowerCase()
+  if (folded.length < 2) return []
+  const words = (text: string | null | undefined) => (text ?? "").toLowerCase().split(/[^a-z0-9]+/)
+  const compact = folded.replace(/[^a-z0-9]/g, "")
+  const matches = reservoirs.filter(({ properties }) => {
+    const names = [properties.name, properties.osmName, ...(properties.altNames ?? [])]
+    return (
+      [...names, properties.river, properties.district].some((text) =>
+        words(text).some((word) => word.startsWith(folded)),
+      ) ||
+      names.some((name) =>
+        (name ?? "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "")
+          .startsWith(compact),
+      )
+    )
+  })
+  const attention = (status: string) => (status === "spilling" || status === "releasing" ? 0 : 1)
+  return [...matches]
+    .sort((a, b) => attention(a.properties.status) - attention(b.properties.status))
+    .slice(0, limit)
+    .map((reservoir) => {
+      const { id, name, district, storagePercent, storageFresh, status, mapped } =
+        reservoir.properties
+      const [lon, lat] = reservoir.geometry?.coordinates ?? [null, null]
+      return {
+        id: `reservoir:${id}`,
+        kind: "reservoir" as const,
+        title: name,
+        subtitle: [
+          district ? `${district} District` : null,
+          reservoirStatusLabels[status],
+          mapped ? null : "not on the map",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        meta: storagePercent !== null && storageFresh ? `${storagePercent}%` : undefined,
+        choice: { type: "reservoir", id, name, lat, lon },
       }
     })
 }
@@ -139,11 +195,14 @@ export function validRecent(value: unknown): SearchEntry[] {
         item !== null &&
         typeof item.id === "string" &&
         typeof item.title === "string" &&
-        ["place", "station", "area"].includes(item.kind) &&
+        ["place", "station", "reservoir", "area"].includes(item.kind) &&
         typeof item.choice === "object" &&
         item.choice !== null &&
-        Number.isFinite(item.choice.lat) &&
-        Number.isFinite(item.choice.lon),
+        // Only a reservoir may lack a position.
+        ((item.choice.type === "reservoir" &&
+          item.choice.lat === null &&
+          item.choice.lon === null) ||
+          (Number.isFinite(item.choice.lat) && Number.isFinite(item.choice.lon))),
     )
     .slice(0, maxRecent)
 }

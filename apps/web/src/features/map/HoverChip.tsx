@@ -7,9 +7,12 @@ import { FLOOD_GAUGES } from "../floods/FloodForecastLayer"
 import type { FloodSeverity } from "../floods/types"
 import { regionLabel } from "../location/present"
 import type { RegionLevel } from "../location/types"
-import { statusLabels } from "../rivers/present"
+import { formatLevel, statusLabels } from "../rivers/present"
 import { RIVER_STATIONS } from "../rivers/RiverLevelsLayer"
-import type { RiverStatus } from "../rivers/types"
+import type { LevelUnit, RiverStatus } from "../rivers/types"
+import { reservoirStatusLabels } from "../reservoirs/present"
+import { RESERVOIR_AREAS, RESERVOIR_POINTS } from "../reservoirs/ReservoirsLayer"
+import type { ReservoirStatus } from "../reservoirs/types"
 import { regionVariables, type RegionVariable } from "../regions/present"
 import { REGIONS_FILL, REGIONS_SOURCE } from "../regions/RegionsLayer"
 import type { RegionWeather } from "../regions/types"
@@ -82,7 +85,9 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
       const { regions: regionInfo, wind: field } = props.current
       const lines: string[] = []
 
-      const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES].filter((id) => map.getLayer(id))
+      const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES, RESERVOIR_POINTS].filter((id) =>
+        map.getLayer(id),
+      )
       const point = pointLayers.length
         ? map.queryRenderedFeatures(
             [
@@ -92,8 +97,14 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
             { layers: pointLayers },
           )[0]
         : undefined
+      const reservoir: MapGeoJSONFeature | undefined =
+        point?.layer.id === RESERVOIR_POINTS
+          ? point
+          : !point && map.getLayer(RESERVOIR_AREAS)
+            ? map.queryRenderedFeatures(event.point, { layers: [RESERVOIR_AREAS] })[0]
+            : undefined
       const region: MapGeoJSONFeature | undefined =
-        !point && map.getLayer(REGIONS_FILL)
+        !point && !reservoir && map.getLayer(REGIONS_FILL)
           ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
           : undefined
 
@@ -102,7 +113,7 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
           ? { sourceLayer: region.sourceLayer, id: region.id }
           : null,
       )
-      map.getCanvas().style.cursor = point || region ? "pointer" : ""
+      map.getCanvas().style.cursor = point || reservoir || region ? "pointer" : ""
 
       let title = ""
       let local: string | undefined
@@ -112,8 +123,14 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
         const level = point.properties.waterLevel
         lines.push(
           `${statusLabels[status] ?? "River gauge"}` +
-            (typeof level === "number" ? ` · ${level.toFixed(2)} ${point.properties.unit}` : ""),
+            (typeof level === "number"
+              ? ` · ${formatLevel(level, point.properties.unit as LevelUnit)}`
+              : ""),
         )
+      } else if (reservoir) {
+        title = String(reservoir.properties.name ?? "Reservoir")
+        const status = reservoir.properties.status as ReservoirStatus
+        lines.push(`Reservoir: ${(reservoirStatusLabels[status] ?? "No data").toLowerCase()}`)
       } else if (point?.layer.id === FLOOD_GAUGES) {
         title = gaugeName({
           gaugeId: String(point.properties.gaugeId),
