@@ -49,9 +49,19 @@ Status values: **planned** (not yet implemented), **active**,
 | OpenStreetMap via the Overpass API (`osm-places`) | About 7,000 named places (`place` = city, town, suburb, village, quarter, neighbourhood, hamlet, locality, isolated_dwelling) with Sinhala and Tamil names where tagged, for place search | One Overpass query a week (bounding box 79.5–81.95°E, 5.85–9.9°N, about 1.6 MB), `overpass-api.de` then `overpass.kumi.systems`; the instances ask for under 10,000 queries and 1 GB a day | ODbL. Attribute "© OpenStreetMap contributors"; a derived database made public must be offered under the ODbL | active |
 | GeoNames LK dump | About 17,800 populated places, alternate names with language codes | `download.geonames.org/export/dump/LK.zip` | CC BY 4.0 | evaluating (more villages than OpenStreetMap, but no town and village classes and few populations; see ADR 0006) |
 | `prabhavalabs/lanka-data-layer` | Admin hierarchy, postal codes, census, electoral data; foundry builds SQLite and PMTiles | npm packages `@lanka-data-layer/*`; foundry run offline | MIT; OSM-derived parts ODbL | planned |
-| `nuuuwan/lk_rivers` (HydroRIVERS) | River network lines | Raw GeoJSON | HydroSHEDS licence; attribution required | planned |
+| HydroRIVERS, through `nuuuwan/lk_rivers` (`hydrosheds-hydrorivers`) | 5,699 river segments with flow topology (`NEXT_DOWN`), upstream area and sub-basin, and `lk_rivers`' table of river names | `data/sri_lanka_rivers.geojson` (3.5 MB) and `data/static/riv_id_to_name.json` from raw.githubusercontent.com at the commit the GitHub API reports for each; checked weekly, fetched only when one changes (ADR 0010) | HydroSHEDS licence: free with attribution. Attribute "HydroRIVERS (Lehner & Grill 2013, HydroSHEDS)"; `lk_rivers`' code is MIT | active |
+| HydroBASINS level 12 (`hydrosheds-hydrobasins`) | 501 sub-basins of Sri Lanka with `NEXT_DOWN`, for the flood layer's finer boundaries | `data.hydrosheds.org/file/hydrobasins/standard/hybas_as_lev12_v1c.zip` (80 MB shapefile for Asia), streamed to a temporary file with a limit and clipped; checked monthly by its size, since the host's `Last-Modified` moves with no change to the file (ADR 0010) | HydroSHEDS licence: free with attribution. Attribute "HydroBASINS (Lehner & Grill 2013, HydroSHEDS)" | active |
+| Irrigation Department: `river_basins` (`irrigation-river-basins`) | The official river basins: 103 named, plus coastal areas, 204 after cleaning | Public ArcGIS FeatureServer of the organisation `J7ZFXmR8rSmQ3FGf`, as for gauges; checked weekly by `lastEditDate` (ADR 0010) | No licence or terms published, restrictive or otherwise. Government data; attribute the department | active |
+| Irrigation Department: `Srilanka_River`, `hydrostations` (`irrigation-river-basins`) | Names only: 1,030 named stream polygons (1985 survey), and the tributary each station stands on | As above, loaded with the basins | As above | active |
+| Irrigation Department: `rivers` | 3,379 polylines named with the numbers 1 to 3,379, no topology | As above | As above | rejected (HydroRIVERS has names and topology; ADR 0010) |
 | OpenFreeMap | Vector basemap | Style URLs, keyless | OpenStreetMap data, ODbL; attribution required | planned |
 | Natural Earth (1:10m Admin 0) | Sri Lanka's coastline, simplified to 0.01° and embedded in `internal/grid` to mask the weather grid | Downloaded once; not fetched at run time | Public domain | active |
+
+## Past events
+
+| Source | Data | Access | Licence / terms | Status |
+|---|---|---|---|---|
+| Irrigation Department: `Flood_Map`, `Flood__Nov2025`, `Puttalam_Flood__Detwah_30Nov2025` (`irrigation-past-floods`) | 25 mapped extents of past floods, 1989 to 2025, with event name and year. Past events, not forecasts | Public ArcGIS FeatureServers of the organisation `J7ZFXmR8rSmQ3FGf`, in EPSG:5234 or 3857, queried in EPSG:4326. Layers found by their `Flooding_area` value, not by id. Checked monthly by `lastEditDate` (ADR 0010) | No licence or terms published, restrictive or otherwise. Government data; attribute the department | active |
 
 ## Public reports and social signals
 
