@@ -14,19 +14,21 @@ Status values: **planned** (not yet implemented), **active**,
 | Irrigation Department, Hydrology and Disaster Management Division (`irrigation-gauges`) | River water levels and gauge rainfall at 40 gauging stations, with alert, minor-flood and major-flood thresholds and positions | Public ArcGIS FeatureServer used by the department's gauge dashboard (`services3.arcgis.com/J7ZFXmR8rSmQ3FGf/arcgis/rest/services/gauges_2_view/FeatureServer/0/query`); polled every 15 min (ADR 0004) | About hourly per station | Government data, no licence stated; attribute the department | active |
 | `nuuuwan/lk_irrigation` | Scraped copy of the above, with station, river and basin metadata and history since 2025 | Raw JSON on GitHub (`data/alert_data.json`, `data/static/*.json`) | 30 min | Code MIT; data as upstream | evaluating (history before our first fetch) |
 | `nuuuwan/lk_dmc_vis` | DMC three-hourly water-level bulletins parsed to JSON; station thresholds and coordinates | Raw JSON on GitHub (`data/static/gauging_stations.json`) | 15 min poll | Code MIT; data as upstream | planned (thresholds) |
-| Google Flood Forecasting API | Gauge forecasts, flood status, flash floods, inundation polygons | REST, `floodforecasting.googleapis.com`; API key and acceptance of Google's terms | Daily model runs | Google terms; do not store gauge search results for more than one day | evaluating |
+| Google Flood Forecasting API (`google-flood-forecasting`) | Latest flood status, trend and forecast window at gauges in Sri Lanka (`regionCode` LK; 10 quality-verified HYBAS gauges), gauge thresholds, and the flash floods, significant events and inundation polygons affecting Sri Lanka | REST, `floodforecasting.googleapis.com`: `floodStatus:searchLatestFloodStatusByArea`, `gaugeModels:batchGet`, `flashFloods:search`, `significantEvents:search`, `serializedPolygons/{id}`. Key `LANKAWEATHER_GOOGLE_API_KEY`, sent only in the `X-Goog-Api-Key` header. Polled hourly, about five requests a run (ADR 0007) | Daily model runs; flash floods a few times a day | Google's terms: gauge search results are kept no more than one day (rows older than 24 h are neither served nor stored). Attribute "Google Flood Hub (Flood Forecasting API)" | active |
 | Reservoir and tank levels (Irrigation Department, Mahaweli Authority) | Storage and spill status of major reservoirs | No machine-readable feed found yet | Daily bulletins | Unknown | evaluating |
 
 ## Weather
 
 | Source | Data | Access | Cadence | Licence / terms | Status |
 |---|---|---|---|---|---|
-| NOAA GFS (NOAA Open Data on AWS) | 10 m wind (U/V), precipitation, temperature forecasts | GRIB2 by byte range using the `.idx` inventory | 4 runs a day, 3-hourly steps to 120 h | US government work, public domain | planned |
+| NOAA GFS (`noaa-gfs`, NOAA Open Data on AWS) | 10 m wind (U/V) on the 0.25° grid, cropped to 70–92° E, 2° S–18° N, every 3 h to 72 h, for the animated wind layer | GRIB2 by HTTP byte range using the `.idx` inventory (`noaa-gfs-bdp-pds.s3.amazonaws.com`); about 1.9 MB per forecast hour, 47 MB per run. Checked every 30 min (ADR 0007) | 4 runs a day | US government work, public domain; credit "NOAA GFS" | active |
 | Department of Meteorology | Daily rainfall and temperature per station; forecasts; warnings | Website and bulletins; no public API found | Daily, plus ad hoc warnings | Government data; attribute the department | evaluating |
 | `nuuuwan/weather_lk` | Parsed Met Department daily station data | Raw JSON (`data/latest_flat.json`). Do not clone: the repository is about 50 GB | 6 h | Code MIT; data as upstream | planned |
 | `nuuuwan/lk_weather_3h` | Met Department three-hourly observations at 24 stations | Raw JSON (`data/alert_data.json`) | 15 min | Code MIT; data as upstream | planned |
 | NASA GIBS | IMERG precipitation, infrared cloud imagery | WMTS raster tiles, loaded by the browser | 30 min to 3 h; IMERG early run lags 4 to 7 h | NASA open data; attribution requested | planned |
-| OpenWeather / Open-Meteo | Current conditions and point forecasts | REST with API key (OpenWeather) or keyless (Open-Meteo) | Hourly | Provider terms; check commercial-use limits | evaluating |
+| Open-Meteo (`open-meteo`) | Current conditions and an hourly forecast (9 days) at the 214 nodes of the 0.2° weather grid; the daily summary is derived from the hours | Keyless REST, `api.open-meteo.com/v1/forecast`, 50 coordinates per request, `best_match` models. Current conditions hourly (10 variables), forecast every 3 h (12 variables): about 7,190 of the free tier's 10,000 weighted calls a day (ADR 0007) | Model runs every 1 to 6 h | Free tier for non-commercial use only: under 10,000 calls a day, 5,000 an hour, 600 a minute, per IP address. Data under CC BY 4.0; show "Weather data by Open-Meteo.com" with a link next to the data | active |
+| OpenWeather | Current conditions and point forecasts | REST with API key | Hourly | Provider terms; check commercial-use limits | evaluating |
+| Google Weather API | Current conditions and forecasts | REST, Google Cloud key | Hourly | Google terms | evaluating: the API is disabled on the project's key (403). An optional source behind configuration, off until the API is enabled, may be added |
 
 ## Hazards and warnings
 
@@ -46,6 +48,7 @@ Status values: **planned** (not yet implemented), **active**,
 | `prabhavalabs/lanka-data-layer` | Admin hierarchy, postal codes, census, electoral data; foundry builds SQLite and PMTiles | npm packages `@lanka-data-layer/*`; foundry run offline | MIT; OSM-derived parts ODbL | planned |
 | `nuuuwan/lk_rivers` (HydroRIVERS) | River network lines | Raw GeoJSON | HydroSHEDS licence; attribution required | planned |
 | OpenFreeMap | Vector basemap | Style URLs, keyless | OpenStreetMap data, ODbL; attribution required | planned |
+| Natural Earth (1:10m Admin 0) | Sri Lanka's coastline, simplified to 0.01° and embedded in `internal/grid` to mask the weather grid | Downloaded once; not fetched at run time | Public domain | active |
 
 ## Public reports and social signals
 
