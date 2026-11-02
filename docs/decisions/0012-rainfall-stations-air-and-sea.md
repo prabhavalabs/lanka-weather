@@ -75,7 +75,8 @@ earlier records leave open:
 - **Positions:** the geocoded `flat_places.json` holds names at (0, 0), and
   many at the geocoder's answer for "Sri Lanka" (7.873, 80.772). So the 24
   synoptic stations use a table in code: 21 from NOAA's ISD station history,
-  matched on the WMO number, and 3 with local numbers checked by hand. All
+  matched on the WMO number, and 3 with local numbers (Mattala, Polonnaruwa,
+  Moneragala) from the list, each within 2.1 km of OpenStreetMap's place. All
   24 lie within 7 km of their geocoded towns. Rain-only stations use the list
   with those positions removed, and the panel calls them approximate. Stations
   with no usable position are not stored; the collector logs their names.

@@ -97,7 +97,7 @@ func TestThreeHourlyKeepsOnlyRecentAndDropsImpossibleValues(t *testing.T) {
 }
 
 func TestDecodeDailyReadsARangeRequestsTail(t *testing.T) {
-	decoded, err := DecodeDaily(read(t, "daily_tail.json"), time.Time{})
+	decoded, err := DecodeDaily(read(t, "daily_tail.txt"), time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}

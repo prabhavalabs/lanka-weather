@@ -24,9 +24,10 @@ const (
 	// (ncei.noaa.gov/pub/data/noaa/isd-history.txt), read 2026-11-02, public
 	// domain, matched on the WMO number the 3-hourly source publishes.
 	PositionISD = "noaa-isd"
-	// PositionTable is a town position checked by hand, for stations that have
-	// no WMO number in the ISD list.
-	PositionTable = "hand-checked"
+	// PositionTable is a town position from the geocoded list, checked against
+	// OpenStreetMap's place of that name (all within 2.1 km on 2026-11-02), for
+	// stations that have no WMO number in the ISD list.
+	PositionTable = "osm-checked"
 	// PositionGeocoded is the 3-hourly source's sister list, geocoded by name;
 	// used for rain-only stations and shown as approximate.
 	PositionGeocoded = "nuuuwan-weather-lk-places"
@@ -38,8 +39,8 @@ func metres(value float64) *float64 { return &value }
 // 24 report temperature in the daily report as well. Their numbers are the
 // "Station ID" column of the source's README. Positions are never taken from
 // the source's geocoded list for these, because it holds errors (see
-// DecodePlaces); the position of each was compared with that list by hand and
-// they agree within 7 km.
+// DecodePlaces); each position was compared with that list and they agree
+// within 7 km, which a test holds.
 var knownStations = []Station{
 	{ID: "jaffna", Name: "Jaffna", WMOID: "43404", Lat: 9.650, Lon: 80.017, ElevationM: metres(3), PositionSource: PositionISD},
 	{ID: "mullaitivu", Name: "Mullaitivu", WMOID: "43410", Lat: 9.267, Lon: 80.817, ElevationM: metres(2), PositionSource: PositionISD},
@@ -62,8 +63,7 @@ var knownStations = []Station{
 	{ID: "ratnapura", Name: "Ratnapura", WMOID: "43486", Lat: 6.683, Lon: 80.400, ElevationM: metres(88), PositionSource: PositionISD},
 	{ID: "galle", Name: "Galle", WMOID: "43495", Lat: 6.033, Lon: 80.217, ElevationM: metres(13), PositionSource: PositionISD},
 	{ID: "hambantota", Name: "Hambantota", WMOID: "43497", Lat: 6.117, Lon: 81.133, ElevationM: metres(20), PositionSource: PositionISD},
-	// Local station numbers, not in the ISD list. Town positions from the
-	// source's geocoded list, each looked at on a map.
+	// Local station numbers, not in the ISD list; see PositionTable.
 	{ID: "mattala", Name: "Mattala", WMOID: "", Lat: 6.305, Lon: 81.114, PositionSource: PositionTable},
 	{ID: "polonnaruwa", Name: "Polonnaruwa", WMOID: "", Lat: 7.940, Lon: 81.019, PositionSource: PositionTable},
 	{ID: "moneragala", Name: "Moneragala", WMOID: "", Lat: 6.891, Lon: 81.345, PositionSource: PositionTable},

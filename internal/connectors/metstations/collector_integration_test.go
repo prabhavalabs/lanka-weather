@@ -43,7 +43,7 @@ func (fake *replay) Do(_ context.Context, request source.Request) (source.Respon
 		}
 		return source.Response{Status: 200, Header: http.Header{"Etag": {`"v1"`}}, Body: recorded(fake.t, "alert_data_3h.json")}, nil
 	case metstations.EndpointDaily:
-		return source.Response{Status: http.StatusPartialContent, Body: recorded(fake.t, "daily_tail.json")}, nil
+		return source.Response{Status: http.StatusPartialContent, Body: recorded(fake.t, "daily_tail.txt")}, nil
 	case metstations.EndpointPlaces:
 		return source.Response{Status: 200, Body: recorded(fake.t, "places.json")}, nil
 	}
