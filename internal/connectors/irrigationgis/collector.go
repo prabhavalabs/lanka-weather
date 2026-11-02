@@ -23,10 +23,12 @@ import (
 const DefaultBase = "https://services3.arcgis.com/J7ZFXmR8rSmQ3FGf/arcgis/rest/services"
 
 const (
-	pageSize  = 2000
-	maxPages  = 40 // the Puttalam map is 16 pages
-	maxBytes  = 256 << 20
-	fetchWait = 3 * time.Minute
+	pageSize = 2000
+	// extentOffset is the generalisation of flood extents, in degrees.
+	extentOffset = 0.00005
+	maxPages     = 40 // the Puttalam map is 16 pages
+	maxBytes     = 256 << 20
+	fetchWait    = 3 * time.Minute
 	// Guards against a truncated or emptied service replacing good data.
 	minimumBasins    = 80
 	minimumEvents    = 15
@@ -66,12 +68,28 @@ func (r reader) get(ctx context.Context, address string, query url.Values) ([]by
 // features pages through a layer in WGS 84, whatever the layer's own spatial
 // reference (several use EPSG:5234).
 func (r reader) features(ctx context.Context, service string, layer int, fields string, geometry bool) ([]Feature, error) {
+	return r.pages(ctx, service, layer, fields, geometry, pageSize, 0)
+}
+
+// extents pages through flood extents, generalised to about 5 m: raster
+// polygons carry far more vertices than a map can show. A layer of very large
+// features is asked for a few at a time, or the service times out.
+func (r reader) extents(ctx context.Context, service string, layer int, fields string, records int) ([]Feature, error) {
+	return r.pages(ctx, service, layer, fields, true, records, extentOffset)
+}
+
+func (r reader) pages(ctx context.Context, service string, layer int, fields string, geometry bool, records int, offset float64) ([]Feature, error) {
 	var all []Feature
 	for page := range maxPages {
-		payload, err := r.get(ctx, r.url(service, layer, "/query"), url.Values{
+		query := url.Values{
 			"where": {"1=1"}, "outFields": {fields}, "outSR": {"4326"}, "returnGeometry": {strconv.FormatBool(geometry)},
-			"resultOffset": {strconv.Itoa(page * pageSize)}, "resultRecordCount": {strconv.Itoa(pageSize)},
-		})
+			"resultOffset": {strconv.Itoa(page * records)}, "resultRecordCount": {strconv.Itoa(records)},
+		}
+		if offset > 0 {
+			query.Set("maxAllowableOffset", strconv.FormatFloat(offset, 'f', -1, 64))
+			query.Set("geometryPrecision", "6")
+		}
+		payload, err := r.get(ctx, r.url(service, layer, "/query"), query)
 		if err != nil {
 			return nil, fmt.Errorf("%s/%d page %d: %w", service, layer, page, err)
 		}
@@ -333,7 +351,7 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 	}
 	var skipped []string
 	for _, layer := range inundation {
-		features, err := r.features(ctx, floodMapService, layer.ID, "Flooding_area", true)
+		features, err := r.extents(ctx, floodMapService, layer.ID, "Flooding_area", pageSize)
 		if err != nil {
 			return 0, err
 		}
@@ -347,7 +365,8 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 			add(event, feature.Shape())
 		}
 	}
-	features, err := r.features(ctx, novemberService, 0, "RiverBasin", true)
+	// Each of its seven features is several megabytes.
+	features, err := r.extents(ctx, novemberService, 0, "RiverBasin", 1)
 	if err != nil {
 		return 0, err
 	}
@@ -366,7 +385,7 @@ func (collector *PastFloodsCollector) Collect(ctx context.Context, now time.Time
 		}
 		add(event, feature.Shape())
 	}
-	cells, err := r.features(ctx, puttalamService, 0, "FID", true)
+	cells, err := r.extents(ctx, puttalamService, 0, "FID", pageSize)
 	if err != nil {
 		return 0, err
 	}

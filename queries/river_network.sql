@@ -106,6 +106,9 @@ DELETE FROM river_gauge_matches;
 -- name: DeleteGoogleGaugeMatchesBefore :exec
 DELETE FROM river_gauge_matches WHERE kind = 'google' AND matched_at < $1;
 
+-- name: TouchGoogleGaugeMatches :exec
+UPDATE river_gauge_matches SET matched_at = $1 WHERE kind = 'google';
+
 -- name: ClearSegmentAssignments :exec
 UPDATE river_segments SET river_id = NULL, reach_fid = NULL
 WHERE river_id IS NOT NULL OR reach_fid IS NOT NULL;

@@ -1073,3 +1073,12 @@ func (q *Queries) SystemBasinVotes(ctx context.Context) ([]SystemBasinVotesRow, 
 	}
 	return items, nil
 }
+
+const touchGoogleGaugeMatches = `-- name: TouchGoogleGaugeMatches :exec
+UPDATE river_gauge_matches SET matched_at = $1 WHERE kind = 'google'
+`
+
+func (q *Queries) TouchGoogleGaugeMatches(ctx context.Context, matchedAt time.Time) error {
+	_, err := q.db.Exec(ctx, touchGoogleGaugeMatches, matchedAt)
+	return err
+}

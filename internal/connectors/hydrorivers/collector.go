@@ -15,8 +15,8 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/store"
 )
 
-// Where the data lives. Both files are read at the commit that last changed
-// the river file, so one load never mixes versions.
+// Where the data lives. Each file is read at the commit that last changed it,
+// and the version names both, so a load is reproducible.
 const (
 	Repository     = "nuuuwan/lk_rivers"
 	riversPath     = "data/sri_lanka_rivers.geojson"
@@ -53,16 +53,21 @@ func (collector *Collector) RetryAfter() time.Duration { return 6 * time.Hour }
 // Collect loads the segments and names when a newer commit exists and returns
 // the number of segments stored.
 func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, error) {
-	commit, err := collector.latestCommit(ctx)
+	commit, err := collector.latestCommit(ctx, riversPath)
 	if err != nil {
 		return 0, fmt.Errorf("river version: %w", err)
 	}
+	namesCommit, err := collector.latestCommit(ctx, namesPath)
+	if err != nil {
+		return 0, fmt.Errorf("river names version: %w", err)
+	}
+	version := commit.SHA + "-" + namesCommit.SHA
 	queries := store.New(collector.Pool)
 	stored, err := queries.GetSourceVersion(ctx, SourceName)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return 0, fmt.Errorf("read river version: %w", err)
 	}
-	if err == nil && stored.Version == commit.SHA {
+	if err == nil && stored.Version == version {
 		if count, err := queries.CountRiverSegments(ctx); err == nil && count > 0 {
 			return 0, nil
 		}
@@ -78,7 +83,7 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 	if minimum := collector.minimum(); len(segments) < minimum {
 		return 0, fmt.Errorf("river file has %d segments, want at least %d", len(segments), minimum)
 	}
-	payload, err = collector.raw(ctx, commit.SHA, namesPath)
+	payload, err = collector.raw(ctx, namesCommit.SHA, namesPath)
 	if err != nil {
 		return 0, fmt.Errorf("fetch river names: %w", err)
 	}
@@ -86,6 +91,10 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 	if err != nil {
 		return 0, err
 	}
+	if namesCommit.Time.After(commit.Time) {
+		commit.Time = namesCommit.Time
+	}
+	commit.SHA = version
 	if err := collector.save(ctx, segments, names, commit, now); err != nil {
 		return 0, err
 	}
@@ -99,14 +108,14 @@ func (collector *Collector) minimum() int {
 	return MinimumSegments
 }
 
-func (collector *Collector) latestCommit(ctx context.Context) (adminregions.Commit, error) {
+func (collector *Collector) latestCommit(ctx context.Context, path string) (adminregions.Commit, error) {
 	base := collector.APIBase
 	if base == "" {
 		base = defaultAPIBase
 	}
 	payload, err := collector.Fetcher.Fetch(ctx, source.Request{
 		URL:    base + "/repos/" + Repository + "/commits",
-		Query:  url.Values{"path": {riversPath}, "per_page": {"1"}},
+		Query:  url.Values{"path": {path}, "per_page": {"1"}},
 		Accept: "application/vnd.github+json",
 	})
 	if err != nil {
