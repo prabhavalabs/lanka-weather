@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+type AdminRegion struct {
+	ID         string  `json:"id"`
+	Level      string  `json:"level"`
+	Name       string  `json:"name"`
+	ParentID   *string `json:"parent_id"`
+	ProvinceID string  `json:"province_id"`
+	DistrictID *string `json:"district_id"`
+	DsID       *string `json:"ds_id"`
+	AreaKm2    float64 `json:"area_km2"`
+	LabelPoint []byte  `json:"label_point"`
+	Geom       []byte  `json:"geom"`
+}
+
 type FloodArea struct {
 	ID         string     `json:"id"`
 	Kind       string     `json:"kind"`
