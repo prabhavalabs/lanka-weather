@@ -2,15 +2,19 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 )
 
 // Envelope is the shape of every JSON response.
@@ -25,28 +29,66 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Rivers serves the river-levels layer.
+type Rivers interface {
+	Layer(ctx context.Context) (rivers.FeatureCollection, error)
+	StationHistory(ctx context.Context, id string, period time.Duration) (rivers.History, error)
+}
+
+// Dependencies are the services the API reads from.
+type Dependencies struct {
+	Logger *slog.Logger
+	Rivers Rivers
+	// Ready reports whether the service can serve requests (database reachable).
+	Ready func(ctx context.Context) error
+}
+
+const (
+	defaultHistoryHours = 72
+	maxHistoryHours     = 30 * 24
+)
+
 // NewRouter returns the API's HTTP handler.
-func NewRouter(logger *slog.Logger) http.Handler {
+func NewRouter(deps Dependencies) http.Handler {
+	api := &api{deps: deps}
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(requestLogger(logger))
+	r.Use(requestLogger(deps.Logger))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, Envelope{Data: map[string]string{"status": "ok"}})
 	})
+	r.Get("/readyz", api.ready)
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/layers", listLayers)
 		r.Get("/layers/{id}", getLayer)
+		r.Get("/rivers/levels", api.riverLevels)
+		r.Get("/rivers/stations/{id}/readings", api.stationReadings)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "resource not found")
 	})
 	return r
+}
+
+type api struct {
+	deps Dependencies
+}
+
+func (api *api) ready(w http.ResponseWriter, r *http.Request) {
+	if api.deps.Ready != nil {
+		if err := api.deps.Ready(r.Context()); err != nil {
+			api.deps.Logger.Warn("not ready", "error", err)
+			writeError(w, http.StatusServiceUnavailable, "not_ready", "service is not ready")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, Envelope{Data: map[string]string{"status": "ready"}})
 }
 
 func listLayers(w http.ResponseWriter, _ *http.Request) {
@@ -62,6 +104,57 @@ func getLayer(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	writeJSON(w, http.StatusOK, Envelope{Data: layer})
+}
+
+// riverLevels returns the river-levels layer as a GeoJSON feature collection.
+// It is returned bare, not in the envelope, so map libraries can load it
+// directly; errors still use the envelope.
+func (api *api) riverLevels(w http.ResponseWriter, r *http.Request) {
+	if api.deps.Rivers == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "river levels are not configured")
+		return
+	}
+	collection, err := api.deps.Rivers.Layer(r.Context())
+	if err != nil {
+		api.internalError(w, "river levels", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/geo+json; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(collection)
+}
+
+func (api *api) stationReadings(w http.ResponseWriter, r *http.Request) {
+	if api.deps.Rivers == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "river levels are not configured")
+		return
+	}
+	hours := defaultHistoryHours
+	if raw := r.URL.Query().Get("hours"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > maxHistoryHours {
+			writeError(w, http.StatusBadRequest, "invalid_hours", "hours must be a whole number from 1 to 720")
+			return
+		}
+		hours = parsed
+	}
+	history, err := api.deps.Rivers.StationHistory(r.Context(), chi.URLParam(r, "id"), time.Duration(hours)*time.Hour)
+	if errors.Is(err, rivers.ErrStationNotFound) {
+		writeError(w, http.StatusNotFound, "station_not_found", "unknown station")
+		return
+	}
+	if err != nil {
+		api.internalError(w, "station readings", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	writeJSON(w, http.StatusOK, Envelope{Data: history})
+}
+
+func (api *api) internalError(w http.ResponseWriter, what string, err error) {
+	api.deps.Logger.Error("request failed", "what", what, "error", err)
+	writeError(w, http.StatusInternalServerError, "internal", "the request could not be completed")
 }
 
 func writeJSON(w http.ResponseWriter, status int, body Envelope) {
