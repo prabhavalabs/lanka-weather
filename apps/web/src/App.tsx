@@ -65,6 +65,9 @@ import { useRiverLevels } from "./features/rivers/queries"
 import { RiverLegend } from "./features/rivers/RiverLegend"
 import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsLayer"
 import { StationPanel } from "./features/rivers/StationPanel"
+import { MetStationPanel } from "./features/stations/MetStationPanel"
+import { observedChip, observedPointLayers, observedTarget } from "./features/observed/points"
+import { useObservedLayers, WEATHER_STATIONS } from "./features/observed/useObservedLayers"
 import { placeZoom } from "./features/search/present"
 import type { SearchChoice } from "./features/search/types"
 import { countValues } from "./features/weather-grid/field"
@@ -149,9 +152,20 @@ export function App() {
   const windOn = on(WIND)
   const regionsOn = on(ADMIN_REGIONS)
 
+  const observedLayers = useObservedLayers({
+    available,
+    enabled,
+    selectedMetId: selection?.kind === "met" ? selection.id : null,
+    theme,
+    onShowModelRain: () => {
+      setGridVariable("precipitation")
+      setEnabled((current) => (current.includes(TEMPERATURE) ? current : [...current, TEMPERATURE]))
+    },
+  })
+
   // Region colours give way to the weather field, which shows the same weather in more detail.
   const fillVariable: RegionVariable | null =
-    regionsOn && regionFill !== "none" && !gridOn ? regionFill : null
+    regionsOn && regionFill !== "none" && !gridOn && !observedLayers.airOn ? regionFill : null
 
   const rivers = useRiverLevels(
     riverLayer,
@@ -198,6 +212,8 @@ export function App() {
     selection?.kind === "gauge"
       ? floods.data?.features.filter(isGauge).find((feature) => feature.id === selection.id)
       : undefined
+  const metStation =
+    selection?.kind === "met" ? observedLayers.stationFeature(selection.id) : undefined
 
   const enable = useCallback(
     (id: string) => setEnabled((current) => (current.includes(id) ? current : [...current, id])),
@@ -208,6 +224,7 @@ export function App() {
     const turningOn = !enabled.includes(id)
     if (!turningOn && id === RIVER_LEVELS && selection?.kind === "station") setSelection(null)
     if (!turningOn && id === FLOOD_FORECAST && selection?.kind === "gauge") setSelection(null)
+    if (!turningOn && id === WEATHER_STATIONS && selection?.kind === "met") setSelection(null)
     setEnabled((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     )
@@ -282,13 +299,16 @@ export function App() {
     } else if (selection.kind === "gauge") {
       if (!gauge) return
       lngLat = gauge.geometry.coordinates
+    } else if (selection.kind === "met") {
+      if (!metStation) return
+      lngLat = metStation.geometry.coordinates
     }
     pending.current = null
     if (!lngLat) return
     if (move.target === "fit" && bbox) fitBox(bbox)
     else if (move.target === "fit" || move.target === "zoom") reveal(lngLat, { zoom: 10 })
     else reveal(lngLat)
-  }, [map, selection, regionDetail.data, station, gauge, reveal, fitBox])
+  }, [map, selection, regionDetail.data, station, gauge, metStation, reveal, fitBox])
 
   const openStation = useCallback(
     (id: string) => {
@@ -309,6 +329,16 @@ export function App() {
     [enable, pendingCamera, setSelection],
   )
 
+  const openMetStation = useCallback(
+    (id: string) => {
+      enable(WEATHER_STATIONS)
+      const next: Selection = { kind: "met", id }
+      pendingCamera(next, "reveal")
+      setSelection(next)
+    },
+    [enable, pendingCamera, setSelection],
+  )
+
   // Clicks: a gauge, else a region (weather at its label point), else the point itself.
   useMapClick(map, (event: MapMouseEvent) => {
     if (!map) return
@@ -317,10 +347,16 @@ export function App() {
       [x - pointSlack, y - pointSlack],
       [x + pointSlack, y + pointSlack],
     ]
-    const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES].filter((id) => map.getLayer(id))
+    const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES, ...observedPointLayers].filter((id) =>
+      map.getLayer(id),
+    )
     const hit = pointLayers.length
       ? map.queryRenderedFeatures(box, { layers: pointLayers })[0]
       : null
+    const observed = hit ? observedTarget(hit) : null
+    if (observed) {
+      return observed.kind === "met" ? openMetStation(observed.id) : openStation(observed.id)
+    }
     if (hit?.layer.id === RIVER_STATIONS) return openStation(String(hit.properties.id))
     if (hit?.layer.id === FLOOD_GAUGES) return openGauge(String(hit.properties.gaugeId))
 
@@ -406,8 +442,8 @@ export function App() {
   const close = useCallback(() => setSelection(null), [setSelection])
 
   // Layer list: one-line status, details under layers that are on, stale marks.
-  const statuses: Record<string, LayerStatus> = {}
-  const details: Record<string, ReactNode> = {}
+  const statuses: Record<string, LayerStatus> = { ...observedLayers.statuses }
+  const details: Record<string, ReactNode> = { ...observedLayers.details }
 
   const riverCounts = rivers.data
     ? countByStatus(rivers.data.features.map((feature) => feature.properties))
@@ -636,6 +672,7 @@ export function App() {
     gridOn && isNotReady(grid.error),
     windOn && isNotReady(wind.query.error),
     regionsOn && isNotReady(level === "gn" ? gnWeather.error : levelWeather.error),
+    observedLayers.waiting,
   ].some(Boolean)
   let notice: ReactNode = null
   if (regionsOn && zoom < levelMinZoom[level] && map) {
@@ -680,6 +717,7 @@ export function App() {
           onClose={close}
           onSelectStation={openStation}
           onSelectGauge={openGauge}
+          onSelectMetStation={openMetStation}
         />
       </Suspense>
     )
@@ -697,6 +735,9 @@ export function App() {
         onClose={close}
       />
     )
+  } else if (selection?.kind === "met") {
+    detailLabel = "Weather station"
+    detail = <MetStationPanel id={selection.id} onClose={close} />
   } else if (selection?.kind === "gauge") {
     detailLabel = "Flood forecast gauge"
     const areas = (floods.data?.features ?? []).filter(
@@ -721,6 +762,7 @@ export function App() {
   const legends = (
     <>
       {windTimeline}
+      {observedLayers.legends}
       {gridOn && <GridLegend variable={gridVariable} className={legendClass} />}
       {fillVariable && (
         <RegionLegend variable={fillVariable} level={level} className={legendClass} />
@@ -742,6 +784,7 @@ export function App() {
         map={
           <MapView theme={theme} onReady={setMap}>
             {gridOn && <GridLayer grid={grid.data} variable={gridVariable} />}
+            {observedLayers.mapLayers}
             {regionsOn && regionsLayer && (
               <RegionsLayer
                 layer={regionsLayer}
@@ -775,6 +818,11 @@ export function App() {
             <HoverChip
               regions={regionsOn ? { variable: fillVariable, lookup: regionLookup } : null}
               wind={windOn ? wind.field : null}
+              extra={{
+                layers: observedPointLayers,
+                describe: observedChip,
+                lineAt: observedLayers.lineAt,
+              }}
             />
           </MapView>
         }
@@ -815,7 +863,21 @@ export function App() {
         detailLabel={detailLabel}
         onDetailClose={close}
         legends={legends}
-        timeline={windTimeline}
+        timeline={
+          windTimeline && observedLayers.rainTimeline ? (
+            <div className="flex w-full flex-col items-center gap-2">
+              {observedLayers.rainTimeline}
+              {windTimeline}
+            </div>
+          ) : (
+            windTimeline || observedLayers.rainTimeline
+          )
+        }
+        className={
+          windTimeline && observedLayers.rainTimeline
+            ? "max-md:[--map-controls-bottom:17rem]"
+            : undefined
+        }
       />
       {searchLoaded && (
         <Suspense fallback={null}>

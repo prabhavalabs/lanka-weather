@@ -21,6 +21,12 @@ interface HoverChipProps {
   regions?: { variable: RegionVariable | null; lookup: Map<string, RegionWeather> } | null
   /** The wind field on the map, read under the pointer. */
   wind?: WindField | null
+  /** More layers' points, and lines read from their grids at a place. */
+  extra?: {
+    layers: string[]
+    describe: (point: MapGeoJSONFeature) => { title: string; lines: string[] } | null
+    lineAt: (lon: number, lat: number) => string[]
+  }
 }
 
 interface Chip {
@@ -40,15 +46,15 @@ const pointSlack = 5
  * wind there when the wind layer is on. Hovered regions are outlined. Only
  * on devices with a mouse; on touch, a tap opens the panel instead.
  */
-export function HoverChip({ regions, wind }: HoverChipProps) {
+export function HoverChip({ regions, wind, extra }: HoverChipProps) {
   const map = useMap()
   const canHover = useMediaQuery("(hover: hover) and (pointer: fine)")
   const [chip, setChip] = useState<Chip | null>(null)
-  const props = useRef({ regions, wind })
+  const props = useRef({ regions, wind, extra })
 
   useEffect(() => {
-    props.current = { regions, wind }
-  }, [regions, wind])
+    props.current = { regions, wind, extra }
+  }, [regions, wind, extra])
 
   useEffect(() => {
     if (!map || !canHover) return
@@ -79,10 +85,12 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
       const event = pending
       if (!event) return
       const { x, y } = event.point
-      const { regions: regionInfo, wind: field } = props.current
+      const { regions: regionInfo, wind: field, extra: more } = props.current
       const lines: string[] = []
 
-      const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES].filter((id) => map.getLayer(id))
+      const pointLayers = [RIVER_STATIONS, FLOOD_GAUGES, ...(more?.layers ?? [])].filter((id) =>
+        map.getLayer(id),
+      )
       const point = pointLayers.length
         ? map.queryRenderedFeatures(
             [
@@ -137,6 +145,12 @@ export function HoverChip({ regions, wind }: HoverChipProps) {
           }
         }
       }
+      const described = point ? more?.describe(point) : null
+      if (described) {
+        title = described.title
+        lines.push(...described.lines)
+      }
+      lines.push(...(more?.lineAt(event.lngLat.lng, event.lngLat.lat) ?? []))
       if (field) {
         const sample = sampleWind(field, event.lngLat.lng, event.lngLat.lat)
         if (sample) lines.push(`Wind ${windText(sample[0], sample[1])}`)

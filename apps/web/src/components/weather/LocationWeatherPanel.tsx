@@ -153,6 +153,7 @@ export function LocationWeatherPanel({
           <div className="flex items-start gap-4">
             <StatValue
               className="flex-1"
+              label="Modelled now"
               value={formatNumber(current.temperatureC, 1)}
               unit="°C"
               caption={

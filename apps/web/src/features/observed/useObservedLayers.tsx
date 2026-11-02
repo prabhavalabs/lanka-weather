@@ -1,0 +1,420 @@
+/**
+ * The rainfall, weather-stations, air-quality and sea-conditions layers on the
+ * map, in the list and in the legends. Kept apart from App, which only asks
+ * for what goes in each slot.
+ */
+import type { ExpressionSpecification } from "maplibre-gl"
+import { useCallback, type ReactNode } from "react"
+import { Button } from "@/components/ui/button"
+import { LegendSwatch } from "@/components/LegendSwatch"
+import { MapLegend } from "@/components/weather/MapLegend"
+import { RainfallLegend } from "@/components/weather/RainfallLegend"
+import { RampLegend } from "@/components/weather/RampLegend"
+import { StepLegend } from "@/components/weather/StepLegend"
+import { TemperatureLegend } from "@/components/weather/TemperatureLegend"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { isNotReady } from "@/lib/api"
+import { rampFromScale, type RampStop } from "@/lib/colour"
+import { formatAge, formatNumber } from "@/lib/format"
+import type { Layer } from "@/lib/layers"
+import type { ResolvedTheme } from "@/lib/theme"
+import { aqiScale, pm25Scale, readToken, waveScale } from "@/lib/tokens"
+import { useLocalStorage } from "@/lib/useLocalStorage"
+import { aqiBandOf, seaStateOf, steppedRamp } from "../environment/present"
+import { FieldLayer } from "../environment/FieldLayer"
+import { useAirGrid, useSeaGrid } from "../environment/queries"
+import type { AirKey } from "../environment/types"
+import { count, layerStatus, type LayerStatus } from "../layers/status"
+import { ObservedRainLayer } from "../rainfall/ObservedRainLayer"
+import { useObservedRain, useRainSteps } from "../rainfall/queries"
+import { RainImageLayer } from "../rainfall/RainImageLayer"
+import { RainImageScale, RainTimeline } from "../rainfall/RainTimeline"
+import { useRainTimeline } from "../rainfall/useRainTimeline"
+import { MetStationsLayer } from "../stations/MetStationsLayer"
+import { feedNotice, markerTemperature } from "../stations/present"
+import { useMetStations } from "../stations/queries"
+import { sampleGrid } from "../weather-grid/field"
+
+export const RAINFALL = "rainfall"
+export const WEATHER_STATIONS = "weather-stations"
+export const AIR_QUALITY = "air-quality"
+export const SEA_CONDITIONS = "sea-conditions"
+
+type AirVariable = "usAqi" | "pm25"
+
+/**
+ * The wave field fades as the map zooms in: its grid is about 55 km across and
+ * its coast simplified to about 1 km, so close up it says little and its edge
+ * no longer meets the basemap's shore.
+ */
+const seaOpacity: ExpressionSpecification = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  8,
+  0.78,
+  11,
+  0.3,
+  13,
+  0,
+]
+
+interface ObservedLayersOptions {
+  available: (id: string) => Layer | undefined
+  enabled: string[]
+  /** The selected Met station, if any. */
+  selectedMetId: string | null
+  theme: ResolvedTheme
+  /** Shows the weather field's forecast rain. */
+  onShowModelRain: () => void
+}
+
+function airRamp(variable: AirKey): RampStop[] {
+  const scale = variable === "usAqi" ? aqiScale : pm25Scale
+  return steppedRamp(
+    scale,
+    scale.map((step) => readToken(step.token)),
+    500,
+  )
+}
+
+function seaRamp(): RampStop[] {
+  return rampFromScale(
+    waveScale,
+    waveScale.map((step) => readToken(step.token)),
+    0.5,
+  )
+}
+
+export function useObservedLayers({
+  available,
+  enabled,
+  selectedMetId,
+  theme,
+  onShowModelRain,
+}: ObservedLayersOptions) {
+  const [airVariable, setAirVariable] = useLocalStorage<AirVariable>(
+    "lanka-weather:air-variable",
+    "usAqi",
+  )
+  const on = (id: string) => enabled.includes(id) && available(id) !== undefined
+  const rainLayer = available(RAINFALL)
+  const stationLayer = available(WEATHER_STATIONS)
+  const airLayer = available(AIR_QUALITY)
+  const seaLayer = available(SEA_CONDITIONS)
+  const rainOn = on(RAINFALL)
+  const stationsOn = on(WEATHER_STATIONS)
+  const airOn = on(AIR_QUALITY)
+  const seaOn = on(SEA_CONDITIONS)
+
+  const rain = useRainSteps(rainLayer, rainOn)
+  const observedRain = useObservedRain(rainOn)
+  const stations = useMetStations(stationLayer, stationsOn || selectedMetId !== null)
+  const air = useAirGrid(airLayer, airOn)
+  const sea = useSeaGrid(seaLayer, seaOn)
+  const timeline = useRainTimeline(rain.data?.steps ?? [], rainOn)
+
+  const statuses: Record<string, LayerStatus> = {}
+  const details: Record<string, ReactNode> = {}
+
+  // Rainfall: the satellite estimate, measured totals, and a way to the forecast.
+  if (rainLayer) {
+    const counts = observedRain.data?.meta
+    statuses[RAINFALL] = {
+      ...layerStatus({
+        layer: rainLayer,
+        parts: rain.data
+          ? ["Satellite estimate", ...(counts?.fresh ? [count(counts.fresh, "point")] : [])]
+          : [],
+        observedAt: rain.data?.newestValidAt,
+        ageLabel: "image",
+        error: rain.error,
+        pending: rain.isPending,
+      }),
+    }
+  }
+  details[RAINFALL] = (
+    <div className="flex flex-col gap-3 text-xs text-muted-foreground">
+      <section className="flex flex-col gap-1.5">
+        <h3 className="font-medium text-foreground">Satellite estimate</h3>
+        <p>
+          NASA IMERG, not a measurement. Images lag by hours
+          {rain.data?.newestValidAt
+            ? `; the newest is ${formatAge(rain.data.newestValidAt)}.`
+            : "."}
+        </p>
+        {rain.data && <RainImageScale data={rain.data} theme={theme} />}
+      </section>
+      <section className="flex flex-col gap-1.5">
+        <h3 className="font-medium text-foreground">Measured, last 24 hours</h3>
+        <p>
+          Circles are river gauges and squares Met stations. Hollow points are too old to be
+          current; open one for its date.
+          {observedRain.data &&
+            ` ${observedRain.data.meta.fresh} current, ${observedRain.data.meta.stale} old.`}
+        </p>
+        <RainfallLegend bare />
+      </section>
+      <section className="flex flex-col gap-1.5">
+        <h3 className="font-medium text-foreground">Forecast</h3>
+        <p>Rain ahead is in the weather field and the place panel. It is model data.</p>
+        <Button size="sm" variant="secondary" className="self-start" onClick={onShowModelRain}>
+          Show forecast rain
+        </Button>
+      </section>
+    </div>
+  )
+
+  // Stations: measured readings, with a plain warning when the copy has stopped.
+  const stationMeta = stations.data?.meta
+  const notice = stationMeta ? feedNotice(stationMeta) : null
+  if (stationLayer) {
+    const newest = [stationMeta?.threeHourly.newestObservedAt, stationMeta?.daily.newestObservedAt]
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1)
+    const shown = stations.data?.features.filter(
+      (feature) => markerTemperature(feature.properties) !== null,
+    )
+    statuses[WEATHER_STATIONS] = {
+      ...layerStatus({
+        layer: stationLayer,
+        parts: shown ? ["Observed", count(shown.length, "station")] : [],
+        observedAt: newest,
+        ageLabel: "newest",
+        error: stations.error,
+        pending: stations.isPending,
+      }),
+      ...(stationMeta ? { stale: stationMeta.stale } : {}),
+    }
+  }
+  details[WEATHER_STATIONS] = (
+    <div className="flex flex-col gap-3 text-xs text-muted-foreground">
+      {notice && (
+        <p
+          role="status"
+          className="rounded-xl border border-border bg-card px-3 py-2 text-foreground"
+        >
+          {notice}
+        </p>
+      )}
+      <p className="flex items-center gap-2">
+        <LegendSwatch color="var(--temp-4)" />
+        Measured at Met stations, coloured by temperature. Faded squares are out of date.
+      </p>
+      <TemperatureLegend title="Temperature" bare className="md:hidden" />
+    </div>
+  )
+
+  // Air quality.
+  if (airLayer) {
+    const values = air.data?.values[airVariable]
+    statuses[AIR_QUALITY] = layerStatus({
+      layer: airLayer,
+      parts: values ? ["Estimate", airVariable === "usAqi" ? "US AQI" : "PM2.5"] : [],
+      observedAt: air.data?.fetchedAt,
+      error: air.error,
+      pending: air.isPending,
+    })
+  }
+  const airLegend = (bare: boolean, className?: string) =>
+    airVariable === "usAqi" ? (
+      <MapLegend
+        title="US Air Quality Index"
+        unit="Estimate"
+        bare={bare}
+        className={className ?? "w-64"}
+      >
+        <ul className="flex flex-col gap-1">
+          {[
+            ["--aqi-1", "Good", "0–50"],
+            ["--aqi-2", "Moderate", "51–100"],
+            ["--aqi-3", "Unhealthy for sensitive groups", "101–150"],
+            ["--aqi-4", "Unhealthy", "151–200"],
+            ["--aqi-5", "Very unhealthy", "201–300"],
+            ["--aqi-6", "Hazardous", "301+"],
+          ].map(([token, label, range]) => (
+            <li key={token} className="flex items-center justify-between gap-2">
+              <LegendSwatch color={`var(${token})`} label={label} />
+              <span className="numeric shrink-0 text-[0.6875rem] whitespace-nowrap text-muted-foreground">
+                {range}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </MapLegend>
+    ) : (
+      <StepLegend
+        title="PM2.5 · Estimate"
+        unit="µg/m³"
+        scale={pm25Scale}
+        names={{ 0: "Good", 3: "Unhealthy", 5: "Hazardous" }}
+        bare={bare}
+        className={className}
+      />
+    )
+  details[AIR_QUALITY] = (
+    <div className="flex flex-col gap-3">
+      <ToggleGroup
+        type="single"
+        size="sm"
+        value={airVariable}
+        onValueChange={(value) => {
+          if (value) setAirVariable(value as AirVariable)
+        }}
+        aria-label="Air quality shows"
+        className="w-full"
+      >
+        <ToggleGroupItem value="usAqi" className="flex-1">
+          US AQI
+        </ToggleGroupItem>
+        <ToggleGroupItem value="pm25" className="flex-1">
+          PM2.5
+        </ToggleGroupItem>
+      </ToggleGroup>
+      {airLegend(true, "md:hidden")}
+      <p className="text-xs text-muted-foreground">
+        Estimate from the CAMS atmosphere model, about 40 km across. It does not measure the air at
+        any place. Air quality by Open-Meteo.com (CC BY 4.0), generated using Copernicus Atmosphere
+        Monitoring Service information.
+      </p>
+    </div>
+  )
+
+  // Sea conditions.
+  if (seaLayer) {
+    statuses[SEA_CONDITIONS] = layerStatus({
+      layer: seaLayer,
+      parts: sea.data ? ["Model", "wave height"] : [],
+      observedAt: sea.data?.fetchedAt,
+      error: sea.error,
+      pending: sea.isPending,
+    })
+  }
+  const seaLegend = (bare: boolean, className?: string) => (
+    <RampLegend
+      title="Wave height · Model"
+      unit="m"
+      scale={waveScale}
+      openSpan={0.5}
+      ends={["smooth", "high"]}
+      bare={bare}
+      className={className}
+    />
+  )
+  details[SEA_CONDITIONS] = (
+    <div className="flex flex-col gap-3">
+      {seaLegend(true, "md:hidden")}
+      <p className="text-xs text-muted-foreground">
+        Wave and swell model values on a 0.5° grid (about 55 km), not observations. Follow the
+        Department of Meteorology&apos;s sea-area warnings. Marine data by Open-Meteo.com (CC BY
+        4.0).
+      </p>
+    </div>
+  )
+
+  const rainTimeline =
+    rainOn && rain.data && rain.data.steps.length > 0 ? (
+      <RainTimeline
+        data={rain.data}
+        index={timeline.index}
+        step={timeline.step}
+        onIndexChange={timeline.setIndex}
+        playing={timeline.playing}
+        onPlayingChange={timeline.setPlaying}
+        canPlay={timeline.canPlay}
+        theme={theme}
+      />
+    ) : null
+
+  const legends = (
+    <>
+      {rainTimeline}
+      {stationsOn && <TemperatureLegend title="Temperature, observed" className="w-60" />}
+      {airOn && airLegend(false)}
+      {seaOn && seaLegend(false, "w-60")}
+    </>
+  )
+
+  const airRampFor = useCallback(() => airRamp(airVariable), [airVariable])
+
+  const mapLayers = (
+    <>
+      {airOn && (
+        <FieldLayer
+          id="air-quality"
+          grid={air.data?.grid}
+          values={air.data?.values[airVariable]}
+          ramp={airRampFor}
+          rampKey={airVariable}
+          slot="fills"
+        />
+      )}
+      {seaOn && (
+        <FieldLayer
+          id="sea"
+          grid={sea.data?.grid}
+          values={sea.data?.values.waveHeightM}
+          ramp={seaRamp}
+          rampKey="waves"
+          slot="lines"
+          land={sea.data?.land}
+          opacity={seaOpacity}
+        />
+      )}
+      {rainOn && (
+        <RainImageLayer
+          steps={rain.data}
+          step={timeline.step}
+          nextStep={timeline.playing ? timeline.nextStep : undefined}
+          theme={theme}
+        />
+      )}
+      {rainOn && <ObservedRainLayer data={observedRain.data} />}
+      {stationsOn && <MetStationsLayer data={stations.data} selectedId={selectedMetId} />}
+    </>
+  )
+
+  /** Lines under the pointer from the grids that are on. */
+  const lineAt = (lon: number, lat: number): string[] => {
+    const lines: string[] = []
+    const airValues = air.data?.values[airVariable]
+    if (airOn && air.data && airValues) {
+      const value = sampleGrid(air.data.grid, airValues, lon, lat)
+      if (value !== null) {
+        lines.push(
+          airVariable === "usAqi"
+            ? `Air quality (estimate): ${aqiBandOf(value).label}, AQI ${Math.round(value)}`
+            : `PM2.5 (estimate): ${formatNumber(value, 1)} µg/m³`,
+        )
+      }
+    }
+    const waves = sea.data?.values.waveHeightM
+    if (seaOn && sea.data && waves) {
+      const value = sampleGrid(sea.data.grid, waves, lon, lat)
+      if (value !== null) {
+        lines.push(`Waves (model): ${formatNumber(value, 1)} m, ${seaStateOf(value).toLowerCase()}`)
+      }
+    }
+    return lines
+  }
+
+  return {
+    stationsOn,
+    airOn,
+    statuses,
+    details,
+    legends,
+    rainTimeline,
+    mapLayers,
+    lineAt,
+    stationFeature: (id: string) => stations.data?.features.find((feature) => feature.id === id),
+    stationsPending: stations.isPending,
+    /** Whether any layer is waiting for its first collection. */
+    waiting: [
+      rainOn && isNotReady(rain.error),
+      airOn && isNotReady(air.error),
+      seaOn && isNotReady(sea.error),
+    ].some(Boolean),
+  }
+}
