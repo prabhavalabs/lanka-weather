@@ -61,7 +61,16 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
       new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: false } }),
       "bottom-right",
     )
-    instance.once("load", () => setMap(instance))
+    instance.once("load", () => {
+      // On phones the attribution, open at first, would cover much of the map: start it
+      // folded behind its button, as MapLibre does after the first drag.
+      if (instance.getCanvasContainer().offsetWidth <= 640) {
+        container.current
+          ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")
+          ?.classList.remove("maplibregl-compact-show")
+      }
+      setMap(instance)
+    })
     return () => {
       setMap(null)
       instance.remove()
