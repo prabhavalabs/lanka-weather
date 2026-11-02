@@ -20,6 +20,7 @@ const meta: LandslideMeta = {
   attribution: "a",
   status: "active",
   note: "Report of 31 Oct 2026, valid until 1 Nov 2026 16:00.",
+  limit: "A level may already have been withdrawn.",
   stale: false,
   reportDate: "2026-10-31",
   issuedAt: "2026-10-31T10:30:00Z",

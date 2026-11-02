@@ -62,6 +62,34 @@ function BulletinItem({ bulletin }: { bulletin: Bulletin }) {
           </>
         )}
       </p>
+      {bulletin.withdrawnBy && (
+        <p className="text-xs text-foreground">
+          Withdrawn by the notice of{" "}
+          <time dateTime={bulletin.withdrawnBy.issuedAt}>
+            {formatDayTime(bulletin.withdrawnBy.issuedAt)}
+          </time>
+          , which names this basin.{" "}
+          <OfficialLink href={bulletin.withdrawnBy.pdfUrl}>Withdrawal notice</OfficialLink>
+        </p>
+      )}
+      {bulletin.mayBeWithdrawnBy && (
+        <p className="rounded-lg border border-border bg-inset px-2.5 py-2 text-xs text-foreground">
+          This may already have been withdrawn. A notice of{" "}
+          <time dateTime={bulletin.mayBeWithdrawnBy.issuedAt}>
+            {formatDayTime(bulletin.mayBeWithdrawnBy.issuedAt)}
+          </time>{" "}
+          withdrew flood warnings, and we cannot tell whether it includes this one, so it stays
+          shown. <OfficialLink href={bulletin.mayBeWithdrawnBy.pdfUrl}>Read the notice</OfficialLink>{" "}
+          or check <OfficialLink href="https://www.dmc.gov.lk/">dmc.gov.lk</OfficialLink>.
+        </p>
+      )}
+      {bulletin.severity === "withdrawal" && bulletin.withdrawnBasins && (
+        <p className="text-xs text-foreground">
+          {bulletin.withdrawnBasins.length > 0
+            ? `Withdraws flood warnings for: ${bulletin.withdrawnBasins.join(", ")}.`
+            : "We could not read which basins this notice lists, so earlier warnings stay shown. Read the PDF."}
+        </p>
+      )}
       {bulletin.text && (
         <details className="group">
           <summary className="cursor-pointer rounded-sm text-xs text-muted-foreground outline-none select-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
@@ -113,11 +141,11 @@ function LandslideStatusCard({ meta }: { meta: LandslideMeta }) {
           (Amber) {meta.counts["2"]} · Level 1 (Yellow) {meta.counts["1"]}
         </p>
       )}
-      {meta.pdfUrl && (
-        <p>
-          <OfficialLink href={meta.pdfUrl}>Official report</OfficialLink>
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground">{meta.limit}</p>
+      <p className="flex flex-wrap gap-x-3 gap-y-1">
+        {meta.pdfUrl && <OfficialLink href={meta.pdfUrl}>Official report</OfficialLink>}
+        <OfficialLink href="https://www.dmc.gov.lk/">dmc.gov.lk</OfficialLink>
+      </p>
     </section>
   )
 }

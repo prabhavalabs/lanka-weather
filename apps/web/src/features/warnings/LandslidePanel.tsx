@@ -79,6 +79,18 @@ export function LandslidePanel({ id, onClose }: LandslidePanelProps) {
         )}
       </div>
       <p className="text-sm text-foreground">{report.note}</p>
+      <p className="text-xs text-muted-foreground">
+        {report.limit}{" "}
+        <a
+          href="https://www.dmc.gov.lk/"
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-brand-text underline underline-offset-2 hover:text-foreground"
+        >
+          dmc.gov.lk
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </p>
       {!level && (report.status === "active" || report.status === "lapsed") && (
         <p className="text-sm text-foreground">
           {data.name} is not named in this report. That does not mean it is safe.

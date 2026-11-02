@@ -194,3 +194,54 @@ func TestHighlightsSeparateStructuredLevelsFromMentions(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestApplyWithdrawals(t *testing.T) {
+	issued := time.Date(2026, 10, 30, 6, 0, 0, 0, time.UTC)
+	later := issued.Add(24 * time.Hour)
+	flood := func(title string, at time.Time) Bulletin {
+		return Bulletin{ID: title, Type: "water_level", Severity: "warning", Title: title, IssuedAt: at, Current: true}
+	}
+	notice := func(at time.Time, basins ...string) Notice {
+		return Notice{NoticeRef: NoticeRef{ID: "notice", IssuedAt: at}, Basins: basins}
+	}
+	cases := []struct {
+		name      string
+		bulletin  Bulletin
+		notices   []Notice
+		withdrawn bool
+		doubt     bool
+	}{
+		{"named by its river", flood("Flood warning for Kelani River", issued), []Notice{notice(later, "Kelani Ganga", "Kalu Ganga")}, true, false},
+		{"named as a basin", flood("Flood warning for Kalu River Basin - No 2 - (Extended warning)", issued), []Notice{notice(later, "Kalu River Basin")}, true, false},
+		{"spelled another way", flood("Flood warning for Attanagalu Oya", issued), []Notice{notice(later, "Aththanagalu Oya")}, true, false},
+		{"a basin's Tamil edition", flood("Flood Warning for Gin River Basin (Tamil Language)", issued), []Notice{notice(later, "Gin Ganga")}, true, false},
+		{"a later notice for another basin", flood("Flood Warning for Kala Oya Basin", issued), []Notice{notice(later, "Kelani Ganga")}, false, false},
+		{"a sub-basin is not its parent", flood("Flood warning for Kalu River Basin", issued), []Notice{notice(later, "Kuda Ganga Sub Basin of Kalu River")}, false, false},
+		{"a sub-basin's own warning", flood("Flood warning for Kuda Ganga Sub-basin", issued), []Notice{notice(later, "Kuda Ganga Sub Basin of Kalu River")}, true, false},
+		{"a notice before the warning ends nothing", flood("Flood warning for Kelani River", later), []Notice{notice(issued, "Kelani Ganga")}, false, false},
+		{"a notice that cannot be read leaves doubt", flood("Flood warning for Kelani River", issued), []Notice{{NoticeRef: NoticeRef{ID: "notice", IssuedAt: later}}}, false, true},
+		{"a title naming no basin leaves doubt", flood("Flood Warning", issued), []Notice{notice(later, "Kelani Ganga")}, false, true},
+		{"a later notice naming it ends the doubt", flood("Flood warning for Kelani River", issued), []Notice{{NoticeRef: NoticeRef{ID: "first", IssuedAt: later}}, notice(later.Add(time.Hour), "Kelani Ganga")}, true, false},
+		{"weather warnings are not flood warnings", Bulletin{ID: "wind", Type: "weather", Severity: "warning", Title: "Warning for strong winds", IssuedAt: issued, Current: true}, []Notice{notice(later, "Kelani Ganga")}, false, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := ApplyWithdrawals([]Bulletin{c.bulletin}, c.notices)[0]
+			if (got.WithdrawnBy != nil) != c.withdrawn || got.Current == c.withdrawn {
+				t.Fatalf("withdrawn = %+v, current %v; want withdrawn %v", got.WithdrawnBy, got.Current, c.withdrawn)
+			}
+			if (got.MayBeWithdrawnBy != nil) != c.doubt {
+				t.Fatalf("doubt = %+v, want %v", got.MayBeWithdrawnBy, c.doubt)
+			}
+		})
+	}
+}
+
+func TestAWithdrawnWarningLeavesTheListInForce(t *testing.T) {
+	issued := time.Date(2026, 10, 30, 6, 0, 0, 0, time.UTC)
+	bulletins := ApplyWithdrawals([]Bulletin{{ID: "w", Type: "water_level", Severity: "warning", Title: "Flood warning for Gin River Basin", IssuedAt: issued, Current: true}},
+		[]Notice{{NoticeRef: NoticeRef{ID: "n", IssuedAt: issued.Add(time.Hour)}, Basins: []string{"Gin Ganga"}}})
+	if got := InForce(bulletins); len(got) != 0 {
+		t.Fatalf("in force = %+v", got)
+	}
+}

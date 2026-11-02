@@ -86,10 +86,13 @@ export function colourVariant(colour: string | null | undefined): BadgeTone {
 }
 
 /** A bulletin's badge: its stated colour, else how its title reads. */
-export function bulletinBadge(bulletin: Pick<Bulletin, "severity" | "colour">): {
+export function bulletinBadge(
+  bulletin: Pick<Bulletin, "severity" | "colour"> & Partial<Pick<Bulletin, "withdrawnBy">>,
+): {
   variant: BadgeTone
   label: string
 } {
+  if (bulletin.withdrawnBy) return { variant: "chip", label: "Withdrawn" }
   if (bulletin.severity === "routine") return { variant: "chip", label: "Report" }
   if (bulletin.severity === "withdrawal") return { variant: "normal", label: "Withdrawal" }
   const word = severityLabels[bulletin.severity]

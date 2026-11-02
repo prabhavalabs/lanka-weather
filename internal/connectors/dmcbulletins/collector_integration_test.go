@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/dmcbulletins"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database/dbtest"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
+	"github.com/prabhavalabs/lanka-weather/internal/store"
 	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 )
 
@@ -157,6 +159,51 @@ func TestCollectStoresBulletinsAndServesThem(t *testing.T) {
 	for _, bulletin := range again.Bulletins {
 		if bulletin.ID == warning.ID && (bulletin.Text == nil || bulletin.Severity != "warning") {
 			t.Fatalf("second run lost text: %+v", bulletin)
+		}
+	}
+}
+
+func TestAWithdrawalNoticeEndsTheWarningsItNames(t *testing.T) {
+	pool := dbtest.Open(t, tables...)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 2, 19, 0, 0, 0, time.UTC)
+	collector := &dmcbulletins.Collector{Pool: pool, Fetcher: &replay{t: t}}
+	if _, err := collector.Collect(ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	queries := store.New(pool)
+	listed, err := queries.ListWithdrawalNotices(ctx, now.Add(-30*24*time.Hour))
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("notices = %+v, %v", listed, err)
+	}
+	if !slices.Contains(listed[0].WithdrawnBasins, "Kelani Ganga") {
+		t.Fatalf("basins = %q", listed[0].WithdrawnBasins)
+	}
+	// One still running at the notice: the notice names the Kelani, so it ends.
+	// One for a basin it does not name keeps running.
+	issued := listed[0].IssuedAt.Add(-time.Hour)
+	until := now.Add(24 * time.Hour)
+	for _, row := range []struct{ id, title string }{{"named", "Flood warning for Kelani River"}, {"other", "Flood warning for Deduru Oya"}} {
+		if _, err := pool.Exec(ctx, `INSERT INTO official_bulletins (doc_id, bulletin_type, title, severity, issued_at, valid_until, pdf_url, source_page_url, lang, text_status, source, source_time, fetched_at)
+			VALUES ($1, 'water_level', $2, 'warning', $3, $4, 'https://dmc.gov.lk/x.pdf', 'https://dmc.gov.lk/', 'en', 'unusable', 'test', $3, $3)`, row.id, row.title, issued, until); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := &warnings.Service{Pool: pool, Now: func() time.Time { return now }, BulletinStaleAfter: 6 * time.Hour, LandslideStaleAfter: 12 * time.Hour}
+	overview, err := service.Overview(ctx, warnings.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inForce := map[string]bool{}
+	for _, bulletin := range overview.InForce {
+		inForce[bulletin.ID] = true
+	}
+	if inForce["named"] || !inForce["other"] {
+		t.Fatalf("in force = %v", inForce)
+	}
+	for _, bulletin := range overview.Bulletins {
+		if bulletin.ID == "named" && (bulletin.WithdrawnBy == nil || bulletin.Current) {
+			t.Fatalf("the warning should stay listed and marked: %+v", bulletin)
 		}
 	}
 }

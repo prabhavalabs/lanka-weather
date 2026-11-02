@@ -185,8 +185,17 @@ type Bulletin struct {
 	// ValidUntil is the period the bulletin states; null if it states none.
 	ValidUntil *time.Time `json:"validUntil"`
 	// Current says this warning or advisory is in force: within its stated
-	// period, or within 24 hours of issue if it states none.
-	Current       bool   `json:"current"`
+	// period, or within 24 hours of issue if it states none, and not withdrawn.
+	Current bool `json:"current"`
+	// WithdrawnBy is the later notice that names this warning's basin.
+	WithdrawnBy *NoticeRef `json:"withdrawnBy"`
+	// MayBeWithdrawnBy is a later notice that may have ended this warning but
+	// cannot be matched to it: the notice's list cannot be read, or this
+	// warning's title names no basin. The warning stays in force.
+	MayBeWithdrawnBy *NoticeRef `json:"mayBeWithdrawnBy"`
+	// WithdrawnBasins are the basins a withdrawal notice lists; null if none
+	// could be read.
+	WithdrawnBasins []string `json:"withdrawnBasins"`
 	PDFURL        string `json:"pdfUrl"`
 	SourcePageURL string `json:"sourcePageUrl"`
 	Language      string `json:"language"`
@@ -215,10 +224,9 @@ var TypeLabels = map[string]string{
 	string(dmcbulletins.TypeSituation):  "Situation report",
 }
 
-// IsCurrent reports whether a warning or advisory is in force. Withdrawals
-// and routine bulletins never are. A withdrawal does not end earlier warnings
-// here: it lists basins that cannot be read reliably, so an earlier warning
-// runs its period and the withdrawal is shown beside it.
+// IsCurrent reports whether a warning or advisory's period covers now.
+// Withdrawals and routine bulletins never are. ApplyWithdrawals then ends those
+// a later notice names.
 func IsCurrent(severity string, issuedAt time.Time, validUntil *time.Time, now time.Time) bool {
 	if severity != string(dmcbulletins.SeverityWarning) && severity != string(dmcbulletins.SeverityAdvisory) {
 		return false
@@ -228,6 +236,103 @@ func IsCurrent(severity string, issuedAt time.Time, validUntil *time.Time, now t
 		until = *validUntil
 	}
 	return !now.After(until)
+}
+
+// NoticeRef points at a withdrawal notice.
+type NoticeRef struct {
+	ID       string    `json:"id"`
+	IssuedAt time.Time `json:"issuedAt"`
+	PDFURL   string    `json:"pdfUrl"`
+}
+
+// Notice is a withdrawal notice. Basins is nil when its list could not be read.
+type Notice struct {
+	NoticeRef
+	Basins []string
+}
+
+// ApplyWithdrawals ends flood warnings that a later notice names by basin, in the
+// issuer's own words. Everything uncertain stays in force and is marked: a notice
+// whose list cannot be read, or a warning whose title names no basin, might or
+// might not be related, and showing a warning that was withdrawn is the smaller
+// error of the two. Only flood warnings are ended, the only kind notices have
+// been seen to withdraw. Notices are oldest first (ADR 0011).
+func ApplyWithdrawals(bulletins []Bulletin, notices []Notice) []Bulletin {
+	for index := range bulletins {
+		bulletin := &bulletins[index]
+		if bulletin.Type != string(dmcbulletins.TypeWaterLevel) ||
+			(bulletin.Severity != string(dmcbulletins.SeverityWarning) && bulletin.Severity != string(dmcbulletins.SeverityAdvisory)) {
+			continue
+		}
+		key := warnedBasin(bulletin.Title)
+		var unmatched *NoticeRef
+		for _, notice := range notices {
+			if !notice.IssuedAt.After(bulletin.IssuedAt) {
+				continue
+			}
+			if key != "" && len(notice.Basins) > 0 && namesBasin(notice.Basins, key) {
+				ref := notice.NoticeRef
+				bulletin.WithdrawnBy, bulletin.Current, unmatched = &ref, false, nil
+				break
+			}
+			if key == "" || len(notice.Basins) == 0 {
+				ref := notice.NoticeRef
+				unmatched = &ref
+			}
+		}
+		if unmatched != nil && bulletin.Current {
+			bulletin.MayBeWithdrawnBy = unmatched
+		}
+	}
+	return bulletins
+}
+
+func namesBasin(basins []string, key string) bool {
+	for _, basin := range basins {
+		if basinKey(basin) == key {
+			return true
+		}
+	}
+	return false
+}
+
+var (
+	warnedFor = regexp.MustCompile(`(?i)\bflood\s+warnings?\s+for\s+(.+)$`)
+	subBasin  = regexp.MustCompile(`(?i)^(.*?)\s*\bsub[\s-]*basins?\b`)
+	// basinWords are the words that say what kind of water a name is: "Kelani
+	// River", "Kelani Ganga" and "Kelani River Basin" are one basin.
+	basinWords = map[string]bool{"river": true, "rivers": true, "ganga": true, "oya": true, "aru": true, "ara": true, "basin": true, "basins": true, "the": true}
+	// basinSpellings are the same basin spelled differently by different notices.
+	basinSpellings = map[string]string{"aththanagalu": "attanagalu", "attanagala": "attanagalu"}
+)
+
+// warnedBasin is the basin a flood warning's title names, or "" if it names none:
+// "Flood Warning" alone says nothing about where.
+func warnedBasin(title string) string {
+	match := warnedFor.FindStringSubmatch(titleNoise.ReplaceAllString(title, " "))
+	if match == nil {
+		return ""
+	}
+	return basinKey(match[1])
+}
+
+// basinKey reduces a basin's name to what identifies it. A sub-basin is its own
+// basin: "Kuda Ganga Sub Basin of Kalu River" says nothing of the Kalu.
+func basinKey(name string) string {
+	if match := subBasin.FindStringSubmatch(name); match != nil {
+		name = match[1]
+	}
+	words := []string{}
+	for _, word := range strings.Fields(strings.ToLower(name)) {
+		if !basinWords[word] {
+			words = append(words, word)
+		}
+	}
+	key := strings.Join(words, " ")
+	if spelled, ok := basinSpellings[key]; ok {
+		return spelled
+	}
+	return key
 }
 
 var titleNoise = regexp.MustCompile(`(?i)\(?\s*tamil(\s+language)?\s*\)?|-\s*no\.?\s*\d+|\bno\.?\s*\d+\b|\(extended warning\)|[-–]`)

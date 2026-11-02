@@ -240,3 +240,45 @@ func TestNamedDistrictsNeedsWholeWords(t *testing.T) {
 		t.Fatalf("districts = %v", got)
 	}
 }
+
+// Every kind of notice in the upstream's history: a list on one line, the list
+// that repeats warning details, a sub-basin, and one written only in Sinhala.
+func TestWithdrawnBasinsFromRecordedNotices(t *testing.T) {
+	cases := []struct {
+		file string
+		want []string
+	}{
+		{"2026-10-31-18-00-withdrawal-of-flo-8b8d1019.txt", []string{"Kelani Ganga", "Kalu Ganga", "Gin Ganga", "Mahaweli Ganga", "Attanagalu oya"}},
+		{"2026-08-04-16-00-flood-withdrawal.txt", []string{"Kelani River Basin", "Kalu River Basin"}},
+		{"2026-05-19-10-00-withdrawal-of-flo-6e49245a.txt", []string{"Aththanagalu Oya", "Kuda Ganga Sub Basin of Kalu River"}},
+		{"2025-10-22-16-00-withdrawal-of-flo-0efeed0b.txt", nil},
+		{"2026-10-26-18-00-flood-warning-for-55a1dd39.txt", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.file, func(t *testing.T) {
+			got := WithdrawnBasins(string(read(t, c.file)))
+			if len(got) != len(c.want) {
+				t.Fatalf("got %q, want %q", got, c.want)
+			}
+			for index := range got {
+				if got[index] != c.want[index] {
+					t.Fatalf("got %q, want %q", got, c.want)
+				}
+			}
+		})
+	}
+}
+
+func TestWithdrawnBasinsReadsNothingFromAListItCannotFollow(t *testing.T) {
+	for name, text := range map[string]string{
+		"no preamble":      "Flood warnings: 1. Kelani Ganga 2. Kalu Ganga. The Hydrology and Disaster Management Division continues to monitor.",
+		"no end":           "are hereby withdrawn. 1. Kelani Ganga 2. Kalu Ganga",
+		"no list":          "are hereby withdrawn, as water levels have receded. The Hydrology and Disaster Management Division continues to monitor.",
+		"a list from 2":    "are hereby withdrawn. 2. Kelani Ganga 3. Kalu Ganga The Hydrology and Disaster Management Division continues to monitor.",
+		"an item too long": "are hereby withdrawn. 1. " + strings.Repeat("Kelani ", 20) + "The Hydrology and Disaster Management Division continues to monitor.",
+	} {
+		if got := WithdrawnBasins(text); got != nil {
+			t.Errorf("%s: got %q", name, got)
+		}
+	}
+}

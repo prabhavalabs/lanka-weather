@@ -84,12 +84,52 @@ to avoid implying safety when a feed goes quiet.
   hours from issue if it states none. The header's count is these, one per
   warning (Tamil editions and numbered updates are the same warning), plus
   one if a landslide report is showing.
-- A withdrawal does not end earlier warnings: it lists basins that cannot be
-  read reliably. Earlier warnings run their period, with the withdrawal shown
-  beside them. This errs towards showing too much for up to a day.
+- A flood warning withdrawal ends the earlier warnings that it names by basin.
+  See "Withdrawals" below.
 - The banner is raised by a level 2 or 3 division on the map and by bulletins
   of severity `warning`. It is not raised by level 1, advisories or routine
   reports. Dismissing it remembers what it announced, so anything new shows.
+
+### Withdrawals
+
+A warning wrongly shown as active costs trust and can cost a night's sleep; a
+warning wrongly shown as ended can cost lives. So one is ended only on the issuer's
+own words, and anything less certain stays shown with a plain caveat.
+
+Read on 2026-11-02, from the whole upstream history and not only the last 100:
+
+- **Flood warnings have a usable signal.** `nuuuwan/lk_dmc` holds 8 withdrawal notices
+  from October 2025 to October 2026. 6 have an English list of basins, in two wordings:
+  a numbered list on one line, and one that repeats each warning's number and date.
+  The other 2 are only in Sinhala. An earlier reading here, from one notice, called
+  these lists unreliable; the list is more regular than that, though it does not pass
+  the clean-sentence rules, so it is read by its own parser.
+- **`WithdrawnBasins`** reads the list only if it finds "hereby withdrawn", a list
+  numbered from 1 and the paragraph that ends it. Otherwise it reads nothing.
+- **`ApplyWithdrawals`** ends a flood warning or advisory only if a later notice names
+  its basin, comparing "Kelani River", "Kelani Ganga" and "Kelani River Basin" as one.
+  A sub-basin is its own basin: "Kuda Ganga Sub Basin of Kalu River" does not end a
+  warning for the Kalu. A warning issued after the notice is not touched. The warning
+  stays listed, marked "Withdrawn" with a link to the notice, and stops counting as in
+  force, on the map, in the banner and in the header.
+- **When we cannot tell, it stays in force and says so.** That covers a notice whose
+  list cannot be read, and a warning titled just "Flood Warning" (there is one in the
+  last 100). The panel says it may already have been withdrawn and links the notice and
+  the DMC.
+
+**Landslide levels have no such signal.** None of the 100 landslide documents in the
+index, and no document name in that dataset's whole history, mentions a withdrawal,
+lifting or cancellation. A lowered level appears as the next report, which the map
+already follows, and a report's end is its period. 37 of 592 reports list no division
+at all, which could be how a report ends a warning, but nothing says so. So a level
+ended early can still show until the next report reaches us, about 4.5 hours or more
+after issue. The layer, the division panel and the warnings panel say this in plain words
+and link dmc.gov.lk. **This limit remains.** A direct DMC collector would shorten it
+and not remove it.
+
+Withdrawn basins are stored in `official_bulletins.withdrawn_basins` (migration
+00009): null until read, empty if read with no list. A notice already stored is read
+again by the next collector run, so nothing needs backfilling.
 
 ### Map highlights for official warnings
 
@@ -163,5 +203,8 @@ Sumatra, outside the old limit.
 - Excerpts can omit content that was in tables or images. They are labelled as
   excerpts, and the PDF stays one click away.
 - A division's history is kept indefinitely; 592 reports hold about 16,000 rows.
+- Two notices of eight cannot be read in English, and warnings they ended run out
+  their period with a caveat. If the department changes its notice's wording, notices
+  fall back to that caveat rather than to a wrong answer.
 - A mention match can highlight a coastal district for a warning about deep sea
   areas. The label says what it is.

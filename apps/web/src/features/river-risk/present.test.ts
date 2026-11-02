@@ -56,6 +56,8 @@ function document(rivers: RiverRisk[], meta: Partial<RiskDocument["meta"]> = {})
       forecastFetchedAt: null,
       rainFetchedAt: null,
       rainStale: false,
+      reservoirsFetchedAt: null,
+      reservoirLinks: { byPosition: 0, byRiver: 0, unlinked: [] },
       attribution: "",
       seeded: false,
       ...meta,

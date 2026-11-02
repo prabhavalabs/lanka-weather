@@ -164,25 +164,26 @@ type OfficialBasin struct {
 }
 
 type OfficialBulletin struct {
-	DocID         string     `json:"doc_id"`
-	BulletinType  string     `json:"bulletin_type"`
-	Title         string     `json:"title"`
-	Severity      string     `json:"severity"`
-	Colour        *string    `json:"colour"`
-	MessageID     *string    `json:"message_id"`
-	IssuedAt      time.Time  `json:"issued_at"`
-	ValidFrom     *time.Time `json:"valid_from"`
-	ValidUntil    *time.Time `json:"valid_until"`
-	PdfUrl        string     `json:"pdf_url"`
-	SourcePageUrl string     `json:"source_page_url"`
-	Lang          string     `json:"lang"`
-	Body          *string    `json:"body"`
-	TextStatus    string     `json:"text_status"`
-	Districts     []string   `json:"districts"`
-	Source        string     `json:"source"`
-	SourceTime    time.Time  `json:"source_time"`
-	FetchedAt     time.Time  `json:"fetched_at"`
-	TextFetchedAt *time.Time `json:"text_fetched_at"`
+	DocID           string     `json:"doc_id"`
+	BulletinType    string     `json:"bulletin_type"`
+	Title           string     `json:"title"`
+	Severity        string     `json:"severity"`
+	Colour          *string    `json:"colour"`
+	MessageID       *string    `json:"message_id"`
+	IssuedAt        time.Time  `json:"issued_at"`
+	ValidFrom       *time.Time `json:"valid_from"`
+	ValidUntil      *time.Time `json:"valid_until"`
+	PdfUrl          string     `json:"pdf_url"`
+	SourcePageUrl   string     `json:"source_page_url"`
+	Lang            string     `json:"lang"`
+	Body            *string    `json:"body"`
+	TextStatus      string     `json:"text_status"`
+	Districts       []string   `json:"districts"`
+	Source          string     `json:"source"`
+	SourceTime      time.Time  `json:"source_time"`
+	FetchedAt       time.Time  `json:"fetched_at"`
+	TextFetchedAt   *time.Time `json:"text_fetched_at"`
+	WithdrawnBasins []string   `json:"withdrawn_basins"`
 }
 
 type OfficialStation struct {

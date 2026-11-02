@@ -20,6 +20,12 @@ export interface DistrictRef {
   name: string
 }
 
+export interface NoticeRef {
+  id: string
+  issuedAt: string
+  pdfUrl: string
+}
+
 export interface Bulletin {
   id: string
   type: BulletinType
@@ -35,6 +41,12 @@ export interface Bulletin {
   /** The period it states; null if none. */
   validUntil: string | null
   current: boolean
+  /** The later notice that names this warning's basin, which ended it. */
+  withdrawnBy?: NoticeRef | null
+  /** A later notice that may have ended this warning but cannot be matched to it. */
+  mayBeWithdrawnBy?: NoticeRef | null
+  /** The basins a withdrawal notice lists; null if none could be read. */
+  withdrawnBasins?: string[] | null
   pdfUrl: string
   sourcePageUrl: string
   language: string
@@ -53,6 +65,8 @@ export interface LandslideMeta {
   status: LandslideStatus
   /** The sentence to show about the status. */
   note: string
+  /** What the feed cannot tell: that a level was ended early. */
+  limit: string
   stale: boolean
   reportDate: string | null
   issuedAt: string | null

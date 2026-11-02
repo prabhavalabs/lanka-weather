@@ -29,6 +29,9 @@ const (
 	districtWindow = 48 * time.Hour
 	historyRows    = 30
 	bulletinNote   = "Bulletins reach us through nuuuwan/lk_dmc, usually within hours of being issued. The PDF on dmc.gov.lk is the official version."
+	// landslideLimit is said wherever landslide levels are: no feed says when a
+	// level was ended early (ADR 0011).
+	landslideLimit = "NBRO can lower or end a level before a report's period runs out. We learn of that only from its next report, hours later, so a level shown here may already have been withdrawn. Check with the DMC."
 )
 
 // ErrDivisionNotFound is returned for a code that is not a known DS division.
@@ -80,6 +83,8 @@ type LandslideMeta struct {
 	Status string `json:"status"`
 	// Note is the sentence to show about the status.
 	Note string `json:"note"`
+	// Limit says what the feed cannot tell: that a level was ended early.
+	Limit string `json:"limit"`
 	// Stale says the feed has not been checked recently enough to trust.
 	Stale bool `json:"stale"`
 	// ReportDate is the latest report's local date, YYYY-MM-DD.
@@ -112,7 +117,7 @@ func (service *Service) loadLandslides(ctx context.Context) (loaded, error) {
 	queries := store.New(service.Pool)
 	result := loaded{meta: LandslideMeta{
 		Source: landslides.SourceName, Attribution: landslides.Attribution, Status: StatusWaiting,
-		Note:   "Landslide warnings have not been collected yet.",
+		Note:   "Landslide warnings have not been collected yet.", Limit: landslideLimit,
 		Counts: map[string]int{"1": 0, "2": 0, "3": 0}, Unresolved: []string{}, GeneratedAt: now,
 	}}
 	if version, err := queries.GetSourceVersion(ctx, landslides.SourceName); err == nil {
@@ -379,7 +384,11 @@ func (service *Service) Overview(ctx context.Context, filter Filter) (*Overview,
 	if err != nil {
 		return nil, fmt.Errorf("list bulletins: %w", err)
 	}
-	inForce, err := service.inForce(ctx, queries, now)
+	notices, err := withdrawalNotices(ctx, queries, now)
+	if err != nil {
+		return nil, err
+	}
+	inForce, err := service.inForce(ctx, queries, now, notices)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +397,7 @@ func (service *Service) Overview(ctx context.Context, filter Filter) (*Overview,
 		return nil, err
 	}
 
-	overview := &Overview{Bulletins: toBulletins(rows, now), InForce: inForce, Landslide: state.meta, Meta: OverviewMeta{
+	overview := &Overview{Bulletins: ApplyWithdrawals(toBulletins(rows, now), notices), InForce: inForce, Landslide: state.meta, Meta: OverviewMeta{
 		Source: dmcbulletins.SourceName, Attribution: dmcbulletins.Attribution, Note: bulletinNote, GeneratedAt: now,
 	}}
 	if version, err := queries.GetSourceVersion(ctx, dmcbulletins.SourceName); err == nil {
@@ -409,12 +418,25 @@ func (service *Service) Overview(ctx context.Context, filter Filter) (*Overview,
 	return overview, nil
 }
 
-func (service *Service) inForce(ctx context.Context, queries *store.Queries, now time.Time) ([]Bulletin, error) {
+func (service *Service) inForce(ctx context.Context, queries *store.Queries, now time.Time, notices []Notice) ([]Bulletin, error) {
 	rows, err := queries.ListBulletins(ctx, store.ListBulletinsParams{Since: now.Add(-inForceWindow), MaxRows: 400})
 	if err != nil {
 		return nil, fmt.Errorf("list bulletins in force: %w", err)
 	}
-	return InForce(toBulletins(rows, now)), nil
+	return InForce(ApplyWithdrawals(toBulletins(rows, now), notices)), nil
+}
+
+// withdrawalNotices reads the notices that can bear on anything listed.
+func withdrawalNotices(ctx context.Context, queries *store.Queries, now time.Time) ([]Notice, error) {
+	rows, err := queries.ListWithdrawalNotices(ctx, now.Add(-listWindow))
+	if err != nil {
+		return nil, fmt.Errorf("list withdrawal notices: %w", err)
+	}
+	notices := make([]Notice, 0, len(rows))
+	for _, row := range rows {
+		notices = append(notices, Notice{NoticeRef: NoticeRef{ID: row.DocID, IssuedAt: row.IssuedAt, PDFURL: row.PdfUrl}, Basins: row.WithdrawnBasins})
+	}
+	return notices, nil
 }
 
 // banner picks what the prominent notice announces: a level 2 or 3 landslide
@@ -510,7 +532,8 @@ func toBulletins(rows []store.OfficialBulletin, now time.Time) []Bulletin {
 			ValidFrom: row.ValidFrom, ValidUntil: row.ValidUntil,
 			Current: IsCurrent(row.Severity, row.IssuedAt, row.ValidUntil, now),
 			PDFURL:  row.PdfUrl, SourcePageURL: row.SourcePageUrl, Language: row.Lang,
-			Text: row.Body, TextStatus: row.TextStatus, Districts: districts,
+			WithdrawnBasins: row.WithdrawnBasins,
+			Text:            row.Body, TextStatus: row.TextStatus, Districts: districts,
 			Source: row.Source, SourceTime: row.SourceTime, FetchedAt: row.FetchedAt,
 		})
 	}
@@ -591,18 +614,22 @@ func (service *Service) Official(ctx context.Context, districtID, dsID string) (
 		return nil, fmt.Errorf("read bulletin version: %w", err)
 	}
 
+	notices, err := withdrawalNotices(ctx, queries, now)
+	if err != nil {
+		return nil, err
+	}
 	if districtID != "" {
 		rows, err := queries.ListBulletins(ctx, store.ListBulletinsParams{District: &districtID, Since: now.Add(-districtWindow), MaxRows: 10})
 		if err != nil {
 			return nil, fmt.Errorf("list bulletins for %s: %w", districtID, err)
 		}
-		official.Warnings = dedupe(toBulletins(rows, now))
+		official.Warnings = dedupe(ApplyWithdrawals(toBulletins(rows, now), notices))
 	}
 	named := map[string]bool{}
 	for _, bulletin := range official.Warnings {
 		named[bulletin.ID] = true
 	}
-	inForce, err := service.inForce(ctx, queries, now)
+	inForce, err := service.inForce(ctx, queries, now, notices)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +643,7 @@ func (service *Service) Official(ctx context.Context, districtID, dsID string) (
 	if err != nil {
 		return nil, fmt.Errorf("list latest bulletins: %w", err)
 	}
-	for _, bulletin := range toBulletins(latest, now) {
+	for _, bulletin := range ApplyWithdrawals(toBulletins(latest, now), notices) {
 		// Landslide reports are spoken for by the slot above.
 		if !named[bulletin.ID] && bulletin.Type != string(dmcbulletins.TypeLandslide) {
 			official.General = append(official.General, bulletin)

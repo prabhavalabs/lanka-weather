@@ -205,6 +205,9 @@ func DecodeUpdatedAt(payload []byte) (time.Time, error) {
 
 // Extract is what can be relied on in a bulletin's extracted text.
 type Extract struct {
+	// WithdrawnBasins are the basins a withdrawal notice lists; nil when it is
+	// not one or its list cannot be read.
+	WithdrawnBasins []string
 	// Body is whole English sentences copied unchanged, or "" when there are
 	// none worth showing.
 	Body       string
@@ -230,6 +233,9 @@ func ExtractText(raw string, kind Type, issuedAt time.Time) Extract {
 	extract.ValidFrom, extract.ValidUntil = validity(raw, issuedAt)
 	if kind == TypeLandslide {
 		return extract
+	}
+	if kind == TypeWaterLevel {
+		extract.WithdrawnBasins = WithdrawnBasins(raw)
 	}
 	sentences := cleanParagraphs(raw)
 	body := strings.Join(sentences, "\n\n")
@@ -502,4 +508,73 @@ func DistrictName(id string) string {
 		}
 	}
 	return ""
+}
+
+var (
+	// withdrawalPreamble is how the department introduces its list, in both
+	// wordings seen (eight notices from 2025 to 2026): "... are hereby withdrawn,
+	// as the water levels ...".
+	withdrawalPreamble = regexp.MustCompile(`(?i)\bhereby\s+withdrawn\b`)
+	// withdrawalEnd is the paragraph that follows the list.
+	withdrawalEnd = regexp.MustCompile(`(?i)\bThe Hydrology and Disaster Management Division continues\b|\bEng\.\s`)
+	numberedItem  = regexp.MustCompile(`(?:^|\s)(\d{1,2})\.\s+`)
+)
+
+// maxBasinName bounds one list item: anything longer is not a name read cleanly.
+const maxBasinName = 60
+
+// WithdrawnBasins reads the basins a flood warning withdrawal notice lists, in
+// the issuer's spelling, without the warning details that can follow a name:
+//
+//	1. Kelani Ganga 2. Kalu Ganga 3. Gin Ganga
+//	1. Kelani River Basin: Flood Warning - No. 03 issued on 03.08.2026 at 1:30 PM
+//
+// It returns nil unless the English text has the preamble and a list numbered
+// from 1: some notices are only in Sinhala. Nothing is read from a list it cannot
+// follow to its end, so a misread never withdraws the wrong warning.
+func WithdrawnBasins(raw string) []string {
+	text := strings.Join(strings.Fields(raw), " ")
+	start := withdrawalPreamble.FindStringIndex(text)
+	if start == nil {
+		return nil
+	}
+	text = text[start[1]:]
+	end := withdrawalEnd.FindStringIndex(text)
+	if end == nil {
+		return nil
+	}
+	text = text[:end[0]]
+	marks := numberedItem.FindAllStringSubmatchIndex(text, -1)
+	var items []string
+	var from int
+	next := 1
+	for _, mark := range marks {
+		number, err := strconv.Atoi(text[mark[2]:mark[3]])
+		if err != nil || number != next {
+			continue // a number within an item: "No. 03", "at 1.30"
+		}
+		if next > 1 {
+			items = append(items, text[from:mark[0]])
+		}
+		from = mark[1]
+		next++
+	}
+	if next == 1 {
+		return nil
+	}
+	items = append(items, text[from:])
+	basins := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		name, _, _ := strings.Cut(item, ":")
+		name = strings.TrimSpace(name)
+		if name == "" || len(name) > maxBasinName || !isPlainText(name) {
+			return nil
+		}
+		if !seen[strings.ToLower(name)] {
+			seen[strings.ToLower(name)] = true
+			basins = append(basins, name)
+		}
+	}
+	return basins
 }

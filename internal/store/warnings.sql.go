@@ -13,9 +13,9 @@ import (
 )
 
 const bulletinsNeedingText = `-- name: BulletinsNeedingText :many
-SELECT doc_id, bulletin_type, title, issued_at
+SELECT doc_id, bulletin_type, title, severity, issued_at
 FROM official_bulletins
-WHERE text_status = 'pending'
+WHERE (text_status = 'pending' OR (severity = 'withdrawal' AND withdrawn_basins IS NULL AND text_status <> 'unavailable'))
   AND issued_at >= $1
 ORDER BY issued_at DESC, doc_id
 LIMIT $2
@@ -30,10 +30,12 @@ type BulletinsNeedingTextRow struct {
 	DocID        string    `json:"doc_id"`
 	BulletinType string    `json:"bulletin_type"`
 	Title        string    `json:"title"`
+	Severity     string    `json:"severity"`
 	IssuedAt     time.Time `json:"issued_at"`
 }
 
-// Recent bulletins whose text has not been read yet, newest first.
+// Recent bulletins whose text has not been read yet, newest first, and any
+// withdrawal notice not yet read for the basins it lists, whenever it came.
 func (q *Queries) BulletinsNeedingText(ctx context.Context, arg BulletinsNeedingTextParams) ([]BulletinsNeedingTextRow, error) {
 	rows, err := q.db.Query(ctx, bulletinsNeedingText, arg.Since, arg.MaxRows)
 	if err != nil {
@@ -47,6 +49,7 @@ func (q *Queries) BulletinsNeedingText(ctx context.Context, arg BulletinsNeeding
 			&i.DocID,
 			&i.BulletinType,
 			&i.Title,
+			&i.Severity,
 			&i.IssuedAt,
 		); err != nil {
 			return nil, err
@@ -164,7 +167,7 @@ type InsertLandslideLevelsParams struct {
 }
 
 const landslideBulletinsBetween = `-- name: LandslideBulletinsBetween :many
-SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at
+SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at, withdrawn_basins
 FROM official_bulletins
 WHERE bulletin_type = 'landslide'
   AND issued_at >= $1
@@ -202,6 +205,7 @@ func (q *Queries) LandslideBulletinsBetween(ctx context.Context, since time.Time
 			&i.SourceTime,
 			&i.FetchedAt,
 			&i.TextFetchedAt,
+			&i.WithdrawnBasins,
 		); err != nil {
 			return nil, err
 		}
@@ -272,7 +276,7 @@ func (q *Queries) LandslideReportLevels(ctx context.Context, reportDate pgtype.D
 }
 
 const latestBulletinOfEachType = `-- name: LatestBulletinOfEachType :many
-SELECT DISTINCT ON (bulletin_type) doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at
+SELECT DISTINCT ON (bulletin_type) doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at, withdrawn_basins
 FROM official_bulletins
 WHERE lang <> 'ta'
 ORDER BY bulletin_type, issued_at DESC, doc_id
@@ -308,6 +312,7 @@ func (q *Queries) LatestBulletinOfEachType(ctx context.Context) ([]OfficialBulle
 			&i.SourceTime,
 			&i.FetchedAt,
 			&i.TextFetchedAt,
+			&i.WithdrawnBasins,
 		); err != nil {
 			return nil, err
 		}
@@ -320,7 +325,7 @@ func (q *Queries) LatestBulletinOfEachType(ctx context.Context) ([]OfficialBulle
 }
 
 const latestLandslideBulletin = `-- name: LatestLandslideBulletin :one
-SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at
+SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at, withdrawn_basins
 FROM official_bulletins
 WHERE bulletin_type = 'landslide'
 ORDER BY issued_at DESC, doc_id
@@ -351,6 +356,7 @@ func (q *Queries) LatestLandslideBulletin(ctx context.Context) (OfficialBulletin
 		&i.SourceTime,
 		&i.FetchedAt,
 		&i.TextFetchedAt,
+		&i.WithdrawnBasins,
 	)
 	return i, err
 }
@@ -375,7 +381,7 @@ func (q *Queries) LatestLandslideReport(ctx context.Context) (LandslideReport, e
 }
 
 const listBulletins = `-- name: ListBulletins :many
-SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at
+SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at, withdrawn_basins
 FROM official_bulletins
 WHERE ($1::text IS NULL OR bulletin_type = $1)
   AND ($2::text IS NULL OR $2::text = ANY (districts))
@@ -426,6 +432,48 @@ func (q *Queries) ListBulletins(ctx context.Context, arg ListBulletinsParams) ([
 			&i.SourceTime,
 			&i.FetchedAt,
 			&i.TextFetchedAt,
+			&i.WithdrawnBasins,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWithdrawalNotices = `-- name: ListWithdrawalNotices :many
+SELECT doc_id, issued_at, pdf_url, withdrawn_basins
+FROM official_bulletins
+WHERE severity = 'withdrawal'
+  AND issued_at >= $1
+ORDER BY issued_at, doc_id
+`
+
+type ListWithdrawalNoticesRow struct {
+	DocID           string    `json:"doc_id"`
+	IssuedAt        time.Time `json:"issued_at"`
+	PdfUrl          string    `json:"pdf_url"`
+	WithdrawnBasins []string  `json:"withdrawn_basins"`
+}
+
+// Withdrawal notices, oldest first: the first after a warning is what ended it.
+func (q *Queries) ListWithdrawalNotices(ctx context.Context, since time.Time) ([]ListWithdrawalNoticesRow, error) {
+	rows, err := q.db.Query(ctx, listWithdrawalNotices, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWithdrawalNoticesRow{}
+	for rows.Next() {
+		var i ListWithdrawalNoticesRow
+		if err := rows.Scan(
+			&i.DocID,
+			&i.IssuedAt,
+			&i.PdfUrl,
+			&i.WithdrawnBasins,
 		); err != nil {
 			return nil, err
 		}
@@ -463,21 +511,23 @@ SET severity = $1,
     body = $6,
     text_status = $7,
     districts = $8,
-    text_fetched_at = $9
-WHERE doc_id = $10
+    withdrawn_basins = $9,
+    text_fetched_at = $10
+WHERE doc_id = $11
 `
 
 type UpdateBulletinTextParams struct {
-	Severity      string     `json:"severity"`
-	Colour        *string    `json:"colour"`
-	MessageID     *string    `json:"message_id"`
-	ValidFrom     *time.Time `json:"valid_from"`
-	ValidUntil    *time.Time `json:"valid_until"`
-	Body          *string    `json:"body"`
-	TextStatus    string     `json:"text_status"`
-	Districts     []string   `json:"districts"`
-	TextFetchedAt *time.Time `json:"text_fetched_at"`
-	DocID         string     `json:"doc_id"`
+	Severity        string     `json:"severity"`
+	Colour          *string    `json:"colour"`
+	MessageID       *string    `json:"message_id"`
+	ValidFrom       *time.Time `json:"valid_from"`
+	ValidUntil      *time.Time `json:"valid_until"`
+	Body            *string    `json:"body"`
+	TextStatus      string     `json:"text_status"`
+	Districts       []string   `json:"districts"`
+	WithdrawnBasins []string   `json:"withdrawn_basins"`
+	TextFetchedAt   *time.Time `json:"text_fetched_at"`
+	DocID           string     `json:"doc_id"`
 }
 
 func (q *Queries) UpdateBulletinText(ctx context.Context, arg UpdateBulletinTextParams) error {
@@ -490,6 +540,7 @@ func (q *Queries) UpdateBulletinText(ctx context.Context, arg UpdateBulletinText
 		arg.Body,
 		arg.TextStatus,
 		arg.Districts,
+		arg.WithdrawnBasins,
 		arg.TextFetchedAt,
 		arg.DocID,
 	)

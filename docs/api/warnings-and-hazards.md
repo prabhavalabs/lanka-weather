@@ -86,7 +86,12 @@ Only `bulletins` is filtered. The list reaches back 45 days, newest first.
 ```
 
 - `title` and `colour` are the issuer's. `severity` is `warning`, `advisory`,
-  `withdrawal` or `routine`, read from the title and colour. Landslide reports
+  `withdrawal` or `routine`, read from the title and colour. A flood warning that a
+  later notice names by basin has `current: false` and `withdrawnBy`
+  (`id`, `issuedAt`, `pdfUrl`); one such a notice may have ended, when they cannot be
+  matched, stays current with `mayBeWithdrawnBy`. A notice lists `withdrawnBasins`,
+  empty when its list cannot be read (ADR 0011). `landslide.limit` is the sentence to
+  show about levels ended early, which no feed reports. Landslide reports
   are `routine`: their seriousness is each division's level.
 - `text` is null unless `textStatus` is `clean`: sentences copied unchanged,
   separated by blank lines, and possibly incomplete. Other statuses are

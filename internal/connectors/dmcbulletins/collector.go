@@ -160,6 +160,7 @@ func (collector *Collector) collectText(ctx context.Context, queries *store.Quer
 			Colour: optional(extract.Colour), MessageID: optional(extract.MessageID),
 			ValidFrom: extract.ValidFrom, ValidUntil: extract.ValidUntil, Body: optional(extract.Body),
 			TextStatus: extract.Status, Districts: nonNil(extract.Districts), TextFetchedAt: &now,
+			WithdrawnBasins: withdrawnBasins(row.Severity, extract),
 		}); err != nil {
 			failures = append(failures, fmt.Errorf("store text of %s: %w", row.DocID, err))
 		}
@@ -176,6 +177,15 @@ func (collector *Collector) raw(ctx context.Context, dataset, path string) ([]by
 		URL:    fmt.Sprintf("%s/data_%s/data/%s/%s", base, dataset, dataset, path),
 		Accept: "text/plain, application/json, */*",
 	})
+}
+
+// withdrawnBasins is non-nil for every withdrawal notice whose text has been
+// read, so it is not read again, and nil otherwise.
+func withdrawnBasins(severity string, extract Extract) []string {
+	if severity != string(SeverityWithdrawal) {
+		return nil
+	}
+	return nonNil(extract.WithdrawnBasins)
 }
 
 func optional(value string) *string {

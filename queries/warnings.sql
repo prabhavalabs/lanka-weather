@@ -18,10 +18,11 @@ SET bulletin_type = EXCLUDED.bulletin_type,
     fetched_at = EXCLUDED.fetched_at;
 
 -- name: BulletinsNeedingText :many
--- Recent bulletins whose text has not been read yet, newest first.
-SELECT doc_id, bulletin_type, title, issued_at
+-- Recent bulletins whose text has not been read yet, newest first, and any
+-- withdrawal notice not yet read for the basins it lists, whenever it came.
+SELECT doc_id, bulletin_type, title, severity, issued_at
 FROM official_bulletins
-WHERE text_status = 'pending'
+WHERE (text_status = 'pending' OR (severity = 'withdrawal' AND withdrawn_basins IS NULL AND text_status <> 'unavailable'))
   AND issued_at >= @since
 ORDER BY issued_at DESC, doc_id
 LIMIT @max_rows;
@@ -36,6 +37,7 @@ SET severity = @severity,
     body = @body,
     text_status = @text_status,
     districts = @districts,
+    withdrawn_basins = @withdrawn_basins,
     text_fetched_at = @text_fetched_at
 WHERE doc_id = @doc_id;
 
@@ -53,6 +55,14 @@ WHERE (sqlc.narg('bulletin_type')::text IS NULL OR bulletin_type = sqlc.narg('bu
   AND issued_at >= @since
 ORDER BY issued_at DESC, doc_id
 LIMIT @max_rows;
+
+-- name: ListWithdrawalNotices :many
+-- Withdrawal notices, oldest first: the first after a warning is what ended it.
+SELECT doc_id, issued_at, pdf_url, withdrawn_basins
+FROM official_bulletins
+WHERE severity = 'withdrawal'
+  AND issued_at >= @since
+ORDER BY issued_at, doc_id;
 
 -- name: LatestBulletinOfEachType :many
 -- The newest English bulletin of each type: the latest general bulletins.
