@@ -74,26 +74,12 @@ type LastRunRow struct {
 	Status    string    `json:"status"`
 }
 
+// The newest run of a source, to decide when it is next due.
 func (q *Queries) LastRun(ctx context.Context, source string) (LastRunRow, error) {
 	row := q.db.QueryRow(ctx, lastRun, source)
 	var i LastRunRow
 	err := row.Scan(&i.StartedAt, &i.Status)
 	return i, err
-}
-
-const lastRunStart = `-- name: LastRunStart :one
-SELECT started_at
-FROM source_runs
-WHERE source = $1
-ORDER BY started_at DESC
-LIMIT 1
-`
-
-func (q *Queries) LastRunStart(ctx context.Context, source string) (time.Time, error) {
-	row := q.db.QueryRow(ctx, lastRunStart, source)
-	var started_at time.Time
-	err := row.Scan(&started_at)
-	return started_at, err
 }
 
 const lastSuccessfulRun = `-- name: LastSuccessfulRun :one

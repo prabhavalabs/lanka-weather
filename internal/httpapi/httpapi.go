@@ -13,10 +13,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/summary"
+	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
 // Envelope is the shape of every JSON response.
@@ -50,12 +53,36 @@ type Places interface {
 	Search(ctx context.Context, query string, limit int) (places.Result, error)
 }
 
+// Weather serves the weather grid, point forecasts, regions and wind.
+type Weather interface {
+	CurrentGridJSON(ctx context.Context) (plain, gzipped []byte, err error)
+	Point(ctx context.Context, lon, lat float64, hours, days int) (*weather.Point, error)
+	WindJSON(ctx context.Context, at time.Time) (plain, gzipped []byte, err error)
+	RegionWeather(ctx context.Context, level string) (*weather.RegionsResponse, error)
+}
+
+// Floods serves the Google flood-forecast layer.
+type Floods interface {
+	Layer(ctx context.Context) (floods.FeatureCollection, error)
+}
+
+// Summaries serves the location summary.
+type Summaries interface {
+	Summary(ctx context.Context, lon, lat float64) (*summary.Summary, error)
+}
+
 // Dependencies are the services the API reads from.
 type Dependencies struct {
 	Logger  *slog.Logger
 	Rivers  Rivers
 	Regions Regions
 	Places  Places
+	Weather Weather
+	Floods  Floods
+	Summary Summaries
+	// Now is the clock for requests without an explicit time; nil is
+	// time.Now.
+	Now func() time.Time
 	// Ready reports whether the service can serve requests (database reachable).
 	Ready func(ctx context.Context) error
 }
@@ -91,6 +118,12 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/regions/{id}", api.region)
 		r.Get("/tiles/regions/{z}/{x}/{y}.pbf", api.regionTile)
 		r.Get("/places/search", api.searchPlaces)
+		r.Get("/weather/current", api.weatherCurrent)
+		r.Get("/weather/point", api.weatherPoint)
+		r.Get("/weather/wind", api.weatherWind)
+		r.Get("/weather/regions", api.weatherRegions)
+		r.Get("/floods/forecast", api.floodForecast)
+		r.Get("/summary", api.summary)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {

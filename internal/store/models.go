@@ -8,6 +8,42 @@ import (
 	"time"
 )
 
+type FloodArea struct {
+	ID         string     `json:"id"`
+	Kind       string     `json:"kind"`
+	Source     string     `json:"source"`
+	GaugeID    *string    `json:"gauge_id"`
+	Severity   string     `json:"severity"`
+	IssuedAt   *time.Time `json:"issued_at"`
+	ValidFrom  *time.Time `json:"valid_from"`
+	ValidUntil *time.Time `json:"valid_until"`
+	Properties []byte     `json:"properties"`
+	Geom       []byte     `json:"geom"`
+	FetchedAt  time.Time  `json:"fetched_at"`
+}
+
+type FloodGauge struct {
+	GaugeID            string      `json:"gauge_id"`
+	Source             string      `json:"source"`
+	GaugeSource        string      `json:"gauge_source"`
+	SiteName           string      `json:"site_name"`
+	River              string      `json:"river"`
+	Lon                float64     `json:"lon"`
+	Lat                float64     `json:"lat"`
+	Geom               interface{} `json:"geom"`
+	QualityVerified    bool        `json:"quality_verified"`
+	Severity           string      `json:"severity"`
+	Trend              string      `json:"trend"`
+	IssuedAt           time.Time   `json:"issued_at"`
+	ForecastStart      *time.Time  `json:"forecast_start"`
+	ForecastEnd        *time.Time  `json:"forecast_end"`
+	WarningLevel       *float64    `json:"warning_level"`
+	DangerLevel        *float64    `json:"danger_level"`
+	ExtremeDangerLevel *float64    `json:"extreme_danger_level"`
+	ValueUnit          string      `json:"value_unit"`
+	FetchedAt          time.Time   `json:"fetched_at"`
+}
+
 type Place struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
@@ -139,4 +175,58 @@ type SourceVersion struct {
 	SourceTime time.Time `json:"source_time"`
 	FetchedAt  time.Time `json:"fetched_at"`
 	Records    int32     `json:"records"`
+}
+
+type WeatherField struct {
+	RunID       int64     `json:"run_id"`
+	Variable    string    `json:"variable"`
+	Source      string    `json:"source"`
+	ValidFrom   time.Time `json:"valid_from"`
+	StepSeconds int32     `json:"step_seconds"`
+	Steps       int32     `json:"steps"`
+	NodeValues  []float32 `json:"node_values"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+type WeatherGridNode struct {
+	Grid       string      `json:"grid"`
+	Node       int32       `json:"node"`
+	Lon        float64     `json:"lon"`
+	Lat        float64     `json:"lat"`
+	Land       bool        `json:"land"`
+	ElevationM *float64    `json:"elevation_m"`
+	Cell       []byte      `json:"cell"`
+	Geom       interface{} `json:"geom"`
+	Source     string      `json:"source"`
+	UpdatedAt  time.Time   `json:"updated_at"`
+}
+
+type WeatherRun struct {
+	ID         int64     `json:"id"`
+	Kind       string    `json:"kind"`
+	Source     string    `json:"source"`
+	Model      string    `json:"model"`
+	Grid       string    `json:"grid"`
+	Nodes      []int32   `json:"nodes"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type WindField struct {
+	RunAt        time.Time `json:"run_at"`
+	ForecastHour int32     `json:"forecast_hour"`
+	ValidAt      time.Time `json:"valid_at"`
+	Source       string    `json:"source"`
+	Model        string    `json:"model"`
+	Level        string    `json:"level"`
+	Lon0         float64   `json:"lon0"`
+	Lat0         float64   `json:"lat0"`
+	Dlon         float64   `json:"dlon"`
+	Dlat         float64   `json:"dlat"`
+	Nx           int32     `json:"nx"`
+	Ny           int32     `json:"ny"`
+	Scale        float64   `json:"scale"`
+	U            []byte    `json:"u"`
+	V            []byte    `json:"v"`
+	FetchedAt    time.Time `json:"fetched_at"`
 }

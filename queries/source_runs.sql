@@ -15,8 +15,9 @@ WHERE source = $1 AND status = 'ok'
 ORDER BY started_at DESC
 LIMIT 1;
 
--- name: LastRunStart :one
-SELECT started_at
+-- name: LastRun :one
+-- The newest run of a source, to decide when it is next due.
+SELECT started_at, status
 FROM source_runs
 WHERE source = $1
 ORDER BY started_at DESC
@@ -30,10 +31,3 @@ WHERE status = 'running' AND started_at < $1;
 
 -- name: DeleteSourceRunsBefore :exec
 DELETE FROM source_runs WHERE started_at < $1;
-
--- name: LastRun :one
-SELECT started_at, status
-FROM source_runs
-WHERE source = $1
-ORDER BY started_at DESC
-LIMIT 1;

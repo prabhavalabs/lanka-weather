@@ -123,23 +123,32 @@ func (scheduler *Scheduler) RunDue(ctx context.Context) {
 			scheduler.Logger.Warn("read last run failed", "source", collector.Name(), "error", err)
 			continue
 		}
-		if err == nil && scheduler.now().Sub(last.StartedAt) < wait(collector, last.Status) {
+		if err == nil && scheduler.now().Sub(last.StartedAt) < DueAfter(collector, last.Status) {
 			continue
 		}
 		scheduler.RunOne(ctx, collector)
 	}
 }
 
-// wait is how long after a run's start the collector runs again: its
-// interval, or its retry delay when the run failed and it has one.
-func wait(collector source.Collector, status string) time.Duration {
+// DefaultRetryAfter is how soon a collector whose last run failed is tried
+// again, when its interval is longer: a three-hourly forecast should not
+// stay missing for three hours because its source was briefly down. A
+// collector that implements source.Retrier chooses its own delay instead.
+const DefaultRetryAfter = 15 * time.Minute
+
+// DueAfter is how long after its last run a collector is due again: its
+// interval after a success, or its retry delay after a failure (the
+// collector's own RetryAfter, else DefaultRetryAfter), whichever is shorter.
+func DueAfter(collector source.Collector, lastStatus string) time.Duration {
 	interval := collector.Interval()
-	if retrier, ok := collector.(source.Retrier); ok && status == "error" {
-		if retry := retrier.RetryAfter(); retry > 0 && retry < interval {
-			return retry
-		}
+	if lastStatus != "error" {
+		return interval
 	}
-	return interval
+	retry := DefaultRetryAfter
+	if retrier, ok := collector.(source.Retrier); ok && retrier.RetryAfter() > 0 {
+		retry = retrier.RetryAfter()
+	}
+	return min(interval, retry)
 }
 
 // RunOne runs one collector now and records the run.
@@ -180,6 +189,19 @@ func (scheduler *Scheduler) cleanup(ctx context.Context, now time.Time) {
 	if err := queries.DeleteSourceRunsBefore(ctx, now.Add(-runRetention)); err != nil {
 		scheduler.Logger.Warn("delete old runs failed", "error", err)
 	}
+	for _, collector := range scheduler.Collectors {
+		if pruner, ok := collector.(source.Pruner); ok {
+			if err := pruner.Prune(ctx, now); err != nil {
+				scheduler.Logger.Warn("prune failed", "source", collector.Name(), "error", err)
+			}
+		}
+	}
+}
+
+// Prune applies every collector's retention limit now, as the worker does
+// hourly; `collect` calls it after its run.
+func (scheduler *Scheduler) Prune(ctx context.Context) {
+	scheduler.cleanup(ctx, scheduler.now())
 }
 
 func (scheduler *Scheduler) now() time.Time {
