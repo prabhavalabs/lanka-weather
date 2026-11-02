@@ -1,16 +1,19 @@
 import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { mapStyles, panLimit, sriLankaBounds, type MapTheme } from "./config"
+import { MapContext } from "./MapContext"
 
 interface MapViewProps {
   theme: MapTheme
+  /** Data layers; they read the map from MapContext. */
+  children?: ReactNode
 }
 
-/** The base map of Sri Lanka. Data layers are added on top of it. */
-export function MapView({ theme }: MapViewProps) {
+/** The base map of Sri Lanka. Data layers are rendered as children. */
+export function MapView({ theme, children }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
-  const map = useRef<maplibregl.Map | null>(null)
+  const [map, setMap] = useState<maplibregl.Map | null>(null)
 
   useEffect(() => {
     if (!container.current) return
@@ -30,20 +33,29 @@ export function MapView({ theme }: MapViewProps) {
       new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: false } }),
       "bottom-right",
     )
-    map.current = instance
+    instance.once("load", () => setMap(instance))
     return () => {
+      setMap(null)
       instance.remove()
-      map.current = null
     }
     // The map is created once; theme changes are applied below without recreating it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    map.current?.setStyle(mapStyles[theme])
-  }, [theme])
+    // Data layers re-add themselves on "style.load" after a style change.
+    map?.setStyle(mapStyles[theme])
+  }, [map, theme])
 
   return (
-    <div ref={container} className="absolute inset-0" aria-label="Map of Sri Lanka" role="region" />
+    <>
+      <div
+        ref={container}
+        className="absolute inset-0"
+        aria-label="Map of Sri Lanka"
+        role="region"
+      />
+      <MapContext.Provider value={map}>{children}</MapContext.Provider>
+    </>
   )
 }
