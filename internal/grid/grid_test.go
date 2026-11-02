@@ -136,3 +136,34 @@ func TestExpand(t *testing.T) {
 		t.Fatalf("expand put %v at node 7 and %v at a masked node", full[node.Index], full[0])
 	}
 }
+
+func TestCoarseGridsStayCheap(t *testing.T) {
+	air, sea := AirQuality(), Sea()
+	if len(air.Nodes) == 0 || len(air.Nodes) > 80 {
+		t.Fatalf("air-quality nodes = %d", len(air.Nodes))
+	}
+	if len(sea.Nodes) == 0 || len(sea.Nodes) > 90 {
+		t.Fatalf("sea nodes = %d", len(sea.Nodes))
+	}
+	for _, node := range sea.Nodes {
+		if OnLand(node.Lon, node.Lat) {
+			t.Fatalf("sea node on land: %+v", node)
+		}
+	}
+	if len(Land()) == 0 {
+		t.Fatal("land rings are empty")
+	}
+}
+
+func TestNearSea(t *testing.T) {
+	for name, place := range map[string][2]float64{"Colombo": {79.86, 6.92}, "Galle": {80.22, 6.03}, "at sea": {81, 5.5}} {
+		if !NearSea(place[0], place[1], 0.15) {
+			t.Errorf("%s should be near the sea", name)
+		}
+	}
+	for name, place := range map[string][2]float64{"Kandy": {80.63, 7.29}, "Nuwara Eliya": {80.77, 6.97}, "Anuradhapura": {80.4, 8.31}} {
+		if NearSea(place[0], place[1], 0.15) {
+			t.Errorf("%s should be inland", name)
+		}
+	}
+}
