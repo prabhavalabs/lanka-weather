@@ -54,23 +54,46 @@ Use `.env.example` files to document required configuration.
 
 ## Getting started
 
-Prerequisites: Go 1.25 or later, Node.js 24 or later and pnpm (enabled
-through Corepack: `corepack enable`).
+Prerequisites: Go 1.25 or later, Node.js 24 or later, pnpm (enabled
+through Corepack: `corepack enable`) and Docker.
 
 ```bash
-make bootstrap   # install Node and Go dependencies
-make dev-api     # terminal 1: API on http://localhost:8080
-make dev-web     # terminal 2: web app on http://localhost:5173
+cp .env.example .env   # local settings; .env is never committed
+make bootstrap         # install Node and Go dependencies
+make db-up             # PostgreSQL with PostGIS on 127.0.0.1:55440
+make collect           # migrate, then fetch every source once
+make dev-api           # terminal 1: API on http://localhost:8080
+make dev-worker        # terminal 2: scheduler that keeps data current
+make dev-web           # terminal 3: web app on http://localhost:5173
 ```
 
 The Vite dev server proxies `/v1` and `/healthz` to the API. Set
 `LANKAWEATHER_API_URL` to point it elsewhere, and `LANKAWEATHER_ADDR` to
 change the API's listen address.
 
+### Commands
+
+| Command | Purpose |
+|---|---|
+| `lankaweather migrate` | Apply database migrations |
+| `lankaweather serve` | HTTP API |
+| `lankaweather worker` | Scheduler: runs each collector at its interval; one leader across replicas |
+| `lankaweather collect` | Run every collector once and exit |
+
+### API
+
+| Endpoint | Returns |
+|---|---|
+| `GET /healthz`, `GET /readyz` | Liveness; readiness including the database |
+| `GET /v1/layers` | Layer catalogue with refresh cadence and staleness limits |
+| `GET /v1/rivers/levels` | River gauging stations as GeoJSON: level, flood status, trend, data age |
+| `GET /v1/rivers/stations/{id}/readings?hours=72` | One station's readings (1 to 720 hours) |
+
 Before opening a pull request, run everything CI runs:
 
 ```bash
-make ci          # format, lint, type-check, tests and builds
+make ci          # format, lint, type checks, generated-code check, tests, builds;
+                 # integration tests too when LANKAWEATHER_TEST_DATABASE_URL is set
 ```
 
 ## Contributing

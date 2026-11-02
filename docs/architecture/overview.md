@@ -60,6 +60,7 @@ pattern used in TerraGuard:
 | `serve` | HTTP API and, in production, the built web application |
 | `worker` | Scheduler and connectors; one leader elected with a Postgres advisory lock |
 | `migrate` | Database migrations (goose) |
+| `collect` | Run every collector once and exit |
 
 Internal packages (planned):
 
@@ -96,12 +97,12 @@ divisions are under a landslide warning) and bounding-box queries.
 ## Data flow for one layer: river levels
 
 1. The worker polls the Irrigation Department gauge service every
-   15 minutes.
+   15 minutes (ADR 0004).
 2. The connector decodes the payload into readings: station, level,
    unit, observed time.
 3. Readings are upserted; the station's alert, minor-flood and
    major-flood thresholds are joined to give a status and a trend.
-4. `GET /v1/layers/river-levels` returns GeoJSON with status, trend,
+4. `GET /v1/rivers/levels` returns GeoJSON with status, trend,
    observed time and fetched time; the response sets `Cache-Control`
    to match the cadence.
 5. The web app renders the stations, colours them by status and shows
