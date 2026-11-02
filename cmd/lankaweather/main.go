@@ -151,7 +151,7 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 	}
 	if key := os.Getenv("LANKAWEATHER_GOOGLE_API_KEY"); key != "" {
 		list = append(list, &googleflood.Collector{Pool: pool, Client: client, APIKey: key, Logger: logger,
-			IncludeUnverified: os.Getenv("LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED") == "true"})
+			IncludeUnverified: googleflood.IncludeUnverified(os.Getenv("LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED"))})
 	} else {
 		logger.Info("LANKAWEATHER_GOOGLE_API_KEY is not set; Google flood forecasts are not collected")
 	}
