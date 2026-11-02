@@ -84,6 +84,17 @@
   --status-stroke: #0a0a0a;
   --status-stroke-selected: #ec4f16;
 
+  /* Rivers on the map: a stretch nothing measures, minor streams, the halo that
+     lifts rivers off the basemap, and river names */
+  --river-unassessed: #5a7f99;
+  --river-stream: #8fb3c9;
+  --river-casing: #ffffff;
+  --river-label: #0b5a8f;
+  /* Flood basin outlines */
+  --basin-outline: #4c6b80;
+  /* Past flood extents: violet, because no live forecast uses it */
+  --past-flood: #6b46a8;
+
   /* Air temperature, cool to hot (<=18, 21, 24, 27, 30, 33, >=36 °C) */
   --temp-1: #5b6cf0;
   --temp-2: #3d9fe0;
@@ -199,6 +210,13 @@
   --status-unknown-foreground: #0a0a0a;
   --status-stroke: #0a0a0a;
   --status-stroke-selected: #ff5a1f;
+
+  --river-unassessed: #7fa6c0;
+  --river-stream: #48687d;
+  --river-casing: #050607;
+  --river-label: #8fd0fa;
+  --basin-outline: #8aa9bd;
+  --past-flood: #b89bee;
 
   --temp-1: #6f7ff5;
   --temp-2: #4aa9e8;

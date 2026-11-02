@@ -70,6 +70,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-past-flood: var(--past-flood);
   --color-status-normal: var(--status-normal);
   --color-status-normal-foreground: var(--status-normal-foreground);
   --color-status-alert: var(--status-alert);

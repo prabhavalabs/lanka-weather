@@ -6,8 +6,11 @@ import type { LayerSpecification, Map as MapLibreMap } from "maplibre-gl"
  * - `fills`: the weather field and region colours, over land and landcover
  *   but under a copy of the basemap's water, so they are clipped to the
  *   coast at every zoom;
- * - `lines`: region boundaries, over roads;
+ * - `basins`: flood basin tints, over those colours and also under the water;
+ * - `lines`: region boundaries and basin outlines, over roads;
+ * - `past`: past flood extents, under anything current;
  * - `areas`: flood polygons;
+ * - `rivers`: the river network, over flood areas so a river stays readable;
  * - `particles`: the animated wind;
  * - basemap labels;
  * - `points`: river gauges, flood gauges and their labels, on top.
@@ -17,12 +20,16 @@ import type { LayerSpecification, Map as MapLibreMap } from "maplibre-gl"
  * MapLibre reloads the whole style on a theme change, so layers call
  * `slotBefore` on every style load.
  */
-export type Slot = "fills" | "lines" | "areas" | "particles" | "points"
+export type Slot =
+  "fills" | "basins" | "lines" | "past" | "areas" | "rivers" | "particles" | "points"
 
 const anchors: Record<Slot, string> = {
   fills: "slot:fills",
+  basins: "slot:basins",
   lines: "slot:lines",
+  past: "slot:past",
   areas: "slot:areas",
+  rivers: "slot:rivers",
   particles: "slot:particles",
   points: "slot:points",
 }
@@ -69,10 +76,11 @@ export function ensureSlots(map: MapLibreMap) {
   const plan = slotPlan(layers)
 
   map.addLayer(anchor(anchors.fills), plan.fillsBefore)
+  map.addLayer(anchor(anchors.basins), plan.fillsBefore)
   const water = layers.find((layer) => layer.id === plan.waterId)
   if (water) map.addLayer({ ...water, id: waterMaskId } as LayerSpecification, plan.fillsBefore)
 
-  for (const slot of ["lines", "areas", "particles"] as const) {
+  for (const slot of ["lines", "past", "areas", "rivers", "particles"] as const) {
     map.addLayer(anchor(anchors[slot]), plan.overlaysBefore)
   }
   map.addLayer(anchor(anchors.points))

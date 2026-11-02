@@ -79,6 +79,10 @@ const nonTextPairs: [string, string][] = [
   // Map symbols stand off their outline; the selected outline stands off the land.
   ...statuses.map((status) => [`status-${status}`, "status-stroke"] as [string, string]),
   ["status-stroke-selected", "map-land"],
+  ["river-unassessed", "map-land"],
+  ["basin-outline", "map-land"],
+  ["past-flood", "map-land"],
+  ["status-normal", "map-land"],
 ]
 
 for (const [name, tokens] of Object.entries(themes)) {
