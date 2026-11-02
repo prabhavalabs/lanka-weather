@@ -94,10 +94,13 @@ interval come from the layer catalogue served by the API, so cadence is
 defined once.
 
 The map uses MapLibre GL with OpenFreeMap basemaps, vector tiles from the
-API for administrative regions, PMTiles for other static geography
-(rivers), GeoJSON sources for stations
-and warnings, raster tiles for imagery, and a canvas overlay for
-animated wind.
+API for administrative regions (coloured by weather through feature
+state), PMTiles for other static geography (rivers), GeoJSON sources for
+stations, flood forecasts and warnings, an image painted in the browser
+for the weather grid, raster tiles for imagery, and a WebGL custom layer
+for animated wind. Layers are stacked through fixed slots, fills are
+clipped to the coast by the basemap's water, and a click or a search
+opens the weather of a place in the location panel (ADR 0009).
 
 ### PostgreSQL + PostGIS
 

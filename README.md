@@ -117,6 +117,20 @@ Region ids are Department of Census and Statistics codes: `LK-2`
 The weather and flood endpoints are described, with example responses, in
 [docs/api/weather-and-floods.md](docs/api/weather-and-floods.md).
 
+### Web application
+
+One map of Sri Lanka with weather by region (province, district, DS or GN
+division), a smooth weather field (temperature, rain, humidity, cloud or
+wind), animated GFS wind with a 72-hour time scrubber, Google flood
+forecasts and river levels. Search with ⌘K or Ctrl+K; click the map, a
+region or a gauge for its weather, 72-hour and 7-day forecast, nearby
+gauges and alerts. Alerts derived by lanka-weather are labelled
+"Estimate"; official warnings come from the Department of Meteorology
+and the DMC. A selection is kept in the URL, for example
+`/?at=7.2931,80.6350&name=Kandy`, `/?region=LK-21`,
+`/?station=peradeniya` or `/?gauge=hybas_4121155030`. ADR 0009 records
+how the map is put together.
+
 Before opening a pull request, run everything CI runs:
 
 ```bash
