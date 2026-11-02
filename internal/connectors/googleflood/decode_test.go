@@ -135,6 +135,26 @@ func TestParsePolygonKML(t *testing.T) {
 	}
 }
 
+func TestInundationMapTypeAndWindowReachTheAreas(t *testing.T) {
+	payload := []byte(`{"floodStatuses":[{"gaugeId":"hybas_1","gaugeLocation":{"latitude":7,"longitude":80},
+		"issuedTime":"2026-11-02T00:00:00Z","severity":"SEVERE",
+		"forecastTimeRange":{"start":"2026-11-02T00:00:00Z","end":"2026-11-08T00:00:00Z"},
+		"inundationMapSet":{"inundationMapType":"PROBABILITY",
+			"inundationMapsTimeRange":{"start":"2026-11-03T00:00:00Z","end":"2026-11-04T00:00:00Z"},
+			"inundationMaps":[{"level":"HIGH","serializedPolygonId":"h"},{"level":"LOW","serializedPolygonId":"l"}]}}]}`)
+	statuses, _, _, err := DecodeStatuses(payload)
+	if err != nil || len(statuses) != 1 {
+		t.Fatalf("statuses = %v, %v", statuses, err)
+	}
+	areas := GaugeAreas(statuses[0])
+	if len(areas) != 2 || areas[0].Properties["mapType"] != "probability" {
+		t.Fatalf("areas = %+v", areas)
+	}
+	if !areas[0].ValidFrom.Equal(time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("the window should be the maps' own: %v", areas[0].ValidFrom)
+	}
+}
+
 func TestIncludeUnverifiedIsOnUnlessFalse(t *testing.T) {
 	for setting, want := range map[string]bool{"": true, "true": true, "1": true, "false": false, "FALSE": false, " false ": false} {
 		if got := IncludeUnverified(setting); got != want {

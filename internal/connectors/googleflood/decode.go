@@ -78,6 +78,12 @@ type Status struct {
 	// are polygon IDs, given for gauges above normal.
 	NotificationPolygon string
 	InundationPolygons  map[string]string
+	// InundationType says what the levels mean: "probability" (high inside
+	// medium inside low) or "depth", from Google's InundationMapType.
+	InundationType string
+	// InundationStart and InundationEnd are the state the maps refer to.
+	InundationStart *time.Time
+	InundationEnd   *time.Time
 }
 
 type wireInterval struct {
@@ -106,6 +112,8 @@ type wireStatus struct {
 			Level     string `json:"level"`
 			PolygonID string `json:"serializedPolygonId"`
 		} `json:"inundationMaps"`
+		TimeRange *wireInterval `json:"inundationMapsTimeRange"`
+		MapType   string        `json:"inundationMapType"`
 	} `json:"inundationMapSet"`
 }
 
@@ -167,6 +175,11 @@ func decodeStatus(wire wireStatus) (Status, bool) {
 				}
 				status.InundationPolygons[level] = id
 			}
+		}
+		status.InundationType = strings.ToLower(strings.TrimSpace(wire.InundationMapSet.MapType))
+		if timeRange := wire.InundationMapSet.TimeRange; timeRange != nil {
+			status.InundationStart, _ = parseTime(timeRange.Start)
+			status.InundationEnd, _ = parseTime(timeRange.End)
 		}
 	}
 	return status, true
@@ -270,8 +283,10 @@ const (
 	KindSignificantEvent = "significant_event"
 )
 
-// DecodeFlashFloods reads flashFlood:search and keeps the forecasts
-// affecting Sri Lanka, one area per likely or highly likely polygon. It does
+// DecodeFlashFloods reads flashFloods:search and keeps the forecasts affecting
+// Sri Lanka, one area per likely or highly likely polygon. eventPolygonId is
+// not read: Google documents it as the union of the other two, and live it
+// repeats the highly likely polygon, so drawing it would add nothing. It does
 // no I/O.
 func DecodeFlashFloods(payload []byte) ([]Area, string, error) {
 	var page struct {
@@ -389,6 +404,12 @@ func GaugeAreas(status Status) []Area {
 		if id := status.InundationPolygons[level]; id != "" {
 			area := base
 			area.PolygonID, area.Kind = id, "inundation_"+level
+			if status.InundationStart != nil || status.InundationEnd != nil {
+				area.ValidFrom, area.ValidUntil = status.InundationStart, status.InundationEnd
+			}
+			if status.InundationType != "" {
+				area.Properties = map[string]any{"mapType": status.InundationType}
+			}
 			areas = append(areas, area)
 		}
 	}

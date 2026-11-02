@@ -27,16 +27,16 @@ const (
 	// Interval: gauge statuses are reissued about daily and flash floods a
 	// few times a day; hourly picks a new issue up soon. A calm run is about
 	// 13 requests with extended coverage: 2 for statuses, 7 for 320 gauges'
-	// models, and 2 each for the worldwide searches, whose last page is empty.
+	// models, and 2 each for the two searches, whose last page is empty.
 	Interval = time.Hour
 	// Retention is the longest Google's terms let gauge search results be
 	// kept.
 	Retention = 24 * time.Hour
-	// searchPageSize keeps requests low: the 131 flash floods live on
+	// searchPageSize keeps requests low: the 131 flash floods live worldwide on
 	// 2 November 2026 came on one page of this size, against seven at 20.
 	searchPageSize = 1000
-	// maxPages bounds one search. Reaching it is logged, not silent: the worldwide
-	// searches filter after paging, so a Sri Lankan event can be on any page.
+	// maxPages bounds one search. Reaching it is logged, not silent: significant
+	// events are worldwide and filtered here, so one can be on any page.
 	maxPages = 25
 	// maxPolygons bounds the polygons read in a run. Flash floods and events are
 	// read first, then verified gauges, so lower-confidence gauges in a large
@@ -94,11 +94,11 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 	if err != nil {
 		return 0, fmt.Errorf("gauge models: %w", err)
 	}
-	flash, err := collector.search(ctx, "/v1/flashFloods:search", DecodeFlashFloods)
+	flash, err := collector.search(ctx, "/v1/flashFloods:search", []string{RegionCode}, DecodeFlashFloods)
 	if err != nil {
 		return 0, fmt.Errorf("flash floods: %w", err)
 	}
-	events, err := collector.search(ctx, "/v1/significantEvents:search", DecodeSignificantEvents)
+	events, err := collector.search(ctx, "/v1/significantEvents:search", nil, DecodeSignificantEvents)
 	if err != nil {
 		return 0, fmt.Errorf("significant events: %w", err)
 	}
@@ -156,8 +156,11 @@ type statusRequest struct {
 }
 
 type searchRequest struct {
-	PageSize  int    `json:"pageSize"`
-	PageToken string `json:"pageToken,omitempty"`
+	// CountryCodes narrows flashFloods:search; significantEvents:search takes
+	// no such filter, so its results are read worldwide and kept by country.
+	CountryCodes []string `json:"countryCodes,omitempty"`
+	PageSize     int      `json:"pageSize"`
+	PageToken    string   `json:"pageToken,omitempty"`
 }
 
 // statuses pages through Sri Lanka's gauges.
@@ -216,13 +219,13 @@ func (collector *Collector) models(ctx context.Context, statuses []Status) (map[
 	return models, nil
 }
 
-// search pages through a worldwide search and keeps what affects Sri
-// Lanka; these endpoints take no region filter.
-func (collector *Collector) search(ctx context.Context, path string, decode func([]byte) ([]Area, string, error)) ([]Area, error) {
+// search pages through a search and keeps what affects Sri Lanka. Even a
+// filtered search is checked by country again: decode keeps only LK.
+func (collector *Collector) search(ctx context.Context, path string, countries []string, decode func([]byte) ([]Area, string, error)) ([]Area, error) {
 	var all []Area
 	token := ""
 	for range maxPages {
-		payload, err := collector.post(ctx, path, searchRequest{PageSize: searchPageSize, PageToken: token})
+		payload, err := collector.post(ctx, path, searchRequest{CountryCodes: countries, PageSize: searchPageSize, PageToken: token})
 		if err != nil {
 			return nil, err
 		}
