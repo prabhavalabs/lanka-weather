@@ -23,6 +23,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
 	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 	"github.com/prabhavalabs/lanka-weather/internal/ingest"
@@ -93,6 +94,7 @@ func collectors(pool *pgxpool.Pool) []source.Collector {
 	client := source.NewClient(os.Getenv("LANKAWEATHER_CONTACT"))
 	return []source.Collector{
 		&irrigation.Collector{Pool: pool, Fetcher: client},
+		&adminregions.Collector{Pool: pool, Fetcher: client},
 	}
 }
 

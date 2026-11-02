@@ -1,0 +1,12 @@
+region_id	region_name	region_ent_type	total_value	male	female
+LK	Sri Lanka	country	21781800	10512344	11269456
+LK-1	Western	province	6117341	2961374	3155967
+LK-2	Central	province	2714045	1298405	1415640
+LK-11	Colombo	district	2375415	1146093	1229322
+LK-21	Kandy	district	1461895	696713	765182
+LK-1103	Colombo	dsd	292089	146000	146089
+LK-2130	Gangawata Korale	dsd	153329	74000	79329
+LK-1103005	Sammanthranapura	gnd	5321	2700	2621
+LK-1103010	Mattakkuliya	gnd	39710	19800	19910
+LG-11011	Colombo MC	lg	447271	220000	227271
+LK-2130120	Mahanuwara	gnd	unknown	0	0
