@@ -16,6 +16,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/overview"
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
@@ -86,6 +87,11 @@ type Hazards interface {
 	Cyclones(ctx context.Context) (hazards.CycloneLayer, error)
 }
 
+// Overviews serves "Sri Lanka now".
+type Overviews interface {
+	Overview(ctx context.Context) (*overview.Overview, error)
+}
+
 // Dependencies are the services the API reads from.
 type Dependencies struct {
 	Logger      *slog.Logger
@@ -107,6 +113,8 @@ type Dependencies struct {
 
 	// Reservoirs serves the reservoirs layer.
 	Reservoirs Reservoirs
+	// Overview composes the others into one first look.
+	Overview Overviews
 	// Now is the clock for requests without an explicit time; nil is
 	// time.Now.
 	Now func() time.Time
@@ -151,6 +159,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/weather/regions", api.weatherRegions)
 		r.Get("/floods/forecast", api.floodForecast)
 		r.Get("/summary", api.summary)
+		r.Get("/overview", api.overview)
 		api.riverRoutes(r)
 		r.Get("/warnings", api.warningsOverview)
 		r.Get("/warnings/landslides", api.landslideWarnings)
@@ -249,6 +258,22 @@ func (api *api) stationReadings(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, Envelope{Data: history})
+}
+
+// overview returns "Sri Lanka now". A feed that fails is said to be unread inside
+// the answer, so this fails only if the service itself does.
+func (api *api) overview(w http.ResponseWriter, r *http.Request) {
+	if api.deps.Overview == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "the overview is not configured")
+		return
+	}
+	document, err := api.deps.Overview.Overview(r.Context())
+	if err != nil {
+		api.internalError(w, "overview", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	writeJSON(w, http.StatusOK, Envelope{Data: document})
 }
 
 func (api *api) internalError(w http.ResponseWriter, what string, err error) {

@@ -8,7 +8,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
     // The contrast test reads the theme stylesheet as text.
     css: { include: [/theme\.css/] },
   },

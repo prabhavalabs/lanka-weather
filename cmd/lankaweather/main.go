@@ -47,6 +47,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 	"github.com/prabhavalabs/lanka-weather/internal/ingest"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/overview"
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
 	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
@@ -209,6 +210,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 		BulletinStaleAfter: staleAfter("official-warnings")}
 	stationService := &stations.Service{Pool: pool, StaleAfter: staleAfter("weather-stations")}
 	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
+	hazardService := &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -223,8 +225,10 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 				Stations: stationService, Environment: environmentService, Reservoirs: reservoirService, Logger: logger},
 			RiverRisk: riverRiskService,
 			Warnings:  warningService,
-			Hazards: &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"),
-				CyclonesStaleAfter: staleAfter("cyclones")},
+			Overview: &overview.Service{Warnings: warningService, Risk: riverRiskService, Gauges: riverService,
+				Reservoirs: reservoirService, Hazards: hazardService, Weather: weatherService, Rain: stationService,
+				Environment: environmentService, Regions: regionService, WeatherStaleAfter: staleAfter("temperature"), Logger: logger},
+			Hazards:     hazardService,
 			Stations:    stationService,
 			Rain:        &rainfall.Service{Pool: pool, StaleAfter: staleAfter("rainfall")},
 			Environment: environmentService,

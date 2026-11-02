@@ -357,6 +357,71 @@ func (service *Service) SeaAt(ctx context.Context, lon, lat float64) (*SeaPoint,
 		Stale: service.now().Sub(current.fetchedAt) > service.SeaStaleAfter, Estimate: true, Attribution: openmeteo.AttributionMarine, Note: seaNote}, nil
 }
 
+// Located is a grid value and where it is.
+type Located[T any] struct {
+	Value    T
+	Lon, Lat float64
+}
+
+// WorstAir finds the highest air quality index on the grid; nil before the grid
+// is collected or if it has no values.
+func (service *Service) WorstAir(ctx context.Context) (*Located[AirPoint], error) {
+	current, err := service.load(ctx, &service.air, openmeteo.KindAirQuality)
+	if errors.Is(err, weather.ErrNoData) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	index, ok := highest(current, "us_aqi")
+	if !ok {
+		return nil, nil
+	}
+	node := current.nodes[index]
+	aqi := math.Round(float64(current.fields["us_aqi"][node.Index]))
+	point := AirPoint{USAQI: aqi, Category: AQICategory(aqi), ValidAt: current.sourceTime, FetchedAt: current.fetchedAt,
+		Stale: service.now().Sub(current.fetchedAt) > service.AirStaleAfter, Estimate: true, Attribution: openmeteo.AttributionAirQuality}
+	return &Located[AirPoint]{Value: point, Lon: node.Lon, Lat: node.Lat}, nil
+}
+
+// HighestSea finds the highest wave height on the grid; nil before the grid is
+// collected or if it has no values.
+func (service *Service) HighestSea(ctx context.Context) (*Located[SeaPoint], error) {
+	current, err := service.load(ctx, &service.sea, openmeteo.KindMarine)
+	if errors.Is(err, weather.ErrNoData) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	index, ok := highest(current, "wave_height")
+	if !ok {
+		return nil, nil
+	}
+	node := current.nodes[index]
+	height := math.Round(float64(current.fields["wave_height"][node.Index])*10) / 10
+	point := SeaPoint{WaveHeightM: height, State: SeaState(height), DistanceKm: math.Round(grid.CoastDistanceKm(node.Lon, node.Lat)),
+		ValidAt: current.sourceTime, FetchedAt: current.fetchedAt, Stale: service.now().Sub(current.fetchedAt) > service.SeaStaleAfter,
+		Estimate: true, Attribution: openmeteo.AttributionMarine, Note: seaNote}
+	return &Located[SeaPoint]{Value: point, Lon: node.Lon, Lat: node.Lat}, nil
+}
+
+// highest is the position in current.nodes of a field's largest value.
+func highest(current *run, field string) (int, bool) {
+	values := current.fields[field]
+	best, bestValue := -1, math.Inf(-1)
+	for position, node := range current.nodes {
+		if node.Index >= len(values) {
+			continue
+		}
+		value := float64(values[node.Index])
+		if !math.IsNaN(value) && value > bestValue {
+			best, bestValue = position, value
+		}
+	}
+	return best, best >= 0
+}
+
 func distanceKm(lon1, lat1, lon2, lat2 float64) float64 {
 	const earthRadiusKm = 6371.0088
 	toRadians := math.Pi / 180

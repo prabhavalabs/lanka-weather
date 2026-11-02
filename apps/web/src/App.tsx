@@ -101,6 +101,11 @@ import { RiverLegend } from "./features/rivers/RiverLegend"
 import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsLayer"
 import { StationPanel } from "./features/rivers/StationPanel"
 import { MetStationPanel } from "./features/stations/MetStationPanel"
+import { OverviewButton } from "./features/overview/OverviewButton"
+import { OverviewPanel } from "./features/overview/OverviewPanel"
+import { overviewAction } from "./features/overview/present"
+import { useOverview } from "./features/overview/queries"
+import type { OverviewTarget } from "./features/overview/types"
 import { observedChip, observedPointLayers, observedTarget } from "./features/observed/points"
 import { useObservedLayers, WEATHER_STATIONS } from "./features/observed/useObservedLayers"
 import { placeZoom } from "./features/search/present"
@@ -180,6 +185,9 @@ export function App() {
   const [searchLoaded, setSearchLoaded] = useState(false)
   const [gnDistricts, setGnDistricts] = useState<string[]>([])
   const [clickedAt, setClickedAt] = useState<{ lat: number; lon: number } | null>(null)
+  // The first thing on load, until dismissed or the map is used instead.
+  const [overviewOpen, setOverviewOpen] = useState(true)
+  const overview = useOverview(overviewOpen)
   const zoom = useMapZoom(map)
   const desktop = useMediaQuery(desktopQuery, true)
   const { resolved: theme } = useTheme()
@@ -564,6 +572,7 @@ export function App() {
   // features/map/hits, else the place itself.
   useMapClick(map, (event: MapMouseEvent) => {
     if (!map) return
+    setOverviewOpen(false)
     const order = hitOrder(hitLayerIds({ hazards: hazards.hover, observed: observedPointLayers }))
     for (const { feature } of orderedHits(order, queryMap(map, event.point, pointSlack))) {
       const layer = feature.layer.id
@@ -621,6 +630,7 @@ export function App() {
 
   const choose = useCallback(
     (choice: SearchChoice) => {
+      setOverviewOpen(false)
       if (choice.type === "place") {
         const next: Selection = {
           kind: "point",
@@ -661,6 +671,30 @@ export function App() {
     [enabled, enable, fitBox, pendingCamera, reveal, setLevel, setSelection],
   )
 
+  // A line of the overview opens its layer and panel. The overview stays behind it,
+  // so closing the panel comes back to the list.
+  const openOverviewTarget = useCallback(
+    (target: OverviewTarget) => {
+      const action = overviewAction(target)
+      action.enable.forEach(enable)
+      if (action.fill) setRegionFill(action.fill)
+      if (action.level) setLevel(action.level)
+      if (action.selection) {
+        if (action.camera) pendingCamera(action.selection, action.camera)
+        else pending.current = null
+        setSelection(action.selection)
+      } else if (action.reveal) {
+        reveal(action.reveal)
+      }
+    },
+    [enable, pendingCamera, reveal, setLevel, setRegionFill, setSelection],
+  )
+  const openOverview = useCallback(() => {
+    setSelection(null)
+    setOverviewOpen(true)
+  }, [setSelection])
+  const closeOverview = useCallback(() => setOverviewOpen(false), [])
+
   // Search: ⌘K or Ctrl+K anywhere; the palette's code loads on first use.
   const openSearch = useCallback(() => {
     setSearchLoaded(true)
@@ -681,13 +715,14 @@ export function App() {
   // Escape closes the detail panel when no dialog is open.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !selection) return
+      if (event.key !== "Escape" || (!selection && !overviewOpen)) return
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
-      setSelection(null)
+      if (selection) setSelection(null)
+      else setOverviewOpen(false)
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selection, setSelection])
+  }, [selection, overviewOpen, setSelection])
 
   const close = useCallback(() => setSelection(null), [setSelection])
 
@@ -1207,6 +1242,19 @@ export function App() {
     )
   }
 
+  if (!selection && overviewOpen) {
+    detailLabel = "Sri Lanka now"
+    detail = (
+      <OverviewPanel
+        overview={overview.data}
+        pending={overview.isPending}
+        failed={overview.isError}
+        onOpen={openOverviewTarget}
+        onClose={closeOverview}
+      />
+    )
+  }
+
   // Legends for the layers that are on (wide screens; phones show them in the layer sheet).
   // Gauge legends are in the sidebar while it is open.
   const legendClass = "w-60"
@@ -1349,6 +1397,7 @@ export function App() {
             actions={
               <>
                 <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
+                <OverviewButton compact onClick={openOverview} />
                 {hazards.button(true)}
               </>
             }
@@ -1362,6 +1411,7 @@ export function App() {
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
             />
+            <OverviewButton onClick={openOverview} className="pointer-events-auto" />
             {hazards.button(false)}
             {regionsOn && (
               <div className="pointer-events-auto rounded-full border border-border bg-card/95 p-1 shadow-panel backdrop-blur-md">
@@ -1381,7 +1431,7 @@ export function App() {
         detail={detail}
         detailLabel={detailLabel}
         detailFull={hazards.detailFull}
-        onDetailClose={close}
+        onDetailClose={selection ? close : closeOverview}
         legends={legends}
         timeline={
           windTimeline && observedLayers.rainTimeline ? (
