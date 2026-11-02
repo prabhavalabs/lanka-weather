@@ -79,8 +79,9 @@ function BulletinItem({ bulletin }: { bulletin: Bulletin }) {
             {formatDayTime(bulletin.mayBeWithdrawnBy.issuedAt)}
           </time>{" "}
           withdrew flood warnings, and we cannot tell whether it includes this one, so it stays
-          shown. <OfficialLink href={bulletin.mayBeWithdrawnBy.pdfUrl}>Read the notice</OfficialLink>{" "}
-          or check <OfficialLink href="https://www.dmc.gov.lk/">dmc.gov.lk</OfficialLink>.
+          shown.{" "}
+          <OfficialLink href={bulletin.mayBeWithdrawnBy.pdfUrl}>Read the notice</OfficialLink> or
+          check <OfficialLink href="https://www.dmc.gov.lk/">dmc.gov.lk</OfficialLink>.
         </p>
       )}
       {bulletin.severity === "withdrawal" && bulletin.withdrawnBasins && (

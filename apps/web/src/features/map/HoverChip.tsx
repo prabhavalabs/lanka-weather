@@ -3,13 +3,11 @@ import { useEffect, useRef, useState } from "react"
 import { formatNumber } from "@/lib/format"
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { basinStateLabels } from "../floods/basins"
-import { BASIN_FILL, SUBBASIN_FILL } from "../floods/FloodBasinsLayer"
+import { SUBBASIN_FILL } from "../floods/FloodBasinsLayer"
 import { floodAreaLabels, floodSeverityLabels, gaugeName } from "../floods/present"
 import { FLOOD_AREAS, FLOOD_GAUGES } from "../floods/FloodForecastLayer"
-import { PAST_FLOOD_FILL } from "../floods/PastFloods"
 import type { FloodAreaKind, FloodSeverity } from "../floods/types"
 import { riskLabels } from "../river-risk/present"
-import { RIVER_LINES } from "../river-risk/RiverNetworkLayer"
 import type { BasinState, ReachRisk, RiverRisk } from "../river-risk/types"
 import { regionLabel } from "../location/present"
 import type { RegionLevel } from "../location/types"
@@ -20,9 +18,11 @@ import { reservoirStatusLabels } from "../reservoirs/present"
 import { RESERVOIR_AREAS, RESERVOIR_POINTS } from "../reservoirs/ReservoirsLayer"
 import type { ReservoirStatus } from "../reservoirs/types"
 import { regionVariables, type RegionVariable } from "../regions/present"
-import { REGIONS_FILL, REGIONS_SOURCE } from "../regions/RegionsLayer"
+import { REGIONS_SOURCE } from "../regions/RegionsLayer"
 import type { RegionWeather } from "../regions/types"
 import { sampleWind, windText, type WindField } from "../wind/field"
+import { hitLayerIds } from "./hitLayers"
+import { firstHit, hitOrder, queryMap } from "./hits"
 import { useMap } from "./MapContext"
 
 /** Other layers the chip can name, and how. */
@@ -123,78 +123,31 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
       } = props.current
       const lines: string[] = []
 
-      const pointLayers = [
-        RIVER_STATIONS,
-        FLOOD_GAUGES,
-        RESERVOIR_POINTS,
-        ...(more?.layers ?? []),
-      ].filter((id) => map.getLayer(id))
-      const point = pointLayers.length
-        ? map.queryRenderedFeatures(
-            [
-              [x - pointSlack, y - pointSlack],
-              [x + pointSlack, y + pointSlack],
-            ],
-            { layers: pointLayers },
-          )[0]
-        : undefined
-      const near: [[number, number], [number, number]] = [
-        [x - pointSlack, y - pointSlack],
-        [x + pointSlack, y + pointSlack],
-      ]
-      const hazardPoints = (hazardLayers?.points ?? []).filter((id) => map.getLayer(id))
-      const hazardAreas = (hazardLayers?.areas ?? []).filter((id) => map.getLayer(id))
-      const hazard: MapGeoJSONFeature | undefined = point
-        ? undefined
-        : ((hazardPoints.length
-            ? map.queryRenderedFeatures(near, { layers: hazardPoints })[0]
-            : undefined) ??
-          (hazardAreas.length
-            ? map.queryRenderedFeatures(event.point, { layers: hazardAreas })[0]
-            : undefined))
-      const area =
-        !point && !hazard && map.getLayer(FLOOD_AREAS)
-          ? map.queryRenderedFeatures(event.point, { layers: [FLOOD_AREAS] })[0]
-          : undefined
-      const riverLayers = RIVER_LINES.filter((id) => map.getLayer(id))
-      const river =
-        !point && !hazard && !area && riverLayers.length
-          ? map.queryRenderedFeatures(near, { layers: riverLayers })[0]
-          : undefined
-      const reservoir: MapGeoJSONFeature | undefined =
-        point?.layer.id === RESERVOIR_POINTS
-          ? point
-          : !point && !hazard && !area && !river && map.getLayer(RESERVOIR_AREAS)
-            ? map.queryRenderedFeatures(event.point, { layers: [RESERVOIR_AREAS] })[0]
-            : undefined
-      const past =
-        !point && !hazard && !area && !river && !reservoir && map.getLayer(PAST_FLOOD_FILL)
-          ? map.queryRenderedFeatures(event.point, { layers: [PAST_FLOOD_FILL] })[0]
-          : undefined
-      const basinLayers = [BASIN_FILL, SUBBASIN_FILL].filter((id) => map.getLayer(id))
-      const basin =
-        !point && !hazard && !area && !river && !reservoir && !past && basinLayers.length
-          ? map.queryRenderedFeatures(event.point, { layers: basinLayers })[0]
-          : undefined
-      const region: MapGeoJSONFeature | undefined =
-        !point &&
-        !hazard &&
-        !area &&
-        !river &&
-        !reservoir &&
-        !past &&
-        !basin &&
-        map.getLayer(REGIONS_FILL)
-          ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
-          : undefined
+      // The same order a click follows (features/map/hits).
+      const hit = firstHit(
+        hitOrder(hitLayerIds({ hazards: hazardLayers, observed: more?.layers ?? [] })),
+        queryMap(map, event.point, pointSlack),
+      )
+      const layer = hit?.feature.layer.id
+      const isHazard =
+        layer !== undefined &&
+        (hazardLayers?.points.includes(layer) || hazardLayers?.areas.includes(layer))
+      const hazard = isHazard ? hit?.feature : undefined
+      const point = hit?.group === "point" && !isHazard ? hit.feature : undefined
+      const reservoir =
+        layer === RESERVOIR_POINTS || layer === RESERVOIR_AREAS ? hit?.feature : undefined
+      const area = layer === FLOOD_AREAS ? hit?.feature : undefined
+      const river = hit?.group === "river" ? hit.feature : undefined
+      const past = hit?.group === "past" ? hit.feature : undefined
+      const basin = hit?.group === "basin" ? hit.feature : undefined
+      const region = hit?.group === "region" ? hit.feature : undefined
 
       setHovered(
         region && typeof region.id === "number" && region.sourceLayer
           ? { sourceLayer: region.sourceLayer, id: region.id }
           : null,
       )
-      map.getCanvas().style.cursor =
-        point || hazard || area || river || reservoir || past || basin || region ? "pointer" : ""
+      map.getCanvas().style.cursor = hit ? "pointer" : ""
 
       let title = ""
       let local: string | undefined

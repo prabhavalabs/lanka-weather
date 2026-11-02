@@ -3,7 +3,7 @@
  * add to the map, the layer list, the legends, the detail panel and the click
  * and hover handling. App.tsx composes the result with everything else.
  */
-import type { MapGeoJSONFeature, Map as MapLibreMap, MapMouseEvent, PointLike } from "maplibre-gl"
+import type { MapGeoJSONFeature, Map as MapLibreMap } from "maplibre-gl"
 import { ActivityIcon, TornadoIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { DetailPlaceholder } from "@/components/DetailPlaceholder"
@@ -76,8 +76,6 @@ interface HazardsOptions {
   /** Moves the map, if needed, so a point is clear of the cards over it. */
   reveal: (lngLat: [number, number]) => void
 }
-
-const pointSlack = 6
 
 export function useHazards({
   reveal,
@@ -159,46 +157,34 @@ export function useHazards({
     }
   }, [map, divisionKey, reveal])
 
-  // Clicks: a storm or an earthquake, then a division, then a highlighted district.
-  const handleClick = useCallback(
-    (event: MapMouseEvent): boolean => {
-      if (!map) return false
-      const { x, y } = event.point
-      const box: [PointLike, PointLike] = [
-        [x - pointSlack, y - pointSlack],
-        [x + pointSlack, y + pointSlack],
-      ]
-      const points = [CYCLONE_POSITIONS, EARTHQUAKES].filter((id) => map.getLayer(id))
-      const hit = points.length ? map.queryRenderedFeatures(box, { layers: points })[0] : undefined
-      if (hit?.layer.id === CYCLONE_POSITIONS) {
-        setSelection({ kind: "cyclone", id: String(hit.properties.eventId) })
+  // A click that has landed on a hazard (see features/map/hits): a storm or an
+  // earthquake, a division or a highlighted district.
+  const handleHit = useCallback(
+    (feature: MapGeoJSONFeature): boolean => {
+      const { id: layer } = feature.layer
+      if (layer === CYCLONE_POSITIONS) {
+        setSelection({ kind: "cyclone", id: String(feature.properties.eventId) })
         return true
       }
-      if (hit?.layer.id === EARTHQUAKES) {
-        setSelection({ kind: "quake", id: String(hit.properties.id) })
+      if (layer === EARTHQUAKES) {
+        setSelection({ kind: "quake", id: String(feature.properties.id) })
         return true
       }
-      const named = map.getLayer(LANDSLIDE_FILL)
-        ? map.queryRenderedFeatures(event.point, { layers: [LANDSLIDE_FILL] })[0]
-        : undefined
-      if (named) {
-        setSelection({ kind: "landslide", id: String(named.properties.id) })
+      if (layer === LANDSLIDE_FILL) {
+        setSelection({ kind: "landslide", id: String(feature.properties.id) })
         return true
       }
-      const district = map.getLayer(OFFICIAL_FILL)
-        ? map.queryRenderedFeatures(event.point, { layers: [OFFICIAL_FILL] })[0]
-        : undefined
       if (
-        district &&
-        typeof district.properties.id === "string" &&
-        regionLevelOf(district.properties.id) === "district"
+        layer === OFFICIAL_FILL &&
+        typeof feature.properties.id === "string" &&
+        regionLevelOf(feature.properties.id) === "district"
       ) {
-        openWarnings({ district: district.properties.id })
+        openWarnings({ district: feature.properties.id })
         return true
       }
       return false
     },
-    [map, setSelection, openWarnings],
+    [setSelection, openWarnings],
   )
 
   const highlighted = warnings.data?.districts
@@ -541,7 +527,7 @@ export function useHazards({
     banner,
     button,
     hover,
-    handleClick,
+    handleHit,
   }
 }
 

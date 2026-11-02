@@ -1,4 +1,4 @@
-import type { Map as MapLibreMap, MapMouseEvent, PointLike } from "maplibre-gl"
+import type { Map as MapLibreMap, MapMouseEvent } from "maplibre-gl"
 import { ContainerIcon, ListIcon, MapPinIcon, WavesIcon, ZoomInIcon } from "lucide-react"
 import {
   lazy,
@@ -56,6 +56,8 @@ import {
   type Selection,
 } from "./features/location/selection"
 import { useUrlSelection } from "./features/location/useUrlSelection"
+import { hitLayerIds } from "./features/map/hitLayers"
+import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
 import { HoverChip } from "./features/map/HoverChip"
 import { MapView } from "./features/map/MapView"
 import { clearCentreOffset, clearPadding, inClearArea, layoutInsets } from "./features/map/reveal"
@@ -558,85 +560,51 @@ export function App() {
     reveal: revealPoint,
   })
 
-  // Clicks: a gauge or reservoir, a hazard, a flood area, a river, a past flood, a flood basin,
-  // else a region (weather at its label point), else the point itself.
+  // Clicks: the first thing under the pointer that can open, in the order of
+  // features/map/hits, else the place itself.
   useMapClick(map, (event: MapMouseEvent) => {
     if (!map) return
-    const { x, y } = event.point
-    const box: [PointLike, PointLike] = [
-      [x - pointSlack, y - pointSlack],
-      [x + pointSlack, y + pointSlack],
-    ]
-    const pointLayers = [
-      RIVER_STATIONS,
-      FLOOD_GAUGES,
-      RESERVOIR_POINTS,
-      ...observedPointLayers,
-    ].filter((id) => map.getLayer(id))
-    const hit = pointLayers.length
-      ? map.queryRenderedFeatures(box, { layers: pointLayers })[0]
-      : null
-    const observed = hit ? observedTarget(hit) : null
-    if (observed) {
-      return observed.kind === "met" ? openMetStation(observed.id) : openStation(observed.id)
-    }
-    if (hit?.layer.id === RIVER_STATIONS) return openStation(String(hit.properties.id))
-    if (hit?.layer.id === FLOOD_GAUGES) return openGauge(String(hit.properties.gaugeId))
-    if (hit?.layer.id === RESERVOIR_POINTS) return openReservoir(String(hit.properties.id))
-    if (hazards.handleClick(event)) return
-
-    const area = map.getLayer(FLOOD_AREAS)
-      ? map.queryRenderedFeatures(event.point, { layers: [FLOOD_AREAS] })[0]
-      : null
-    if (area && typeof area.properties.id === "string") return openArea(area.properties.id)
-
-    const riverLayers = RIVER_LINES.filter((id) => map.getLayer(id))
-    const river = riverLayers.length
-      ? map.queryRenderedFeatures(box, { layers: riverLayers })[0]
-      : null
-    if (river && river.properties.river) {
-      const reach =
-        riverLayers[0] && river.sourceLayer === "reaches" && typeof river.id === "number"
-          ? river.id
-          : undefined
-      return openRiver(String(river.properties.river), reach, "none")
-    }
-
-    const water = map.getLayer(RESERVOIR_AREAS)
-      ? map.queryRenderedFeatures(event.point, { layers: [RESERVOIR_AREAS] })[0]
-      : null
-    if (water) return openReservoir(String(water.properties.id))
-
-    const past = map.getLayer(PAST_FLOOD_FILL)
-      ? map.queryRenderedFeatures(event.point, { layers: [PAST_FLOOD_FILL] })[0]
-      : null
-    if (past && typeof past.properties.id === "string") return openPast(past.properties.id, "none")
-
-    // The basin holds a link to the weather at the clicked place.
-    const basinLayers = [BASIN_FILL, SUBBASIN_FILL].filter((id) => map.getLayer(id))
-    const basinHit = basinLayers.length
-      ? map.queryRenderedFeatures(event.point, { layers: basinLayers })[0]
-      : null
-    if (basinHit) {
-      const fid =
-        basinHit.layer.id === SUBBASIN_FILL
-          ? Number(basinHit.properties.basin)
-          : Number(basinHit.id)
-      const basin = basins.data?.basins.find((item) => item.fid === fid)
-      if (basin) {
-        setClickedAt({ lat: event.lngLat.lat, lon: event.lngLat.lng })
-        pending.current = null
-        return setSelection({ kind: "basin", id: basin.id })
+    const order = hitOrder(hitLayerIds({ hazards: hazards.hover, observed: observedPointLayers }))
+    for (const { feature } of orderedHits(order, queryMap(map, event.point, pointSlack))) {
+      const layer = feature.layer.id
+      const observed = observedTarget(feature)
+      if (observed) {
+        return observed.kind === "met" ? openMetStation(observed.id) : openStation(observed.id)
       }
-    }
-
-    const region = map.getLayer(REGIONS_FILL)
-      ? map.queryRenderedFeatures(event.point, { layers: [REGIONS_FILL] })[0]
-      : null
-    if (region && typeof region.properties.id === "string") {
-      const next: Selection = { kind: "region", id: region.properties.id }
-      pendingCamera(next, "reveal")
-      return setSelection(next)
+      if (layer === RIVER_STATIONS) return openStation(String(feature.properties.id))
+      if (layer === FLOOD_GAUGES) return openGauge(String(feature.properties.gaugeId))
+      if (layer === RESERVOIR_POINTS || layer === RESERVOIR_AREAS) {
+        return openReservoir(String(feature.properties.id))
+      }
+      if (hazards.handleHit(feature)) return
+      if (layer === FLOOD_AREAS && typeof feature.properties.id === "string") {
+        return openArea(feature.properties.id)
+      }
+      if (RIVER_LINES.includes(layer) && feature.properties.river) {
+        const reach =
+          feature.sourceLayer === "reaches" && typeof feature.id === "number"
+            ? feature.id
+            : undefined
+        return openRiver(String(feature.properties.river), reach, "none")
+      }
+      if (layer === PAST_FLOOD_FILL && typeof feature.properties.id === "string") {
+        return openPast(feature.properties.id, "none")
+      }
+      if (layer === BASIN_FILL || layer === SUBBASIN_FILL) {
+        // The basin holds a link to the weather at the clicked place.
+        const fid = layer === SUBBASIN_FILL ? Number(feature.properties.basin) : Number(feature.id)
+        const basin = basins.data?.basins.find((item) => item.fid === fid)
+        if (basin) {
+          setClickedAt({ lat: event.lngLat.lat, lon: event.lngLat.lng })
+          pending.current = null
+          return setSelection({ kind: "basin", id: basin.id })
+        }
+      }
+      if (layer === REGIONS_FILL && typeof feature.properties.id === "string") {
+        const next: Selection = { kind: "region", id: feature.properties.id }
+        pendingCamera(next, "reveal")
+        return setSelection(next)
+      }
     }
 
     const { lat, lng } = event.lngLat

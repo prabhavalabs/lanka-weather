@@ -306,10 +306,12 @@ Google's polygons change from dashed outlines to solid fills with strong outline
 inundation graded by how likely the water is, the likeliest drawn on top. They open a
 panel with valid times and attribution.
 
-**A click on a basin now takes the click that used to open a region.** With the flood layer
-on, which is the default, the click order is: gauge, flood area, river, past flood, basin,
-then region. The basin panel offers "Weather at this place". With the flood layer off,
-regions take clicks as before. Region colours also default to off for new visitors, so
+**A click on a basin now takes the click that used to open a region.** Clicks and hovers
+share one order (`features/map/hits`): points, rivers, a reservoir's water, then the flood,
+landslide and official areas in that order, past floods, basins, and regions. Rivers come
+before areas because a thin line under any fill could otherwise never be reached, and a
+landslide fill can cover a whole hill country. The basin panel offers "Weather at this place".
+With the flood layer off, regions take clicks as before. Region colours also default to off for new visitors, so
 rivers and basins read first; they stay one control away.
 
 ### Past floods
