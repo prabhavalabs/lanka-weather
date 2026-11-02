@@ -1,0 +1,224 @@
+/*
+ * Design tokens for Lanka Weather, light (:root) and dark (.dark).
+ *
+ * Near-black cards with hairline borders, one orange-red signal colour,
+ * neutral greys for everything else. Values are hex so that the contrast
+ * test (src/styles/contrast.test.ts) can check them and MapLibre can read
+ * them at runtime (src/lib/tokens.ts).
+ *
+ * shadcn/ui variables keep their usual meaning: `accent` is the quiet hover
+ * surface of menus and rows, not the brand colour. The orange lives in
+ * `brand-*`, and `ring` uses it so focus is always visible.
+ */
+
+:root {
+  color-scheme: light;
+
+  --radius: 0.875rem;
+  --elevation-panel: 0 1px 2px rgb(10 10 10 / 0.06), 0 16px 40px -16px rgb(10 10 10 / 0.3);
+
+  /* Surfaces and text */
+  --background: #efefed;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #fafafa;
+  --secondary: #ebebe8;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f4f4f2;
+  --muted-foreground: #5f5f5b;
+  --accent: #f0f0ee;
+  --accent-foreground: #0a0a0a;
+  --destructive: #c8102e;
+  --destructive-foreground: #ffffff;
+  --border: #e3e3e0;
+  --input: #d4d4d0;
+  --ring: #c2410c;
+
+  /* Brand signal: highlighted data, selected segments, switches, deltas */
+  --brand: #ec4f16;
+  --brand-foreground: #0a0a0a;
+  --brand-soft: #ffe8de;
+  --brand-soft-foreground: #8f2a05;
+  --brand-text: #c2410c;
+
+  /* Tooltips are dark chips in both themes */
+  --tooltip: #262626;
+  --tooltip-foreground: #f2f2f2;
+
+  /* Texture */
+  --hatch: #cfcfcb;
+  --grid-dot: #d6d6d2;
+  --inset: #f7f7f5;
+
+  --chart-1: #ec4f16;
+  --chart-2: #3a3a38;
+  --chart-3: #7a7a76;
+  --chart-4: #b4b4b0;
+  --chart-5: #dcdcd8;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: #0a0a0a;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #f0f0ee;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: #e3e3e0;
+  --sidebar-ring: #c2410c;
+
+  /* River flood status (Irrigation Department thresholds) */
+  --status-normal: #0a84d6;
+  --status-normal-foreground: #0a0a0a;
+  --status-alert: #e0a800;
+  --status-alert-foreground: #0a0a0a;
+  --status-minor-flood: #e67300;
+  --status-minor-flood-foreground: #0a0a0a;
+  --status-major-flood: #d91e45;
+  --status-major-flood-foreground: #ffffff;
+  --status-unknown: #7d7d7a;
+  --status-unknown-foreground: #0a0a0a;
+  /* Outline of map symbols; the selected one is outlined in the signal colour */
+  --status-stroke: #0a0a0a;
+  --status-stroke-selected: #ec4f16;
+
+  /* Air temperature, cool to hot (<=18, 21, 24, 27, 30, 33, >=36 °C) */
+  --temp-1: #5b6cf0;
+  --temp-2: #3d9fe0;
+  --temp-3: #36b8a6;
+  --temp-4: #94cc4f;
+  --temp-5: #f2c230;
+  --temp-6: #f2852e;
+  --temp-7: #dc3a35;
+
+  /* Rainfall in 24 h, light to extreme (1, 10, 25, 50, 100, 150+ mm) */
+  --rain-1: #8ccbf0;
+  --rain-2: #4a9fe6;
+  --rain-3: #2563d9;
+  --rain-4: #5338c2;
+  --rain-5: #9530b0;
+  --rain-6: #d0258c;
+
+  /* Wind speed, calm to cyclone (<10, 20, 30, 50, 70, 90, 118+ km/h) */
+  --wind-1: #86b4c4;
+  --wind-2: #45a99a;
+  --wind-3: #93c84a;
+  --wind-4: #ecc23a;
+  --wind-5: #ee8034;
+  --wind-6: #db3b3b;
+  --wind-7: #a3238c;
+
+  /* Basemap, applied over the OpenFreeMap style (src/features/map/basemap.ts) */
+  --map-land: #f6f6f4;
+  --map-water: #d3dade;
+  --map-waterway: #b9c4ca;
+  --map-park: #eceee9;
+  --map-boundary: #a8a8a3;
+  --map-road: #ffffff;
+  --map-road-casing: #dcdcd8;
+  --map-label: #5c5c58;
+  --map-label-strong: #262624;
+  --map-label-halo: #f6f6f4;
+  --map-water-label: #4a5a66;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --elevation-panel: 0 1px 2px rgb(0 0 0 / 0.5), 0 16px 40px -16px rgb(0 0 0 / 0.8);
+
+  --background: #050505;
+  --foreground: #f2f2f2;
+  --card: #0a0a0a;
+  --card-foreground: #f2f2f2;
+  --popover: #111111;
+  --popover-foreground: #f2f2f2;
+  --primary: #f0f0f0;
+  --primary-foreground: #0a0a0a;
+  --secondary: #262626;
+  --secondary-foreground: #f2f2f2;
+  --muted: #151515;
+  --muted-foreground: #9b9b9b;
+  --accent: #1c1c1c;
+  --accent-foreground: #f2f2f2;
+  --destructive: #ff5c6c;
+  --destructive-foreground: #0a0a0a;
+  --border: #232323;
+  --input: #303030;
+  --ring: #ff6b35;
+
+  --brand: #ff5a1f;
+  --brand-foreground: #0a0a0a;
+  --brand-soft: #461a0a;
+  --brand-soft-foreground: #fff1ea;
+  --brand-text: #ff6b35;
+
+  --hatch: #3a3a3a;
+  --grid-dot: #262626;
+  --inset: #0e0e0e;
+
+  --chart-1: #ff5a1f;
+  --chart-2: #d4d4d4;
+  --chart-3: #8a8a8a;
+  --chart-4: #4a4a4a;
+  --chart-5: #2a2a2a;
+
+  --sidebar: #0a0a0a;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #f0f0f0;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1c1c1c;
+  --sidebar-accent-foreground: #f2f2f2;
+  --sidebar-border: #232323;
+  --sidebar-ring: #ff6b35;
+
+  --status-normal: #4ab3ff;
+  --status-normal-foreground: #0a0a0a;
+  --status-alert: #ffd23f;
+  --status-alert-foreground: #0a0a0a;
+  --status-minor-flood: #ff9a2e;
+  --status-minor-flood-foreground: #0a0a0a;
+  --status-major-flood: #ff4060;
+  --status-major-flood-foreground: #0a0a0a;
+  --status-unknown: #8c8c8c;
+  --status-unknown-foreground: #0a0a0a;
+  --status-stroke: #0a0a0a;
+  --status-stroke-selected: #ff5a1f;
+
+  --temp-1: #6f7ff5;
+  --temp-2: #4aa9e8;
+  --temp-3: #3cc4b1;
+  --temp-4: #a0d65a;
+  --temp-5: #f5ca3c;
+  --temp-6: #f68f3a;
+  --temp-7: #ef4a44;
+
+  --rain-1: #a3d6f5;
+  --rain-2: #5cadee;
+  --rain-3: #3478e8;
+  --rain-4: #6a50d8;
+  --rain-5: #ad45c8;
+  --rain-6: #e63c9f;
+
+  --wind-1: #93bfce;
+  --wind-2: #4fb6a6;
+  --wind-3: #9ed356;
+  --wind-4: #f2ca43;
+  --wind-5: #f48c3e;
+  --wind-6: #ec4a4a;
+  --wind-7: #c23aa6;
+
+  --map-land: #121212;
+  --map-water: #050607;
+  --map-waterway: #1d2124;
+  --map-park: #151715;
+  --map-boundary: #3d3d3d;
+  --map-road: #1f1f1f;
+  --map-road-casing: #161616;
+  --map-label: #8c8c8c;
+  --map-label-strong: #c4c4c4;
+  --map-label-halo: #0a0a0a;
+  --map-water-label: #7a8d9b;
+}

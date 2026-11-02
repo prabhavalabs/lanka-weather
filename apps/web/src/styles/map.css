@@ -1,0 +1,88 @@
+/*
+ * MapLibre controls in the app's style. MapLibre's own stylesheet is not in
+ * a cascade layer, so it beats Tailwind's layered utilities; these rules are
+ * unlayered too and add `.maplibregl-map` for the specificity to win.
+ */
+
+.maplibregl-map {
+  font-family: inherit;
+}
+
+.maplibregl-map .maplibregl-ctrl-group {
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--elevation-panel);
+}
+
+.maplibregl-map .maplibregl-ctrl-group:not(:empty) {
+  box-shadow: var(--elevation-panel);
+}
+
+.maplibregl-map .maplibregl-ctrl-group button {
+  width: 36px;
+  height: 36px;
+  transition: background-color 120ms ease;
+}
+
+.maplibregl-map .maplibregl-ctrl-group button:hover:not(:disabled) {
+  background-color: var(--accent);
+}
+
+.maplibregl-map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--border);
+}
+
+.maplibregl-map .maplibregl-ctrl-group button:focus-visible,
+.maplibregl-map .maplibregl-ctrl-attrib-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+.maplibregl-map .maplibregl-ctrl-group button:focus:first-child,
+.maplibregl-map .maplibregl-ctrl-group button:focus:last-child {
+  border-radius: 0;
+}
+
+.dark .maplibregl-map .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(0.92);
+}
+
+.maplibregl-map .maplibregl-ctrl-bottom-right {
+  right: var(--map-controls-right, 0px);
+  transition: right 200ms ease;
+}
+
+.maplibregl-map .maplibregl-ctrl-bottom-right .maplibregl-ctrl {
+  margin: 0 12px 12px 0;
+}
+
+.maplibregl-map .maplibregl-ctrl-scale {
+  border-color: var(--muted-foreground);
+  background-color: color-mix(in srgb, var(--card) 80%, transparent);
+  color: var(--foreground);
+  font-family: "Geist Mono Variable", ui-monospace, monospace;
+  font-size: 10px;
+  border-radius: 0 0 4px 4px;
+}
+
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  background-color: var(--card);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+
+.maplibregl-map .maplibregl-ctrl-attrib a {
+  color: var(--muted-foreground);
+}
+
+.maplibregl-map .maplibregl-ctrl-attrib a:hover {
+  color: var(--foreground);
+}
+
+.dark .maplibregl-map .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
