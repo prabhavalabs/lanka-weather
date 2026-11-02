@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -27,8 +28,19 @@ type Collector interface {
 	Collect(ctx context.Context, now time.Time) (int, error)
 }
 
-// maxBody caps a response so a misbehaving source cannot exhaust memory.
-const maxBody = 32 << 20
+// Retrier is implemented by collectors whose interval is long, so that a
+// failed run is retried sooner than a full interval later.
+type Retrier interface {
+	// RetryAfter is how long after a failed run the collector runs again.
+	RetryAfter() time.Duration
+}
+
+const (
+	// maxBody caps a response so a misbehaving source cannot exhaust memory.
+	maxBody = 32 << 20
+	// defaultTimeout bounds one request unless the request sets its own.
+	defaultTimeout = 30 * time.Second
+)
 
 // Client is an HTTP client that identifies the project to source operators.
 type Client struct {
@@ -43,38 +55,92 @@ func NewClient(contact string) *Client {
 	if contact != "" {
 		agent += " (+" + contact + ")"
 	}
-	return &Client{http: &http.Client{Timeout: 30 * time.Second}, userAgent: agent}
+	// Requests carry their own deadline (Request.Timeout), so the client has none.
+	return &Client{http: &http.Client{}, userAgent: agent}
 }
 
 // UserAgent returns the User-Agent header the client sends.
 func (client *Client) UserAgent() string { return client.userAgent }
 
-// GetJSON performs a GET request with query parameters and returns the body.
-func (client *Client) GetJSON(ctx context.Context, endpoint string, query url.Values) ([]byte, error) {
-	target := endpoint
-	if len(query) > 0 {
-		target += "?" + query.Encode()
+// Request describes one request to a source.
+type Request struct {
+	// Method defaults to GET.
+	Method string
+	URL    string
+	Query  url.Values
+	// Form, when set, is sent as an application/x-www-form-urlencoded body.
+	Form url.Values
+	// Accept defaults to application/json.
+	Accept string
+	// MaxBytes caps the response body; it defaults to 32 MiB.
+	MaxBytes int64
+	// Timeout bounds the whole request; it defaults to 30 seconds.
+	Timeout time.Duration
+}
+
+// Fetcher performs requests to sources. *Client implements it; tests replay
+// recorded payloads through it.
+type Fetcher interface {
+	Fetch(ctx context.Context, request Request) ([]byte, error)
+}
+
+// Fetch performs a request and returns the body of a 200 response.
+func (client *Client) Fetch(ctx context.Context, spec Request) ([]byte, error) {
+	timeout := spec.Timeout
+	if timeout <= 0 {
+		timeout = defaultTimeout
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	limit := spec.MaxBytes
+	if limit <= 0 {
+		limit = maxBody
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	method := spec.Method
+	if method == "" {
+		method = http.MethodGet
+	}
+	target := spec.URL
+	if len(spec.Query) > 0 {
+		target += "?" + spec.Query.Encode()
+	}
+	var body io.Reader
+	if spec.Form != nil {
+		body = strings.NewReader(spec.Form.Encode())
+	}
+	request, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return nil, err
 	}
+	accept := spec.Accept
+	if accept == "" {
+		accept = "application/json"
+	}
 	request.Header.Set("User-Agent", client.userAgent)
-	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Accept", accept)
+	if spec.Form != nil {
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
 	response, err := client.http.Do(request)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = response.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxBody+1))
+	payload, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(body) > maxBody {
+	if int64(len(payload)) > limit {
 		return nil, errors.New("response exceeds size limit")
 	}
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %d", response.StatusCode)
 	}
-	return body, nil
+	return payload, nil
+}
+
+// GetJSON performs a GET request with query parameters and returns the body.
+func (client *Client) GetJSON(ctx context.Context, endpoint string, query url.Values) ([]byte, error) {
+	return client.Fetch(ctx, Request{URL: endpoint, Query: query})
 }
