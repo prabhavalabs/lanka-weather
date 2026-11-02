@@ -6,6 +6,8 @@ package store
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AdminRegion struct {
@@ -19,6 +21,47 @@ type AdminRegion struct {
 	AreaKm2    float64 `json:"area_km2"`
 	LabelPoint []byte  `json:"label_point"`
 	Geom       []byte  `json:"geom"`
+}
+
+type Cyclone struct {
+	EventID        int64     `json:"event_id"`
+	EpisodeID      int32     `json:"episode_id"`
+	Name           string    `json:"name"`
+	AlertLevel     string    `json:"alert_level"`
+	WindKmh        *float64  `json:"wind_kmh"`
+	SeverityText   string    `json:"severity_text"`
+	Lon            float64   `json:"lon"`
+	Lat            float64   `json:"lat"`
+	Country        string    `json:"country"`
+	StartedAt      time.Time `json:"started_at"`
+	LatestAt       time.Time `json:"latest_at"`
+	AdvisorySource string    `json:"advisory_source"`
+	ReportUrl      string    `json:"report_url"`
+	IsCurrent      bool      `json:"is_current"`
+	Features       []byte    `json:"features"`
+	Source         string    `json:"source"`
+	SourceTime     time.Time `json:"source_time"`
+	FetchedAt      time.Time `json:"fetched_at"`
+}
+
+type Earthquake struct {
+	ID           string    `json:"id"`
+	Magnitude    float64   `json:"magnitude"`
+	MagType      string    `json:"mag_type"`
+	Place        string    `json:"place"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	Lon          float64   `json:"lon"`
+	Lat          float64   `json:"lat"`
+	DepthKm      float64   `json:"depth_km"`
+	Url          string    `json:"url"`
+	Alert        *string   `json:"alert"`
+	Tsunami      bool      `json:"tsunami"`
+	Significance int32     `json:"significance"`
+	EventType    string    `json:"event_type"`
+	Status       string    `json:"status"`
+	Source       string    `json:"source"`
+	SourceTime   time.Time `json:"source_time"`
+	FetchedAt    time.Time `json:"fetched_at"`
 }
 
 type FloodArea struct {
@@ -55,6 +98,42 @@ type FloodGauge struct {
 	ExtremeDangerLevel *float64    `json:"extreme_danger_level"`
 	ValueUnit          string      `json:"value_unit"`
 	FetchedAt          time.Time   `json:"fetched_at"`
+}
+
+type LandslideLevel struct {
+	ReportDate pgtype.Date `json:"report_date"`
+	DsID       string      `json:"ds_id"`
+	DistrictID string      `json:"district_id"`
+	Level      int16       `json:"level"`
+}
+
+type LandslideReport struct {
+	ReportDate pgtype.Date `json:"report_date"`
+	Source     string      `json:"source"`
+	SourceTime time.Time   `json:"source_time"`
+	FetchedAt  time.Time   `json:"fetched_at"`
+}
+
+type OfficialBulletin struct {
+	DocID         string     `json:"doc_id"`
+	BulletinType  string     `json:"bulletin_type"`
+	Title         string     `json:"title"`
+	Severity      string     `json:"severity"`
+	Colour        *string    `json:"colour"`
+	MessageID     *string    `json:"message_id"`
+	IssuedAt      time.Time  `json:"issued_at"`
+	ValidFrom     *time.Time `json:"valid_from"`
+	ValidUntil    *time.Time `json:"valid_until"`
+	PdfUrl        string     `json:"pdf_url"`
+	SourcePageUrl string     `json:"source_page_url"`
+	Lang          string     `json:"lang"`
+	Body          *string    `json:"body"`
+	TextStatus    string     `json:"text_status"`
+	Districts     []string   `json:"districts"`
+	Source        string     `json:"source"`
+	SourceTime    time.Time  `json:"source_time"`
+	FetchedAt     time.Time  `json:"fetched_at"`
+	TextFetchedAt *time.Time `json:"text_fetched_at"`
 }
 
 type Place struct {
