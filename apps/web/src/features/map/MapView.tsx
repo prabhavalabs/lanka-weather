@@ -62,13 +62,11 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
       "bottom-right",
     )
     instance.once("load", () => {
-      // On phones the attribution, open at first, would cover much of the map: start it
-      // folded behind its button, as MapLibre does after the first drag.
-      if (instance.getCanvasContainer().offsetWidth <= 640) {
-        container.current
-          ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")
-          ?.classList.remove("maplibregl-compact-show")
-      }
+      // The attribution names every source on the map, open it would run under the
+      // cards: start it folded behind its button, as MapLibre does after the first drag.
+      container.current
+        ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")
+        ?.classList.remove("maplibregl-compact-show")
       setMap(instance)
     })
     return () => {

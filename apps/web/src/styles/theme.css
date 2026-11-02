@@ -105,9 +105,9 @@
   --reservoir-nodata-foreground: #0a0a0a;
 
   /* Air temperature, cool to hot (<=18, 21, 24, 27, 30, 33, >=36 °C) */
-  --temp-1: #5b6cf0;
-  --temp-2: #3d9fe0;
-  --temp-3: #36b8a6;
+  --temp-1: #6a4fc4;
+  --temp-2: #a06bd1;
+  --temp-3: #46b98a;
   --temp-4: #94cc4f;
   --temp-5: #f2c230;
   --temp-6: #f2852e;
@@ -251,9 +251,9 @@
   --reservoir-nodata: #8c8c8c;
   --reservoir-nodata-foreground: #0a0a0a;
 
-  --temp-1: #6f7ff5;
-  --temp-2: #4aa9e8;
-  --temp-3: #3cc4b1;
+  --temp-1: #8a6fe8;
+  --temp-2: #b98ae6;
+  --temp-3: #4ec795;
   --temp-4: #a0d65a;
   --temp-5: #f5ca3c;
   --temp-6: #f68f3a;

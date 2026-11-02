@@ -49,6 +49,12 @@ function statusColor(palette: Palette): ExpressionSpecification {
   ]
 }
 
+const raised: ExpressionSpecification = [
+  "in",
+  ["get", "status"],
+  ["literal", ["alert", "minor_flood", "major_flood"]],
+]
+
 /** Draws severe stations above calm ones. */
 const severity: ExpressionSpecification = [
   "match",
@@ -82,8 +88,9 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
         type: "circle",
         source: SOURCE,
         filter: ["all", ["==", ["get", "trend"], "rising"], ["!", ["get", "stale"]]],
+        minzoom: 5.5,
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 10, 10, 16],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 6, 8, 9, 10, 16],
           "circle-color": statusColor(palette),
           "circle-opacity": 0.3,
         },
@@ -99,18 +106,32 @@ function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
         source: SOURCE,
         layout: { "circle-sort-key": severity },
         paint: {
+          // A country's worth of calm gauges stay small, so the rivers read; one
+          // that needs attention is clear at any zoom.
           "circle-radius": [
             "interpolate",
             ["linear"],
             ["zoom"],
+            4,
+            ["case", selected, 6, raised, 4, 1.5],
             6,
-            ["case", selected, 7, 5],
+            ["case", selected, 7, raised, 6, 3],
+            8,
+            ["case", selected, 8, raised, 7, 4.5],
             10,
             ["case", selected, 11, 9],
           ],
           "circle-color": statusColor(palette),
           "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
-          "circle-stroke-width": ["case", selected, 3, 1.25],
+          "circle-stroke-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            ["case", selected, 2, raised, 1, 0],
+            6,
+            ["case", selected, 3, 1.25],
+          ],
           "circle-stroke-color": ["case", selected, palette.strokeSelected, palette.stroke],
         },
       },

@@ -185,7 +185,20 @@ function addLayers(map: MapLibreMap, data: FloodForecastCollection) {
         filter: isGauge,
         layout: {
           "icon-image": DIAMOND,
-          "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.75, 10, 1],
+          // Calm forecasts stay small until there is room; a raised one never does.
+          "icon-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            ["case", ["==", ["get", "severity"], "no_flooding"], 0.2, 0.6],
+            6,
+            ["case", ["==", ["get", "severity"], "no_flooding"], 0.42, 0.75],
+            8,
+            ["case", ["==", ["get", "severity"], "no_flooding"], 0.58, 0.85],
+            10,
+            1,
+          ],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
           "symbol-sort-key": severityRank,

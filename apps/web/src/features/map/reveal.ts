@@ -23,18 +23,30 @@ export function sheetPeekHeight(viewportHeight: number): number {
   return Math.round(Math.min(viewportHeight * 0.45, 26 * rem))
 }
 
+/** The sheet's height when what it opens with is short, leaving more of the map. */
+export const sheetSmallPeekHeight = 14.5 * rem
+
+/** Room at the top when the map first opens, for the banner under the toolbar. */
+export const openingTopRoom = 5.75 * rem
+
 /** The parts of the map covered by cards, for the current layout. */
 export function layoutInsets(layout: {
   desktop: boolean
   sidebarCollapsed: boolean
   detailOpen: boolean
   viewportHeight: number
+  /** The sheet is at its small height. */
+  smallSheet?: boolean
 }): Insets {
   if (!layout.desktop) {
     return {
       top: phoneTopInset,
       right: 0,
-      bottom: layout.detailOpen ? sheetPeekHeight(layout.viewportHeight) : 0,
+      bottom: !layout.detailOpen
+        ? 0
+        : layout.smallSheet
+          ? sheetSmallPeekHeight
+          : sheetPeekHeight(layout.viewportHeight),
       left: 0,
     }
   }

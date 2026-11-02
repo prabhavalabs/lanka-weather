@@ -59,6 +59,41 @@ water (labelled), a large earthquake in the last day, reservoirs spilling.
 - **Dismissal lasts until the next load.** This is safety information: yesterday's dismissal should
   not hide today's cyclone.
 
+### The map with everything together
+
+The layers were built apart and first seen together here, on 2 November, at desktop and
+phone width in both themes. What changed:
+
+- **Default layers, safety first:** official warnings, landslide warnings, cyclones and
+  earthquakes; then rivers, river levels, flood forecast and reservoirs; then boundaries.
+  **Wind is now off by default.** Its animation runs over everything, its timeline takes the
+  bottom of a phone, and it answers a different question. People who saved their layers keep
+  what they chose. Temperature, rainfall, stations, air, sea and past floods stay one switch away.
+- **Calm points stay small.** At country scale calm gauges and forecasts shrink, and the
+  rising halo waits for zoom 5.5, so the rivers can be read. A raised gauge stays large at any zoom,
+  so nothing that needs attention shrinks with them.
+- **One map key.** Ten legend cards covered half the map once the sidebar closed. The hazard and
+  river keys share one "Map key" button, whose column scrolls and is remembered. A layer that
+  colours the whole map keeps its own legend card, as its colours mean nothing without it.
+- **The layer list.** A layer's notes open from a chevron, and when it is switched on, rather
+  than always, which had pushed the second group off the sidebar. Official warnings lead their
+  group, and past floods come last in theirs.
+- **Attribution.** It starts folded behind its button at every width, not only on phones, because
+  with every source named it ran under the cards. Opened, it stays in the clear part of the map.
+- **Toolbar.** The search box gives way, and the level selector moves to the layer's notes when
+  the toolbar has less than 42 rem.
+- **Opening view.** With the pan limit widened for Sumatra (55 to 110° E, 20° S to 30° N), the map
+  still opens on Sri Lanka, now fitted into what the cards leave clear and below the banner.
+- **Sri Lanka's own name** comes off the basemap: three lines of script across the middle of the
+  island, on top of the data. Neighbours keep theirs.
+- **Phone sheet.** It opens at 14.5 rem for the overview: the sentence in view and the map above it.
+- **Temperature.** The 21 to 24 °C band was sky blue, and read as water when zoomed in. The cool end
+  now runs violet to orchid, then green-teal from 24 °C, in both themes.
+
+Checked but not changed: labels and points stay over fills; past floods are hatched violet under
+everything current and stay distinct in both themes, including beside the violet temperature band,
+which is a flat field and not a hatch.
+
 ## Consequences
 
 - Each load makes one request, kept for a minute by the API and the browser. It reads about a

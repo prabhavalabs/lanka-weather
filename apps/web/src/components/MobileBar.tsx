@@ -28,7 +28,9 @@ interface MobileBarProps {
 export function MobileBar({ layers, activeCount = 0, footer, actions }: MobileBarProps) {
   return (
     <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-border bg-card/95 py-2 pr-2 pl-3 shadow-panel backdrop-blur-md">
-      <AppLogo className="min-w-0 flex-1" />
+      {/* The bar holds four buttons: on a narrow phone the name would run under them. */}
+      <AppLogo className="min-w-0 flex-1 max-[28rem]:hidden" />
+      <AppLogo variant="mark" className="flex-1 min-[28.0625rem]:hidden" />
       {actions}
       <Drawer>
         <DrawerTrigger asChild>

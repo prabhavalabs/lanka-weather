@@ -132,3 +132,14 @@
   border-radius: 50%;
   background: var(--card);
 }
+
+/*
+ * Open, the attribution names every source on the map. It stays within the part
+ * of the map the cards leave clear, rather than running on underneath them.
+ */
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact-show {
+  max-width: min(
+    36rem,
+    calc(100vw - var(--sidebar-w, 0px) - var(--map-controls-right, 0px) - 14rem)
+  );
+}

@@ -259,8 +259,11 @@ func landslideSection(in Inputs) Section {
 	}
 	meta := in.Landslides.Meta
 	section := Section{ID: SectionLandslides, Group: GroupOfficial, Title: "Landslide warnings", Official: true, Available: true,
-		Stale: meta.Stale, At: firstTime(meta.IssuedAt, meta.FetchedAt), Source: sourceLandslides, Summary: meta.Note, Note: meta.Limit,
+		Stale: meta.Stale, At: firstTime(meta.IssuedAt, meta.FetchedAt), Source: sourceLandslides, Summary: meta.Note,
 		Counts: []Count{}, Items: []Item{}, Target: into}
+	if len(in.Landslides.Features) > 0 {
+		section.Note = meta.Limit // what the feed cannot tell only matters of a level shown
+	}
 	shown := map[int]int{}
 	features := append([]warnings.DivisionFeature(nil), in.Landslides.Features...)
 	sort.SliceStable(features, func(i, j int) bool { return features[i].Properties.Level > features[j].Properties.Level })

@@ -1,4 +1,4 @@
-import type { LayerSpecification, StyleSpecification } from "maplibre-gl"
+import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl"
 
 /** Basemap colours, read from the theme tokens (src/styles/theme.css). */
 export interface BasemapPalette {
@@ -27,6 +27,8 @@ export const basemapTokens: Record<keyof BasemapPalette, `--${string}`> = {
 
 /** Place labels that name larger places, drawn in the stronger label colour. */
 const strongPlaces = /city|capital|country|state/
+
+const notSriLanka: ExpressionSpecification = ["!=", ["get", "name:en"], "Sri Lanka"]
 
 function sourceLayer(layer: LayerSpecification): string | undefined {
   return "source-layer" in layer ? layer["source-layer"] : undefined
@@ -69,11 +71,20 @@ export function tuneBasemap(
         }
         if (source === "water_name" || source === "waterway")
           return repaint(layer, { "text-color": palette.waterLabel, ...halo })
-        if (source === "place")
-          return repaint(layer, {
+        if (source === "place") {
+          const painted = repaint(layer, {
             "text-color": strongPlaces.test(layer.id) ? palette.labelStrong : palette.label,
             ...halo,
           })
+          // The map is about Sri Lanka: its own name, in three scripts across the middle
+          // of the island, would sit on top of the data. Neighbours keep theirs.
+          return /country/.test(layer.id)
+            ? ({
+                ...painted,
+                filter: ["all", ...(painted.filter ? [painted.filter] : []), notSriLanka],
+              } as unknown as LayerSpecification)
+            : painted
+        }
         if (source === "transportation_name" || source === "aerodrome_label")
           return repaint(layer, { "text-color": palette.label, ...halo })
         return layer

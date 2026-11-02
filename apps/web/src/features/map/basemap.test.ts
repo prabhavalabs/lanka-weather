@@ -42,6 +42,30 @@ const paint = (result: StyleSpecification, id: string) =>
 describe("tuneBasemap", () => {
   const result = tuneBasemap(style, palette)
 
+  it("leaves Sri Lanka's own name off the map, and keeps its neighbours'", () => {
+    const tuned = tuneBasemap(
+      {
+        ...style,
+        layers: [
+          {
+            id: "label_country_2",
+            type: "symbol",
+            source: "openmaptiles",
+            "source-layer": "place",
+            filter: ["==", ["get", "class"], "country"],
+          },
+        ],
+      },
+      palette,
+    )
+    const layer = tuned.layers[0] as { filter?: unknown }
+    expect(layer.filter).toEqual([
+      "all",
+      ["==", ["get", "class"], "country"],
+      ["!=", ["get", "name:en"], "Sri Lanka"],
+    ])
+  })
+
   it("paints land, water, parks and boundaries from the palette", () => {
     expect(paint(result, "background")?.["background-color"]).toBe("#111111")
     expect(paint(result, "water")?.["fill-color"]).toBe("#000000")

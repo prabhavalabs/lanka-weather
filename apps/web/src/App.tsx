@@ -21,6 +21,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AdminLevelSelector } from "@/components/weather/AdminLevelSelector"
+import { MapKey } from "@/components/weather/MapKey"
 import { SearchTrigger } from "@/components/weather/SearchTrigger"
 import { isNotReady } from "@/lib/api"
 import type { Layer } from "@/lib/layers"
@@ -60,7 +61,14 @@ import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
 import { HoverChip } from "./features/map/HoverChip"
 import { MapView } from "./features/map/MapView"
-import { clearCentreOffset, clearPadding, inClearArea, layoutInsets } from "./features/map/reveal"
+import { sriLankaBounds } from "./features/map/config"
+import {
+  clearCentreOffset,
+  clearPadding,
+  inClearArea,
+  layoutInsets,
+  openingTopRoom,
+} from "./features/map/reveal"
 import { useMapClick } from "./features/map/useMapClick"
 import { useMapZoom } from "./features/map/useMapZoom"
 import {
@@ -138,15 +146,18 @@ const RIVERS = "rivers"
 const PAST_FLOODS = "past-floods"
 const RESERVOIRS = "reservoirs"
 
-/** Layers on at the first visit. */
+/**
+ * Layers on at the first visit: official warnings and hazards first, then the
+ * water, with boundaries for where things are. Wind is one switch away: its
+ * animation sits over everything and its timeline takes room on a phone.
+ */
 const defaultLayers = [
+  ...hazardDefaults,
   RIVERS,
-  ADMIN_REGIONS,
   RIVER_LEVELS,
   FLOOD_FORECAST,
-  WIND,
   RESERVOIRS,
-  ...hazardDefaults,
+  ADMIN_REGIONS,
 ]
 /** Default layers added since people may have saved their choice; offered to them once. */
 const newDefaultLayers = [RIVERS, RESERVOIRS, ...hazardDefaults]
@@ -355,6 +366,7 @@ export function App() {
   }
 
   // Camera: keep the selected place clear of the cards floating over the map.
+  const overviewShown = overviewOpen && !selection
   const insets = useCallback(
     () =>
       layoutInsets({
@@ -362,9 +374,23 @@ export function App() {
         sidebarCollapsed,
         detailOpen: true,
         viewportHeight: window.innerHeight,
+        smallSheet: overviewShown,
       }),
-    [desktop, sidebarCollapsed],
+    [desktop, sidebarCollapsed, overviewShown],
   )
+  // The map opens on Sri Lanka in what the cards leave clear, whatever the pan limit
+  // allows. A link to a place moves the map itself.
+  const opened = useRef(false)
+  useEffect(() => {
+    if (!map || opened.current) return
+    opened.current = true
+    if (selection) return
+    const padding = clearPadding(insets())
+    map.fitBounds(sriLankaBounds, {
+      padding: { ...padding, top: padding.top + openingTopRoom },
+      duration: 0,
+    })
+  }, [map, selection, insets])
   const reveal = useCallback(
     (lngLat: [number, number], options: { zoom?: number } = {}) => {
       if (!map) return
@@ -983,7 +1009,7 @@ export function App() {
   }
   details[ADMIN_REGIONS] = (
     <div className="flex flex-col gap-3">
-      <AdminLevelSelector level={level} onLevelChange={setLevel} className="md:hidden" />
+      <AdminLevelSelector level={level} onLevelChange={setLevel} />
       <div className="flex flex-col gap-1.5">
         <span className="text-xs text-muted-foreground">Colour regions by</span>
         <ToggleGroup
@@ -1256,7 +1282,7 @@ export function App() {
   }
 
   // Legends for the layers that are on (wide screens; phones show them in the layer sheet).
-  // Gauge legends are in the sidebar while it is open.
+  // What colours the whole map keeps its own card; the rest share the map key.
   const legendClass = "w-60"
   const legends = (
     <>
@@ -1266,18 +1292,20 @@ export function App() {
       {fillVariable && (
         <RegionLegend variable={fillVariable} level={level} className={legendClass} />
       )}
-      {sidebarCollapsed && riverNetworkOn && <RiverRiskLegend card />}
-      {sidebarCollapsed && floodsOn && floodGauges.length > 0 && (
-        <FloodLegend
-          counts={floodCounts}
-          basinCounts={basinCounts}
-          unverified={basinsUnverified}
-          areaCount={areaCount}
-        />
-      )}
-      {sidebarCollapsed && riversOn && <RiverLegend counts={riverCounts} />}
-      {sidebarCollapsed && hazards.legends}
-      {sidebarCollapsed && reservoirsOn && <ReservoirLegend counts={reservoirCounts} />}
+      <MapKey>
+        {riverNetworkOn && <RiverRiskLegend card />}
+        {floodsOn && floodGauges.length > 0 && (
+          <FloodLegend
+            counts={floodCounts}
+            basinCounts={basinCounts}
+            unverified={basinsUnverified}
+            areaCount={areaCount}
+          />
+        )}
+        {riversOn && <RiverLegend counts={riverCounts} />}
+        {reservoirsOn && <ReservoirLegend counts={reservoirCounts} />}
+        {hazards.legends}
+      </MapKey>
     </>
   )
 
@@ -1404,9 +1432,9 @@ export function App() {
           />
         }
         toolbar={
-          <div className="flex w-full max-w-2xl items-center justify-center gap-2">
+          <div className="@container flex w-full max-w-2xl items-center justify-center gap-2">
             <SearchTrigger
-              className="pointer-events-auto max-w-sm flex-1"
+              className="pointer-events-auto max-w-sm min-w-0 flex-1"
               onClick={openSearch}
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
@@ -1414,7 +1442,7 @@ export function App() {
             <OverviewButton onClick={openOverview} className="pointer-events-auto" />
             {hazards.button(false)}
             {regionsOn && (
-              <div className="pointer-events-auto rounded-full border border-border bg-card/95 p-1 shadow-panel backdrop-blur-md">
+              <div className="pointer-events-auto hidden rounded-full border border-border bg-card/95 p-1 shadow-panel backdrop-blur-md @2xl:block">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />
               </div>
             )}
@@ -1431,6 +1459,7 @@ export function App() {
         detail={detail}
         detailLabel={detailLabel}
         detailFull={hazards.detailFull}
+        detailSmall={overviewShown}
         onDetailClose={selection ? close : closeOverview}
         legends={legends}
         timeline={

@@ -2,7 +2,7 @@ import * as React from "react"
 
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer"
 import { cn } from "@/lib/utils"
-import { phoneTopInset, sheetPeekHeight } from "@/features/map/reveal"
+import { phoneTopInset, sheetPeekHeight, sheetSmallPeekHeight } from "@/features/map/reveal"
 
 interface DetailSheetProps {
   open: boolean
@@ -11,6 +11,8 @@ interface DetailSheetProps {
   label: string
   /** Opens at full height rather than part way, for a list to read. */
   openFull?: boolean
+  /** Opens lower than usual, when what is on top is short and the map matters more. */
+  openSmall?: boolean
   children: React.ReactNode
 }
 
@@ -34,12 +36,13 @@ export function DetailSheet({
   onClose,
   label,
   openFull = false,
+  openSmall = false,
   children,
 }: DetailSheetProps) {
   const height = useViewportHeight()
   // The sheet is as tall as the screen below the top bar; vaul measures snap
   // points from the bottom of the window, so the peek adds the bar's height.
-  const peek = `${sheetPeekHeight(height) + phoneTopInset}px`
+  const peek = `${(openSmall ? sheetSmallPeekHeight : sheetPeekHeight(height)) + phoneTopInset}px`
   const snapPoints = React.useMemo(() => [peek, 1], [peek])
   const opening = openFull ? 1 : peek
   const [snap, setSnap] = React.useState<number | string | null>(opening)

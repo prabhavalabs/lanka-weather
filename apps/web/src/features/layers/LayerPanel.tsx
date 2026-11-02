@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from "react"
+import { ChevronDownIcon } from "lucide-react"
+import { useId, useState, type ReactNode } from "react"
 import { IconTile } from "@/components/IconTile"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -32,6 +33,13 @@ export function LayerPanel({
   const { data, error, isPending } = useLayers()
   // The panel can be mounted twice (sidebar and phone sheet), so ids are unique per instance.
   const uid = useId()
+  // Ten layers open at once would fill the list with notes, so a layer's details
+  // open on request, and when it is switched on.
+  const [opened, setOpened] = useState<string[]>([])
+  const setOpen = (id: string, open: boolean) =>
+    setOpened((current) =>
+      open ? [...new Set([...current, id])] : current.filter((value) => value !== id),
+    )
 
   return (
     <div className={cn("flex flex-col gap-5", className)}>
@@ -72,6 +80,8 @@ export function LayerPanel({
                 const Icon = layerIcon(layer)
                 const switchId = `${uid}-switch-${layer.id}`
                 const detail = on && !planned ? details[layer.id] : undefined
+                const detailOpen = opened.includes(layer.id)
+                const detailId = `${uid}-detail-${layer.id}`
                 return (
                   <li
                     key={layer.id}
@@ -114,6 +124,24 @@ export function LayerPanel({
                           {on && summaries[layer.id] ? summaries[layer.id] : layer.attribution}
                         </span>
                       </label>
+                      {detail && (
+                        <button
+                          type="button"
+                          aria-expanded={detailOpen}
+                          aria-controls={detailOpen ? detailId : undefined}
+                          aria-label={`${detailOpen ? "Hide" : "Show"} details of ${layer.title}`}
+                          onClick={() => setOpen(layer.id, !detailOpen)}
+                          className="-mr-1 flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <ChevronDownIcon
+                            aria-hidden="true"
+                            className={cn(
+                              "size-4 transition-transform",
+                              detailOpen && "rotate-180",
+                            )}
+                          />
+                        </button>
+                      )}
                       {planned ? (
                         <Badge variant="chip" className="mr-1">
                           Soon
@@ -122,12 +150,20 @@ export function LayerPanel({
                         <Switch
                           id={switchId}
                           checked={on}
-                          onCheckedChange={() => onToggle(layer.id)}
+                          aria-label={layer.title}
+                          onCheckedChange={() => {
+                            setOpen(layer.id, !on)
+                            onToggle(layer.id)
+                          }}
                           className="mr-1"
                         />
                       )}
                     </div>
-                    {detail && <div className="px-3 pt-1 pb-3">{detail}</div>}
+                    {detail && detailOpen && (
+                      <div id={detailId} className="px-3 pt-1 pb-3">
+                        {detail}
+                      </div>
+                    )}
                   </li>
                 )
               })}

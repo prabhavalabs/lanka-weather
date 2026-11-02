@@ -78,12 +78,32 @@ export function isStale(
 }
 
 /** Layers grouped by category in display order, omitting empty groups. */
+/** Within a group, what people look for first: official before derived, current before past. */
+const layerOrder = [
+  "official-warnings",
+  "landslide-warnings",
+  "cyclones",
+  "earthquakes",
+  "rivers",
+  "river-levels",
+  "flood-forecast",
+  "reservoirs",
+  "past-floods",
+]
+
+function orderOf(layer: Layer): number {
+  const index = layerOrder.indexOf(layer.id)
+  return index < 0 ? layerOrder.length : index
+}
+
 export function groupByCategory(layers: Layer[]) {
   return categoryOrder
     .map((category) => ({
       category,
       label: categoryLabels[category],
-      layers: layers.filter((layer) => layer.category === category),
+      layers: layers
+        .filter((layer) => layer.category === category)
+        .toSorted((a, b) => orderOf(a) - orderOf(b)),
     }))
     .filter((group) => group.layers.length > 0)
 }

@@ -167,6 +167,8 @@ function addLayers(map: MapLibreMap, points: FeatureCollection, areas: FeatureCo
             "interpolate",
             ["linear"],
             ["zoom"],
+            4,
+            ["case", isActive, 0.4, 0.08],
             6,
             ["case", isActive, 0.62, 0.2],
             8,
