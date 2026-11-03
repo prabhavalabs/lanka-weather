@@ -118,7 +118,7 @@ export function Pictogram({ picture, className }: { picture: StepPicture; classN
     >
       {picture.glyph === "app" ? (
         <span className="flex size-8 items-center justify-center rounded-[0.55rem] bg-[#0a0a0a] text-[#f2f2f2]">
-          <AppMark className="h-5" />
+          <AppMark className="size-7" />
         </span>
       ) : (
         <svg

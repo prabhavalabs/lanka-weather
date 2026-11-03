@@ -146,9 +146,9 @@ export default function KitPage() {
             <div className="flex flex-wrap items-center gap-8">
               <AppLogo />
               <AppLogo variant="tile" />
-              <AppMark title="Mark" className="h-16" />
-              <AppMark title="Mark, simple" simple className="h-4" />
-              <AppMark title="Mark" className="h-4" />
+              <AppMark title="Mark" className="size-16" />
+              <AppMark title="Mark, simple" simple className="size-4" />
+              <AppMark title="Mark" className="size-4" />
             </div>
           </Section>
 
