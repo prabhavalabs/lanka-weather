@@ -10,6 +10,7 @@
  * a component renders. Components call `useT()` (or `useLocale()`), which
  * subscribes them, so they re-render when the language changes.
  */
+import type { ExpressionSpecification } from "maplibre-gl"
 import { useCallback, useSyncExternalStore } from "react"
 import { en } from "@/locales/en"
 import { si } from "@/locales/si"
@@ -165,4 +166,65 @@ export function useT(): Translate {
 /** The `Intl` tag for dates and numbers in the current language, e.g. "si-LK". */
 export function intlTag(locale: Locale = current): string {
   return locales[locale].tag
+}
+
+/**
+ * A name as the API gives it: English, with Sinhala and Tamil where the
+ * data has them. Proper names are never translated here, only chosen.
+ */
+export interface LocalNames {
+  name: string
+  nameSi?: string | null
+  nameTa?: string | null
+}
+
+/** The API's `names` object: `{ en, si, ta }`. */
+export interface NameSet {
+  en: string
+  si?: string | null
+  ta?: string | null
+}
+
+function usable(name: string | null | undefined): name is string {
+  return typeof name === "string" && name.trim() !== ""
+}
+
+/** The name in the language, else the English name. */
+export function localName(names: LocalNames, locale: Locale = current): string {
+  const local = locale === "si" ? names.nameSi : locale === "ta" ? names.nameTa : undefined
+  return usable(local) ? local : names.name
+}
+
+/** The name in the language from a `{ en, si, ta }` set, else the English one. */
+export function nameIn(names: NameSet, locale: Locale = current): string {
+  return localName({ name: names.en, nameSi: names.si, nameTa: names.ta }, locale)
+}
+
+/**
+ * A MapLibre expression for a feature's name in the language, falling back
+ * to the English property. Layers rebuild it when the language changes.
+ */
+export function localNameExpression(
+  locale: Locale = current,
+  fields: { name: string; si?: string; ta?: string } = {
+    name: "name",
+    si: "nameSi",
+    ta: "nameTa",
+  },
+): ExpressionSpecification {
+  const local = locale === "si" ? fields.si : locale === "ta" ? fields.ta : undefined
+  if (!local) return ["to-string", ["coalesce", ["get", fields.name], ""]]
+  return ["to-string", ["coalesce", ["get", local], ["get", fields.name], ""]]
+}
+
+/** Folds a name for matching: case, spacing and joiners do not count. */
+export function foldName(name: string): string {
+  return name.normalize("NFC").replace(/[‌‍]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
+}
+
+/** Whether any of a feature's names contains the query, in any script. */
+export function namesMatch(names: Array<string | null | undefined>, query: string): boolean {
+  const folded = foldName(query)
+  if (folded === "") return false
+  return names.some((name) => usable(name) && foldName(name).includes(folded))
 }
