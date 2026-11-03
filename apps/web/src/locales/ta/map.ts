@@ -7,6 +7,7 @@ export const map: Translation<typeof en> = {
     zoomIn: "பெரிதாக்கு",
     zoomOut: "சிறிதாக்கு",
     resetBearing: "திசையை வடக்கிற்கு மீட்டமை",
+    resetView: "முழு இலங்கையையும் காட்டு",
     findMyLocation: "எனது இருப்பிடத்தைக் கண்டறி",
     locationNotAvailable: "இருப்பிடம் கிடைக்கவில்லை",
     toggleAttribution: "மூலக் குறிப்புகளைக் காட்டு அல்லது மறை",

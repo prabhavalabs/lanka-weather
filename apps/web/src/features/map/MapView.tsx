@@ -3,7 +3,9 @@ import "maplibre-gl/dist/maplibre-gl.css"
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
 import sinhalaFontUrl from "@fontsource-variable/noto-sans-sinhala/files/noto-sans-sinhala-sinhala-wght-normal.woff2?url"
 import tamilFontUrl from "@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2?url"
+import { HouseIcon } from "lucide-react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { getLocale, translateIn, useLocale, useT, type Locale } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
 import { basemapTokens, labelFields, localisedLabel, tuneBasemap } from "./basemap"
@@ -55,8 +57,27 @@ const controlButtons: Record<string, string> = {
   "AttributionControl.ToggleAttribution": ".maplibregl-ctrl-attrib-button",
 }
 
+/** An empty control in MapLibre's corner stack, for a button React renders into it. */
+class SlotControl implements maplibregl.IControl {
+  readonly element = document.createElement("div")
+  constructor(className: string) {
+    this.element.className = `maplibregl-ctrl maplibregl-ctrl-group ${className}`
+  }
+  onAdd() {
+    return this.element
+  }
+  onRemove() {
+    this.element.remove()
+  }
+}
+
 interface MapViewProps {
   theme: MapTheme
+  /**
+   * Brings the whole island back into view, from the button above the zoom
+   * buttons. Without it the map fits Sri Lanka to the full map.
+   */
+  onResetView?: () => void
   /** Called with the map once its first style has loaded, and with null when it goes. */
   onReady?: (map: maplibregl.Map | null) => void
   /** Data layers; they read the map from MapContext. */
@@ -64,9 +85,10 @@ interface MapViewProps {
 }
 
 /** The base map of Sri Lanka. Data layers are rendered as children. */
-export function MapView({ theme, onReady, children }: MapViewProps) {
+export function MapView({ theme, onReady, onResetView, children }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
+  const [resetSlot, setResetSlot] = useState<HTMLElement | null>(null)
   const ready = useRef(onReady)
 
   useEffect(() => {
@@ -92,6 +114,9 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
       locale: controlStrings(getLocale()),
     })
     instance.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right")
+    // Bottom corners stack upwards: added after the zoom buttons, it sits on them.
+    const reset = new SlotControl("lw-ctrl-reset-view")
+    instance.addControl(reset, "bottom-right")
     instance.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right")
     instance.addControl(
       new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: false } }),
@@ -103,10 +128,12 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
       container.current
         ?.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")
         ?.classList.remove("maplibregl-compact-show")
+      setResetSlot(reset.element)
       setMap(instance)
     })
     return () => {
       setMap(null)
+      setResetSlot(null)
       instance.remove()
     }
     // The map is created once; theme changes are applied below without recreating it.
@@ -158,6 +185,22 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
           role="region"
         />
       </div>
+      {map &&
+        resetSlot &&
+        createPortal(
+          <button
+            type="button"
+            title={t("map.controls.resetView")}
+            aria-label={t("map.controls.resetView")}
+            onClick={() => {
+              if (onResetView) onResetView()
+              else map.fitBounds(sriLankaBounds, { padding: 24, bearing: 0, pitch: 0 })
+            }}
+          >
+            <HouseIcon aria-hidden="true" className="mx-auto block size-4 text-foreground" />
+          </button>,
+          resetSlot,
+        )}
       <MapContext.Provider value={map}>{children}</MapContext.Provider>
     </>
   )

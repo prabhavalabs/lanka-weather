@@ -6,6 +6,7 @@ export const map = {
     zoomIn: "Zoom in",
     zoomOut: "Zoom out",
     resetBearing: "Reset bearing to north",
+    resetView: "Show all of Sri Lanka",
     findMyLocation: "Find my location",
     locationNotAvailable: "Location not available",
     toggleAttribution: "Toggle attribution",

@@ -411,17 +411,28 @@ export function App() {
   )
   // The map opens on Sri Lanka in what the cards leave clear, whatever the pan limit
   // allows. A link to a place moves the map itself.
+  // The reset button above the zoom buttons brings the same view back.
+  const showSriLanka = useCallback(
+    (animate: boolean) => {
+      if (!map) return
+      const padding = clearPadding(insets())
+      map.fitBounds(sriLankaBounds, {
+        padding: { ...padding, top: padding.top + openingTopRoom },
+        bearing: 0,
+        pitch: 0,
+        duration: animate ? 1200 : 0,
+      })
+    },
+    [map, insets],
+  )
+  const resetView = useCallback(() => showSriLanka(true), [showSriLanka])
   const opened = useRef(false)
   useEffect(() => {
     if (!map || opened.current) return
     opened.current = true
     if (selection) return
-    const padding = clearPadding(insets())
-    map.fitBounds(sriLankaBounds, {
-      padding: { ...padding, top: padding.top + openingTopRoom },
-      duration: 0,
-    })
-  }, [map, selection, insets])
+    showSriLanka(false)
+  }, [map, selection, showSriLanka])
   const reveal = useCallback(
     (lngLat: [number, number], options: { zoom?: number } = {}) => {
       if (!map) return
@@ -1439,7 +1450,7 @@ export function App() {
       <AppShell
         sidebarCollapsed={sidebarCollapsed}
         map={
-          <MapView theme={theme} onReady={setMap}>
+          <MapView theme={theme} onReady={setMap} onResetView={resetView}>
             {gridOn && <GridLayer grid={grid.data} variable={gridVariable} />}
             {observedLayers.mapLayers}
             {regionsOn && regionsLayer && (

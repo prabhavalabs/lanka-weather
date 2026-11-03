@@ -7,6 +7,7 @@ export const map: Translation<typeof en> = {
     zoomIn: "විශාලනය කරන්න",
     zoomOut: "කුඩා කරන්න",
     resetBearing: "දිශානතිය උතුරට යළි සකසන්න",
+    resetView: "මුළු ශ්‍රී ලංකාවම පෙන්වන්න",
     findMyLocation: "මගේ ස්ථානය සොයන්න",
     locationNotAvailable: "ස්ථානය ලබාගත නොහැක",
     toggleAttribution: "මූලාශ්‍ර සඳහන පෙන්වන්න හෝ සඟවන්න",
