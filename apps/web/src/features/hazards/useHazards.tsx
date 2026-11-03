@@ -51,6 +51,7 @@ import { LandslideLegend, OfficialDistrictsLegend } from "../warnings/WarningLeg
 import { WarningBanner } from "../warnings/WarningBanner"
 import { WarningsButton } from "../warnings/WarningsButton"
 import { WarningsPanel } from "../warnings/WarningsPanel"
+import { toolbarPill } from "@/components/weather/toolbar"
 import type { HoverLayers } from "../map/HoverChip"
 import { regionLevelOf } from "../regions/present"
 
@@ -540,7 +541,7 @@ export function useHazards({
       count={activeCount}
       stale={stale}
       onClick={() => openWarnings()}
-      className={compact ? undefined : "pointer-events-auto"}
+      className={compact ? undefined : toolbarPill}
     />
   )
 

@@ -23,6 +23,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { AdminLevelSelector } from "@/components/weather/AdminLevelSelector"
 import { MapKey, type MapKeySection } from "@/components/weather/MapKey"
 import { SearchTrigger } from "@/components/weather/SearchTrigger"
+import { toolbarPill } from "@/components/weather/toolbar"
 import { isNotReady } from "@/lib/api"
 import type { Layer } from "@/lib/layers"
 import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
@@ -1549,18 +1550,20 @@ export function App() {
           />
         }
         toolbar={
-          <div className="@container flex w-full max-w-2xl items-center justify-center gap-2">
+          // One row of pills of one height. The search box gives way first: it
+          // narrows to its icon when the labels (Sinhala, Tamil) leave little room.
+          <div className="@container flex w-full max-w-3xl items-center justify-center gap-2">
             <SearchTrigger
-              className="pointer-events-auto max-w-sm min-w-0 flex-1"
+              className="pointer-events-auto max-w-sm flex-1"
               onClick={openSearch}
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
             />
-            <OverviewButton onClick={openOverview} className="pointer-events-auto" />
+            <OverviewButton onClick={openOverview} className={toolbarPill} />
             {hazards.button(false)}
-            <AlertsButton className="pointer-events-auto" />
+            <AlertsButton className={toolbarPill} />
             {regionsOn && (
-              <div className="pointer-events-auto hidden rounded-full border border-border bg-card/95 p-1 shadow-panel backdrop-blur-md @2xl:block">
+              <div className="pointer-events-auto hidden h-10 shrink-0 items-center rounded-full border border-border bg-card/95 px-[3px] shadow-panel backdrop-blur-md @3xl:flex">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />
               </div>
             )}

@@ -31,21 +31,26 @@ export function SearchTrigger({ compact = false, className, ...props }: SearchTr
       </Button>
     )
   }
+  // The box sizes itself to its room: a round icon button when the row is
+  // tight, the prompt from 8 rem, and the shortcut too from 14 rem. A box
+  // squeezed past its words would show neither.
   return (
-    <button
-      type="button"
-      className={cn(
-        "flex h-10 w-full items-center gap-2.5 rounded-full border border-border bg-card pr-2 pl-3.5 text-left text-sm text-muted-foreground shadow-panel transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-        className,
-      )}
-      aria-keyshortcuts={shortcut}
-      {...props}
-    >
-      <SearchIcon className="size-4 shrink-0" aria-hidden="true" />
-      <span className="min-w-0 flex-1 truncate">{t("weather.search.trigger")}</span>
-      <Kbd aria-hidden="true" className="shrink-0">
-        {isMac ? t("weather.search.shortcutMac") : t("weather.search.shortcutOther")}
-      </Kbd>
-    </button>
+    <div className={cn("@container/search flex min-w-10", className)}>
+      <button
+        type="button"
+        className="flex h-10 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-card/95 text-left text-sm text-muted-foreground shadow-panel backdrop-blur-md transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring @min-[8rem]/search:justify-start @min-[8rem]/search:pr-2 @min-[8rem]/search:pl-3.5"
+        aria-label={t("weather.search.triggerLabel")}
+        aria-keyshortcuts={shortcut}
+        {...props}
+      >
+        <SearchIcon className="size-4 shrink-0" aria-hidden="true" />
+        <span className="hidden min-w-0 flex-1 truncate @min-[8rem]/search:block">
+          {t("weather.search.trigger")}
+        </span>
+        <Kbd aria-hidden="true" className="hidden shrink-0 @min-[14rem]/search:inline-flex">
+          {isMac ? t("weather.search.shortcutMac") : t("weather.search.shortcutOther")}
+        </Kbd>
+      </button>
+    </div>
   )
 }
