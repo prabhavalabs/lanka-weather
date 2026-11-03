@@ -178,7 +178,7 @@ describe("in Sinhala and Tamil", () => {
 
   it("uses the Sri Lankan words for spilling and keeps cusecs", () => {
     setLocale("si")
-    expect(reservoirStatusLabels.spilling).toBe("වාන් දමමින්")
+    expect(reservoirStatusLabels.spilling).toBe("වාන් දමයි")
     expect(flowShort({ kind: "spill", cusecs: 1551, agency: "x" })).toBe("වාන් දැමීම: 1,551 cusecs")
     setLocale("ta")
     expect(flowShort({ kind: "spill", cusecs: null, agency: "x" })).toBe("வான் பாய்தல்")

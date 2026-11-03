@@ -211,10 +211,11 @@ export function LocationWeatherPanel({
 
       {status !== "unavailable" && (
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="gap-3">
-          <TabsList className="w-full">
+          {/* Tabs size to their words and the row scrolls sideways if they run past the panel (Tamil). */}
+          <TabsList className="w-full justify-start overflow-x-auto [scrollbar-width:none]">
             {(Object.keys(tabs) as Tab[]).map((key) => (
-              <TabsTrigger key={key} value={key} className="min-w-0 px-1.5" title={t(tabs[key])}>
-                <span className="truncate">{t(tabs[key])}</span>
+              <TabsTrigger key={key} value={key} className="flex-auto shrink-0 px-2">
+                {t(tabs[key])}
                 {key === "alerts" && warningCount > 0 && (
                   <span className="numeric ml-0.5 rounded-full bg-brand px-1.5 text-[0.6875rem] leading-4 text-brand-foreground">
                     {warningCount}

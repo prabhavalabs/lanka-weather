@@ -325,7 +325,7 @@ describe("in Sinhala and Tamil", () => {
       "",
       "2026-11-02T14:51:02Z",
     )
-    expect(alert.summary).toBe("4 km දුරින් ඇති Peradeniya මිනුම් ස්ථානය සුළු ගංවතුර මට්ටමේ ඇත.")
+    expect(alert.summary).toBe("4 km දුරින් ඇති Peradeniya ජල මිනුම් ස්ථානය සුළු ගංවතුර මට්ටමේ ඇත.")
     expect(alert.basisLang).toBeUndefined()
   })
 

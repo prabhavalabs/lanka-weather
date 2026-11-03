@@ -158,7 +158,7 @@ export const floods: Translation<typeof en> = {
     },
     magnitudeLabel: {
       critical: "බරපතළ ගංවතුර",
-      major: "ප්‍රධාන ගංවතුර",
+      major: "මහ ගංවතුර",
       minor: "සුළු ගංවතුර",
     },
     listSummary: "සිතියම්ගත සිදුවීම් {count} · අතීත, පුරෝකථනයක් නොවේ",

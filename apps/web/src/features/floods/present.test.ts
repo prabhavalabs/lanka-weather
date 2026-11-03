@@ -145,6 +145,6 @@ describe("past floods", () => {
     expect(pastFloodMagnitude("minor")).toBe("Minor")
     expect(pastFloodMagnitude("partial")).toBe("Partial")
     setLocale("si")
-    expect(pastFloodMagnitude("major")).toBe("ප්‍රධාන ගංවතුර")
+    expect(pastFloodMagnitude("major")).toBe("මහ ගංවතුර")
   })
 })

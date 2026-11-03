@@ -219,7 +219,7 @@ describe("reasonText", () => {
       "Hanwella හි ජල මට්ටම 6.10 m කි; එය 6.00 m වන සුළු ගංවතුර මට්ටමට ඉහළින් ය.",
     )
     expect(reasonText(reason("gauge", sentences[7]![1]), "ta").text).toContain(
-      "ஏறத்தாழ 3 மணிநேரத்தில்",
+      "ஏறத்தாழ 3 மணித்தியாலத்தில்",
     )
   })
 

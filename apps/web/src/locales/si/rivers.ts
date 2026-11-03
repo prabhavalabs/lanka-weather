@@ -21,18 +21,18 @@ export const rivers: Translation<typeof en> = {
     below: {
       alert: "අනතුරු ඇඟවීමේ මට්ටමට {amount} පහළින්",
       minor_flood: "සුළු ගංවතුර මට්ටමට {amount} පහළින්",
-      major_flood: "ප්‍රධාන ගංවතුර මට්ටමට {amount} පහළින්",
+      major_flood: "මහ ගංවතුර මට්ටමට {amount} පහළින්",
     },
     towards: {
       alert: "මට්ටම් අතර ජල මට්ටම, අනතුරු ඇඟවීමේ මට්ටම දෙසට",
       minor_flood: "මට්ටම් අතර ජල මට්ටම, සුළු ගංවතුර මට්ටම දෙසට",
-      major_flood: "මට්ටම් අතර ජල මට්ටම, ප්‍රධාන ගංවතුර මට්ටම දෙසට",
+      major_flood: "මට්ටම් අතර ජල මට්ටම, මහ ගංවතුර මට්ටම දෙසට",
     },
     noReading: "මෙම මිනුම් ස්ථානයෙන් දැනට කියවීමක් නැත.",
     noUnit:
       "මෙම මිනුම් ස්ථානය සඳහා ඒකකයක් හෝ ගංවතුර මට්ටම් ප්‍රකාශයට පත් කර නැති නිසා ගංවතුර තත්ත්වයක් කිව නොහැක.",
     noThresholds: "මෙම ස්ථානය ගංවතුර මට්ටම් ප්‍රකාශයට පත් නොකරයි.",
-    aboveMajor: "ප්‍රධාන ගංවතුර මට්ටමට ඉහළින්",
+    aboveMajor: "මහ ගංවතුර මට්ටමට ඉහළින්",
     nextHour: "ඊළඟ පැය (පරීක්ෂණාත්මක, Sri Lanka Water Levels විසින්): {value}, {issued}",
     observed: "නිරීක්ෂණය",
     observedStale: "{age} · යල් පැන ගිය",
@@ -137,15 +137,14 @@ export const rivers: Translation<typeof en> = {
         alert: "{gauge} හි ජල මට්ටම {level} කි; එය {threshold} වන අනතුරු ඇඟවීමේ මට්ටමට ඉහළින් ය.",
         minor_flood:
           "{gauge} හි ජල මට්ටම {level} කි; එය {threshold} වන සුළු ගංවතුර මට්ටමට ඉහළින් ය.",
-        major_flood:
-          "{gauge} හි ජල මට්ටම {level} කි; එය {threshold} වන ප්‍රධාන ගංවතුර මට්ටමට ඉහළින් ය.",
+        major_flood: "{gauge} හි ජල මට්ටම {level} කි; එය {threshold} වන මහ ගංවතුර මට්ටමට ඉහළින් ය.",
       },
       below: "{gauge} හි ජල මට්ටම {level} කි; එය {threshold} වන අනතුරු ඇඟවීමේ මට්ටමට පහළින් ය.",
       near: "එය එම මට්ටමට {gap} ක් ඇතුළත ය.",
       rising: {
         alert: "පැයට {rate} බැගින් ඉහළ යමින්, {time} අනතුරු ඇඟවීමේ මට්ටමට ළඟා විය හැක.",
         minor_flood: "පැයට {rate} බැගින් ඉහළ යමින්, {time} සුළු ගංවතුර මට්ටමට ළඟා විය හැක.",
-        major_flood: "පැයට {rate} බැගින් ඉහළ යමින්, {time} ප්‍රධාන ගංවතුර මට්ටමට ළඟා විය හැක.",
+        major_flood: "පැයට {rate} බැගින් ඉහළ යමින්, {time} මහ ගංවතුර මට්ටමට ළඟා විය හැක.",
       },
       lessThanHour: "පැයකටත් අඩු කාලයකින්",
       aboutHour: "පැයකින් පමණ",

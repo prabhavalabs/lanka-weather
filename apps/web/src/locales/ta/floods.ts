@@ -160,8 +160,8 @@ export const floods: Translation<typeof en> = {
     },
     magnitudeLabel: {
       critical: "மிகத் தீவிர வெள்ளம்",
-      major: "பெரு வெள்ளம்",
-      minor: "சிறு வெள்ளம்",
+      major: "பாரிய வெள்ளம்",
+      minor: "சிறிய வெள்ளம்",
     },
     listSummary: {
       one: "{count} வரைபடமாக்கப்பட்ட நிகழ்வு · கடந்த காலம், முன்னறிவிப்பு அல்ல",

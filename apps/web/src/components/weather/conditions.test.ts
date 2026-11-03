@@ -43,7 +43,7 @@ describe("in Sinhala and Tamil", () => {
     setLocale("si")
     expect(conditionFromWmo(95).summary).toBe("ගිගුරුම් සහිත වැසි")
     expect(conditionLabel("rain")).toBe("වැසි")
-    expect(conditionFromWmo(1, 1, 45).summary).toBe("බොහෝ දුරට පැහැදිලි, සුළං සහිත")
+    expect(conditionFromWmo(1, 1, 45).summary).toBe("බොහෝ දුරට පැහැදිලි, තද සුළං")
     setLocale("ta")
     expect(conditionFromWmo(95).summary).toBe("இடியுடன் கூடிய மழை")
     expect(conditionLabel("rain")).toBe("மழை")

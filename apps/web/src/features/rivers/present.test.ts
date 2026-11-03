@@ -20,9 +20,9 @@ describe("labels", () => {
     expect(thresholdLabels.alert).toBe("Alert level")
     setLocale("si")
     expect(statusLabels.minor_flood).toBe("සුළු ගංවතුර")
-    expect(trendLabels.rising).toBe("ඉහළ යමින්")
+    expect(trendLabels.rising).toBe("ඉහළ නගිමින්")
     setLocale("ta")
-    expect(statusLabels.major_flood).toBe("பெரு வெள்ளம்")
+    expect(statusLabels.major_flood).toBe("பாரிய வெள்ளம்")
   })
 
   it("list every status", () => {
