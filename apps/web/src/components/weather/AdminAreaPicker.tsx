@@ -11,9 +11,9 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-import { adminLevelLabels } from "./adminLevels"
 import type { AdminArea, AdminLevel } from "./types"
 
 interface AdminAreaPickerProps {
@@ -33,6 +33,7 @@ export function AdminAreaPicker({
   onAreaChange,
   className,
 }: AdminAreaPickerProps) {
+  const t = useT()
   const [open, setOpen] = React.useState(false)
   const selected = areas.find((area) => area.id === selectedAreaId)
 
@@ -44,20 +45,20 @@ export function AdminAreaPicker({
           size="sm"
           role="combobox"
           aria-expanded={open}
-          aria-label={`Choose a ${adminLevelLabels[level].long.toLowerCase()}`}
+          aria-label={t(`weather.areaPicker.choose.${level}`)}
           className={cn("min-w-40 justify-between", className)}
         >
           <span className={cn("truncate", !selected && "text-muted-foreground")}>
-            {selected?.name ?? `All ${adminLevelLabels[level].short.toLowerCase()}s`}
+            {selected?.name ?? t(`weather.areaPicker.all.${level}`)}
           </span>
           <ChevronsUpDownIcon className="text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
-          <CommandInput placeholder={`Find a ${adminLevelLabels[level].long.toLowerCase()}…`} />
+          <CommandInput placeholder={t(`weather.areaPicker.find.${level}`)} />
           <CommandList>
-            <CommandEmpty>No match.</CommandEmpty>
+            <CommandEmpty>{t("weather.areaPicker.noMatch")}</CommandEmpty>
             <CommandGroup>
               {areas.map((area) => (
                 <CommandItem
@@ -69,9 +70,11 @@ export function AdminAreaPicker({
                     setOpen(false)
                   }}
                 >
-                  <span className="flex-1 truncate">{area.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{area.name}</span>
                   {area.parentName && (
-                    <span className="text-xs text-muted-foreground">{area.parentName}</span>
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {area.parentName}
+                    </span>
                   )}
                 </CommandItem>
               ))}

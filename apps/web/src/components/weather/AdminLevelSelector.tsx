@@ -1,7 +1,8 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-import { adminLevelLabels, adminLevels } from "./adminLevels"
+import { adminLevelLabel, adminLevels } from "./adminLevels"
 import type { AdminLevel } from "./types"
 
 interface AdminLevelSelectorProps {
@@ -24,6 +25,7 @@ export function AdminLevelSelector({
   disabledLevels = [],
   className,
 }: AdminLevelSelectorProps) {
+  const t = useT()
   return (
     <ToggleGroup
       type="single"
@@ -32,20 +34,24 @@ export function AdminLevelSelector({
       onValueChange={(value) => {
         if (value) onLevelChange(value as AdminLevel)
       }}
-      aria-label="Boundary level"
-      className={cn(className)}
+      aria-label={t("weather.levelSelector.label")}
+      // Wraps rather than overflows where the short names run long (Tamil, Sinhala).
+      className={cn("max-w-full flex-wrap", className)}
     >
-      {adminLevels.map((option) => (
-        <ToggleGroupItem
-          key={option}
-          value={option}
-          disabled={disabledLevels.includes(option)}
-          aria-label={adminLevelLabels[option].long}
-          title={adminLevelLabels[option].long}
-        >
-          {adminLevelLabels[option].short}
-        </ToggleGroupItem>
-      ))}
+      {adminLevels.map((option) => {
+        const label = adminLevelLabel(option)
+        return (
+          <ToggleGroupItem
+            key={option}
+            value={option}
+            disabled={disabledLevels.includes(option)}
+            aria-label={label.long}
+            title={label.long}
+          >
+            {label.short}
+          </ToggleGroupItem>
+        )
+      })}
     </ToggleGroup>
   )
 }

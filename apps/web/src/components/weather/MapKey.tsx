@@ -2,6 +2,7 @@ import { ListIcon } from "lucide-react"
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useT } from "@/lib/i18n"
 import { reducedMotionQuery, useMediaQuery } from "@/lib/useMediaQuery"
 import { useLocalStorage } from "@/lib/useLocalStorage"
 import { cn } from "@/lib/utils"
@@ -27,6 +28,7 @@ const READING_LINE = 12
  * to a legend and shows which one is in view.
  */
 export function MapKey({ sections }: { sections: MapKeySection[] }) {
+  const t = useT()
   const [open, setOpen] = useLocalStorage("lanka-weather:map-key-open", false)
   const reducedMotion = useMediaQuery(reducedMotionQuery)
   const id = useId()
@@ -79,16 +81,20 @@ export function MapKey({ sections }: { sections: MapKeySection[] }) {
           className="flex max-h-[min(62dvh,36rem)] w-80 flex-col overflow-hidden rounded-2xl border border-border bg-card/95 text-card-foreground shadow-panel backdrop-blur-md"
         >
           {sections.length > 1 && (
-            <nav aria-label="Map key sections" className="shrink-0 border-b border-border p-2">
+            <nav
+              aria-label={t("weather.mapKey.sections")}
+              className="shrink-0 border-b border-border p-2"
+            >
               <ul className="flex flex-wrap gap-1">
                 {sections.map((section) => (
-                  <li key={section.id}>
+                  <li key={section.id} className="min-w-0 max-w-full">
                     <button
                       type="button"
                       aria-current={section.id === current ? "true" : undefined}
                       onClick={() => jump(section.id)}
+                      title={section.title}
                       className={cn(
-                        "h-7 rounded-full px-2.5 text-xs text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+                        "h-7 max-w-full truncate rounded-full px-2.5 text-xs text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                         section.id === current && "bg-accent font-medium text-foreground",
                       )}
                     >
@@ -114,11 +120,14 @@ export function MapKey({ sections }: { sections: MapKeySection[] }) {
                   className="py-3 pr-4 pl-3.5"
                 >
                   <header className="mb-2.5 flex items-baseline justify-between gap-2">
-                    <h2 id={`${id}-${section.id}`} className="text-sm font-medium">
+                    <h2
+                      id={`${id}-${section.id}`}
+                      className="min-w-0 text-sm font-medium break-words"
+                    >
                       {section.title}
                     </h2>
                     {section.unit && (
-                      <span className="numeric text-[0.6875rem] text-muted-foreground">
+                      <span className="numeric shrink-0 text-[0.6875rem] text-muted-foreground">
                         {section.unit}
                       </span>
                     )}
@@ -139,7 +148,7 @@ export function MapKey({ sections }: { sections: MapKeySection[] }) {
         onClick={() => setOpen((current) => !current)}
       >
         <ListIcon />
-        {open ? "Hide map key" : "Map key"}
+        {open ? t("weather.mapKey.hide") : t("weather.mapKey.show")}
       </Button>
     </div>
   )

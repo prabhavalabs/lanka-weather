@@ -1,4 +1,105 @@
 import type { Translation } from "@/lib/i18n"
 import type { location as en } from "../en/location"
 
-export const location: Translation<typeof en> = {}
+export const location: Translation<typeof en> = {
+  region: {
+    province: "{name} පළාත",
+    district: "{name} දිස්ත්‍රික්කය",
+  },
+  offCoast: "වෙරළෙන් ඔබ්බට",
+  coordinates: "{lat}° {latHemisphere}, {lon}° {lonHemisphere}",
+  hemisphere: {
+    north: "උ",
+    south: "ද",
+    east: "නැ",
+    west: "බ",
+  },
+  marker: "තෝරාගත් ස්ථානය: {name}",
+  unavailable: {
+    outside: "කාලගුණ තොරතුරු ලබාදෙන්නේ ශ්‍රී ලංකාව සහ එහි වෙරළබඩ මුහුදු ප්‍රදේශ සඳහා පමණි.",
+    loading:
+      "කාලගුණ දත්ත තවම පූරණය වෙමින් පවතී. කාලගුණ දත්ත එකතු කිරීම ක්‍රියාත්මක වූ පසු ඒවා මෙහි දිස්වේ.",
+    failed: "කාලගුණ දත්ත පූරණය කළ නොහැකි විය. ඉක්මනින් නැවත උත්සාහ කෙරේ.",
+  },
+  officialUnread: "නිල අනතුරු ඇඟවීම් මේ මොහොතේ කියවිය නොහැකි විය.",
+  alert: {
+    issuer: "Lanka Weather ඇස්තමේන්තුව",
+    title: {
+      rainYellow: "තද වැසි ඇති විය හැක",
+      rainOrange: "තද වැසි ඇතිවීමේ වැඩි ඉඩක් ඇත",
+      rainRed: "ඉතා තද වැසි ඇතිවීමේ වැඩි ඉඩක් ඇත",
+      windYellow: "තද සුළං ඇති විය හැක",
+      windOrange: "තද සුළං ඇතිවීමේ වැඩි ඉඩක් ඇත",
+      windRed: "හානිකර සුළං ඇතිවීමේ වැඩි ඉඩක් ඇත",
+      heatYellow: "තාපය: වැඩි අවධානයක් යොමු කරන්න",
+      heatOrange: "තාපය: අනතුරුදායකයි",
+      heatRed: "තාපය: අතිශය අනතුරුදායකයි",
+      riverYellow: "ගඟ අනතුරු ඇඟවීමේ මට්ටමට ඉහළින්",
+      riverOrange: "ගඟ සුළු ගංවතුර මට්ටමේ",
+      riverRed: "ගඟ ප්‍රධාන ගංවතුර මට්ටමේ",
+      floodGauge: "අසල ගංගා ගංවතුරක් පුරෝකථනය කර ඇත",
+      floodArea: "පුරෝකථිත ගංවතුර ප්‍රදේශයක් තුළ",
+    },
+    when: {
+      next24h: "ලබන පැය 24 තුළ",
+      tomorrow: "හෙට",
+      dayAfter: "අනිද්දා",
+    },
+    rain: "{when} {value} mm පමණ වර්ෂාපතනයක් පුරෝකථනය කර ඇත (සීමාව {threshold} mm).",
+    gusts: "{when} {value} km/h දක්වා වේගවත් සුළං පුරෝකථනය කර ඇත (සීමාව {threshold} km/h).",
+    winds: "{when} {value} km/h දක්වා සුළං පුරෝකථනය කර ඇත (සීමාව {threshold} km/h).",
+    heat: "තාප දර්ශකය {value} °C දක්වා ඉහළ යා හැක (සීමාව {threshold} °C). ජලය පානය කරන්න, සෙවණේ විවේක ගන්න සහ අන් අය ගැන සොයා බලන්න.",
+    riverYellow: "{distance} km දුරින් ඇති {name} මිනුම් ස්ථානය අනතුරු ඇඟවීමේ මට්ටමට ඉහළින් ඇත.",
+    riverOrange: "{distance} km දුරින් ඇති {name} මිනුම් ස්ථානය සුළු ගංවතුර මට්ටමේ ඇත.",
+    riverRed: "{distance} km දුරින් ඇති {name} මිනුම් ස්ථානය ප්‍රධාන ගංවතුර මට්ටමේ ඇත.",
+    floodGaugeYellow:
+      "{distance} km දුරින් ඇති ගංගා මිනුම් ස්ථානයක සාමාන්‍යයට වඩා ඉහළ ගංවතුරක් Google පුරෝකථනය කරයි.",
+    floodGaugeOrange:
+      "{distance} km දුරින් ඇති ගංගා මිනුම් ස්ථානයක දරුණු ගංවතුරක් Google පුරෝකථනය කරයි.",
+    floodGaugeRed:
+      "{distance} km දුරින් ඇති ගංගා මිනුම් ස්ථානයක අතිශය දරුණු ගංවතුරක් Google පුරෝකථනය කරයි.",
+    floodArea:
+      "මෙම ස්ථානය Google Flood Forecasting විසින් ප්‍රකාශිත ගංවතුර ප්‍රදේශයක් තුළ පිහිටා ඇත.",
+    basis: {
+      forecast: "කාලගුණ ජාලකයෙන් අන්තර්නිවේශනය කළ Open-Meteo පුරෝකථනය",
+      heat: "කාලගුණ ජාලකයෙන් අන්තර්නිවේශනය කළ Open-Meteo පුරෝකථනය; තාප දර්ශකය උෂ්ණත්වය සහ ආර්ද්‍රතාවෙන්",
+      rivers: "වාරිමාර්ග දෙපාර්තමේන්තුවේ ගංගා මිනුම් ස්ථාන කියවීම සහ එම ස්ථානයේම මට්ටම්",
+      riversOther: "{source} මිනුම් ස්ථාන කියවීම සහ එම ස්ථානයේ ප්‍රකාශිත මට්ටම්",
+      floods: "Google Flood Forecasting",
+    },
+  },
+  lists: {
+    rainGauge: "අසල වර්ෂාමානය, පසුගිය පැය 24",
+    rivers: "අසල ගංගා",
+    riverGauges: "අසල ගංගා මිනුම් ස්ථාන",
+    canals: "ඇළ මාර්ග",
+    floodGauges: "අසල ගංවතුර පුරෝකථන මිනුම් ස්ථාන",
+    floodAreas: "මෙහි ගංවතුර ප්‍රදේශ",
+    reservoirs: "අසල වාන් දමන හෝ ජලය මුදාහරින ජලාශ",
+    distance: "{distance} km",
+    forecastFor: "{window} සඳහා පුරෝකථනය",
+    colomboCanals: "කොළඹ ඇළ මාර්ග",
+    canalsReporting: "මිනුම් ස්ථාන {total}න් {reporting}ක් වාර්තා කරයි",
+    canalsContext: "තොරතුරු සඳහා පමණි, ගංවතුර අනතුරු ඇඟවීමක් නොවේ",
+    raised: "{count}ක් ඉහළ",
+    noneRaised: "කිසිවක් ඉහළ නැත",
+  },
+  sources: {
+    item: "{label}: {credit}",
+    weather: "කාලගුණය",
+    weatherCredit: "{source} (CC BY 4.0), 0.2° ආකෘති ජාලකය",
+    observed: "නිරීක්ෂණ",
+    observedCredit: "කාලගුණ විද්‍යා දෙපාර්තමේන්තුව, ශ්‍රී ලංකාව",
+    airQuality: "වායු ගුණත්වය",
+    sea: "මුහුද",
+    riverLevels: "ගංගා ජල මට්ටම්",
+    reservoirs: "ජලාශ",
+    reservoirsCredit:
+      "වාරිමාර්ග දෙපාර්තමේන්තුව සහ මහවැලි අධිකාරිය, Sri Lanka Water Levels (waterlevels.lk) හරහා. මෙය නිල අනතුරු ඇඟවීමක් නොවේ.",
+    floods: "ගංවතුර පුරෝකථන",
+    official: "නිල අනතුරු ඇඟවීම්",
+    officialCredit: "NBRO සහ DMC",
+    boundaries: "මායිම්",
+    boundariesCredit: "මිනින්දෝරු දෙපාර්තමේන්තුව සහ ජනලේඛන හා සංඛ්‍යාලේඛන දෙපාර්තමේන්තුව",
+  },
+}

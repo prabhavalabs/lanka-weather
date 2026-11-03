@@ -1,8 +1,10 @@
 import { formatNumber, formatWeekday } from "@/lib/format"
 import { stepIndex } from "@/lib/colour"
+import { useT } from "@/lib/i18n"
 import { temperatureScale } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 
+import { capitalise } from "./capitalise"
 import { ConditionIcon } from "./ConditionIcon"
 import type { ForecastDay } from "./types"
 
@@ -30,12 +32,13 @@ function noon(date: string) {
  * layer), and the day's rain.
  */
 export function DailyForecast({ days, today, className }: DailyForecastProps) {
+  const t = useT()
   const lows = days.map((day) => day.minC).filter((value): value is number => value !== null)
   const highs = days.map((day) => day.maxC).filter((value): value is number => value !== null)
   if (days.length === 0 || lows.length === 0 || highs.length === 0) {
     return (
       <p className="rounded-2xl border border-border bg-inset px-4 py-8 text-center text-sm text-muted-foreground">
-        No daily forecast available.
+        {t("weather.daily.none")}
       </p>
     )
   }
@@ -46,28 +49,40 @@ export function DailyForecast({ days, today, className }: DailyForecastProps) {
   return (
     <ol
       className={cn("flex flex-col divide-y divide-border", className)}
-      aria-label="Daily forecast"
+      aria-label={t("weather.daily.label")}
     >
       {days.map((day) => {
-        const label = day.date === today ? "Today" : formatWeekday(noon(day.date))
+        const label =
+          day.date === today ? capitalise(t("format.today")) : formatWeekday(noon(day.date))
         const low = day.minC
         const high = day.maxC
         const left = low === null ? 0 : ((low - floor) / span) * 100
         const right = high === null ? 100 : ((high - floor) / span) * 100
-        const spoken =
-          `${label}: ${day.summary}` +
-          (low !== null && high !== null
-            ? `, ${formatNumber(low)} to ${formatNumber(high)} °C`
-            : "") +
-          (day.rainMm !== null ? `, ${formatNumber(day.rainMm, 1)} mm rain` : "") +
-          (day.rainChancePercent !== null ? `, ${Math.round(day.rainChancePercent)}% chance` : "")
+        const spoken = [
+          t("weather.daily.spoken", { day: label, summary: day.summary }),
+          low !== null && high !== null
+            ? t("weather.daily.spokenRange", { low: formatNumber(low), high: formatNumber(high) })
+            : null,
+          day.rainMm !== null
+            ? t("weather.daily.spokenRain", { rain: formatNumber(day.rainMm, 1) })
+            : null,
+          day.rainChancePercent !== null
+            ? t("weather.daily.spokenChance", { chance: Math.round(day.rainChancePercent) })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(", ")
         return (
           <li
             key={day.date}
-            className="grid grid-cols-[2.75rem_1.25rem_2.25rem_2rem_1fr_2rem_3.25rem] items-center gap-x-2 py-2 text-sm"
+            className="grid grid-cols-[3.25rem_1.25rem_2.25rem_2rem_1fr_2rem_3.25rem] items-center gap-x-2 py-2 text-sm"
             aria-label={spoken}
           >
-            <span className={cn("truncate", day.date === today ? "font-medium" : "")} aria-hidden>
+            <span
+              className={cn("truncate", day.date === today ? "font-medium" : "")}
+              title={label}
+              aria-hidden
+            >
               {label}
             </span>
             <ConditionIcon condition={day.condition} className="size-4" />

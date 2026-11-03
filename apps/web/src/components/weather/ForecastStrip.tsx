@@ -1,9 +1,11 @@
 import { DottedGrid } from "@/components/DottedGrid"
 import { formatClock, formatNumber, formatWeekday } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 import { ConditionIcon } from "./ConditionIcon"
-import { conditionLabels } from "./conditions"
+import { capitalise } from "./capitalise"
+import { conditionLabel } from "./conditions"
 import type { ForecastHour } from "./types"
 
 interface ForecastStripProps {
@@ -29,10 +31,11 @@ export function ForecastStrip({
   rainScaleMm = 15,
   className,
 }: ForecastStripProps) {
+  const t = useT()
   if (hours.length === 0) {
     return (
       <DottedGrid className={cn("px-4 py-8 text-center text-sm text-muted-foreground", className)}>
-        No forecast available.
+        {t("weather.hourly.none")}
       </DottedGrid>
     )
   }
@@ -42,22 +45,35 @@ export function ForecastStrip({
     <DottedGrid className={cn("overflow-hidden [contain:inline-size]", className)}>
       <ol
         className="flex snap-x overflow-x-auto overscroll-x-contain px-2 py-3 [scrollbar-width:thin]"
-        aria-label="Hourly forecast"
+        aria-label={t("weather.hourly.label")}
       >
         {hours.map((hour, index) => {
           const selected = index === selectedIndex
           const clock = formatClock(hour.time)
           const newDay = index > 0 && clock === "00:00"
-          const label = `${index === 0 ? "Now" : `${formatWeekday(hour.time)} ${clock}`}: ${conditionLabels[hour.condition]}, ${formatNumber(hour.temperatureC)} °C, ${formatNumber(hour.rainfallMm, 1)} mm rain, ${hour.rainChancePercent}% chance`
+          const label = t("weather.hourly.spoken", {
+            time:
+              index === 0
+                ? capitalise(t("format.now"))
+                : t("weather.hourly.at", { weekday: formatWeekday(hour.time), time: clock }),
+            condition: conditionLabel(hour.condition),
+            temperature: formatNumber(hour.temperatureC),
+            rain: formatNumber(hour.rainfallMm, 1),
+            chance: hour.rainChancePercent,
+          })
           const content = (
             <>
               <span
                 className={cn(
-                  "numeric text-[0.6875rem]",
+                  "numeric text-[0.6875rem] whitespace-nowrap",
                   selected ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                {index === 0 ? "Now" : newDay ? formatWeekday(hour.time) : clock.slice(0, 2)}
+                {index === 0
+                  ? capitalise(t("format.now"))
+                  : newDay
+                    ? formatWeekday(hour.time)
+                    : clock.slice(0, 2)}
               </span>
               <ConditionIcon condition={hour.condition} className="size-4" />
               <span className="numeric text-sm text-foreground">
@@ -77,7 +93,8 @@ export function ForecastStrip({
             </>
           )
           const cellClass = cn(
-            "flex w-11 flex-col items-center gap-1.5 rounded-xl border border-transparent py-2",
+            // At least 44 px; wider where "Now" or a weekday runs longer (Tamil, Sinhala).
+            "flex min-w-11 flex-col items-center gap-1.5 rounded-xl border border-transparent px-1 py-2",
             selected && "border-brand bg-brand-soft",
           )
           return (

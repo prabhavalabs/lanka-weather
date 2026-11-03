@@ -1,13 +1,14 @@
+import { useT } from "@/lib/i18n"
 import { rainfallScale, type ScaleStep } from "@/lib/tokens"
 
 import { StepLegend } from "./StepLegend"
 
 /** Rainfall in mm, from light to extreme: over 24 hours by default, or another scale. */
 export function RainfallLegend({
-  title = "Rainfall, 24 h",
+  title,
   unit = "mm",
   scale = rainfallScale,
-  names = { 0: "Light", 3: "Heavy", 5: "Extreme" },
+  names,
   bare,
   className,
 }: {
@@ -18,12 +19,19 @@ export function RainfallLegend({
   bare?: boolean
   className?: string
 }) {
+  const t = useT()
   return (
     <StepLegend
-      title={title}
+      title={title ?? t("weather.legend.rainfall")}
       unit={unit}
       scale={scale}
-      names={names}
+      names={
+        names ?? {
+          0: t("weather.legend.rainLight"),
+          3: t("weather.legend.rainHeavy"),
+          5: t("weather.legend.rainExtreme"),
+        }
+      }
       bare={bare}
       className={className}
     />

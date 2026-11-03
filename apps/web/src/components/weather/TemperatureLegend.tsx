@@ -1,3 +1,4 @@
+import { useT } from "@/lib/i18n"
 import { temperatureScale } from "@/lib/tokens"
 
 import { RampLegend } from "./RampLegend"
@@ -10,17 +11,14 @@ interface TemperatureLegendProps {
 }
 
 /** A continuous ramp from cool to hot with its °C stops. */
-export function TemperatureLegend({
-  title = "Air temperature",
-  bare,
-  className,
-}: TemperatureLegendProps) {
+export function TemperatureLegend({ title, bare, className }: TemperatureLegendProps) {
+  const t = useT()
   return (
     <RampLegend
-      title={title}
+      title={title ?? t("weather.legend.temperature")}
       unit="°C"
       scale={temperatureScale}
-      ends={["blue", "red"]}
+      ends={[t("weather.legend.cool"), t("weather.legend.hot")]}
       bare={bare}
       className={className}
     />

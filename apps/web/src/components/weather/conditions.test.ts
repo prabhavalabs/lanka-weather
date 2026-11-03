@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest"
-import { conditionFromWmo } from "./conditions"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
+import { conditionFromWmo, conditionLabel } from "./conditions"
+import { estimateLabel, severityLabel } from "./severity"
 
 describe("conditionFromWmo", () => {
   it("maps codes to conditions and words", () => {
@@ -31,5 +33,28 @@ describe("conditionFromWmo", () => {
 
   it("copes with a missing code", () => {
     expect(conditionFromWmo(null, 1)).toEqual({ condition: "partly-cloudy", summary: "Unknown" })
+  })
+})
+
+describe("in Sinhala and Tamil", () => {
+  afterEach(() => setLocale("en"))
+
+  it("words the conditions as the Department of Meteorology does", () => {
+    setLocale("si")
+    expect(conditionFromWmo(95).summary).toBe("ගිගුරුම් සහිත වැසි")
+    expect(conditionLabel("rain")).toBe("වැසි")
+    expect(conditionFromWmo(1, 1, 45).summary).toBe("බොහෝ දුරට පැහැදිලි, සුළං සහිත")
+    setLocale("ta")
+    expect(conditionFromWmo(95).summary).toBe("இடியுடன் கூடிய மழை")
+    expect(conditionLabel("rain")).toBe("மழை")
+  })
+
+  it("keeps an estimate's level apart from the official words", () => {
+    setLocale("si")
+    expect(estimateLabel("warning")).toBe("පෙර සූදානමක් කරගන්න")
+    expect(estimateLabel("warning")).not.toBe(severityLabel("warning"))
+    setLocale("en")
+    expect(estimateLabel("emergency")).toBe("Take action")
+    expect(severityLabel("emergency")).toBe("Emergency")
   })
 })

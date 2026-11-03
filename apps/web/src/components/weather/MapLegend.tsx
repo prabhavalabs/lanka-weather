@@ -30,8 +30,10 @@ export function MapLegend({
       {...props}
     >
       <header className="mb-2.5 flex items-baseline justify-between gap-2">
-        <h2 className="text-xs font-medium">{title}</h2>
-        {unit && <span className="numeric text-[0.6875rem] text-muted-foreground">{unit}</span>}
+        <h2 className="min-w-0 text-xs font-medium break-words">{title}</h2>
+        {unit && (
+          <span className="numeric shrink-0 text-[0.6875rem] text-muted-foreground">{unit}</span>
+        )}
       </header>
       {children}
     </section>

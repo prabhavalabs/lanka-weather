@@ -1,4 +1,5 @@
-import { compassPoint, formatNumber } from "@/lib/format"
+import { compassCode, compassWords, formatNumber } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 interface WindCompassProps {
@@ -12,6 +13,11 @@ interface WindCompassProps {
 }
 
 const ticks = Array.from({ length: 72 }, (_, index) => index * 5)
+/**
+ * The dial's letters are decoration (the dial is one image with a spoken
+ * label), so they stay as the compass letters in every language; the
+ * direction in words is given by the label and beside the dial.
+ */
 const cardinal = [
   { label: "N", angle: 0 },
   { label: "E", angle: 90 },
@@ -30,11 +36,17 @@ export function WindCompass({
   size = 168,
   className,
 }: WindCompassProps) {
-  const point = compassPoint(fromDegrees)
+  const t = useT()
   const towards = (fromDegrees + 180) % 360
+  const values = {
+    direction: compassWords(compassCode(fromDegrees, 16)),
+    degrees: Math.round(fromDegrees),
+    speed: formatNumber(speedKmh),
+  }
   const label =
-    `Wind from the ${point} (${Math.round(fromDegrees)}°) at ${formatNumber(speedKmh)} km/h` +
-    (gustKmh !== undefined ? `, gusting ${formatNumber(gustKmh)} km/h` : "")
+    gustKmh !== undefined
+      ? t("weather.compass.labelGusts", { ...values, gust: formatNumber(gustKmh) })
+      : t("weather.compass.label", values)
 
   return (
     <figure
@@ -73,6 +85,7 @@ export function WindCompass({
               y={100 + Math.sin(radians) * 64}
               textAnchor="middle"
               dominantBaseline="central"
+              aria-hidden="true"
               className={cn(
                 "font-mono text-[11px]",
                 letter === "N" ? "fill-foreground" : "fill-muted-foreground",

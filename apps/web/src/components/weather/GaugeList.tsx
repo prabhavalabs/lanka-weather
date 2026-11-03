@@ -44,7 +44,9 @@ export function GaugeList({ title, items, emptyText, className }: GaugeListProps
             const content = (
               <>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-foreground">{item.title}</span>
+                  <span className="block truncate text-sm text-foreground" title={item.title}>
+                    {item.title}
+                  </span>
                   {item.subtitle && (
                     <span className="line-clamp-2 block text-xs text-muted-foreground">
                       {item.subtitle}
