@@ -17,15 +17,16 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { isNotReady } from "@/lib/api"
 import { rampFromScale, type RampStop } from "@/lib/colour"
 import { formatAge, formatNumber } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import type { Layer } from "@/lib/layers"
 import type { ResolvedTheme } from "@/lib/theme"
 import { aqiScale, pm25Scale, readToken, waveScale } from "@/lib/tokens"
 import { useLocalStorage } from "@/lib/useLocalStorage"
-import { aqiBandOf, seaStateOf, steppedRamp } from "../environment/present"
+import { aqiBands, aqiBandOf, aqiLabel, seaStateOf, steppedRamp } from "../environment/present"
 import { FieldLayer } from "../environment/FieldLayer"
 import { useAirGrid, useSeaGrid } from "../environment/queries"
 import type { AirKey } from "../environment/types"
-import { count, layerStatus, type LayerStatus } from "../layers/status"
+import { layerStatus, type LayerStatus } from "../layers/status"
 import { countBands, gaugesSummary, withoutLiveDuplicates } from "../raingauges/present"
 import { useRainGauges } from "../raingauges/queries"
 import { RainGaugeLegend } from "../raingauges/RainGaugeLegend"
@@ -77,6 +78,9 @@ interface ObservedLayersOptions {
   onShowModelRain: () => void
 }
 
+/** The US AQI range of each band, in the order of `aqiBands`. */
+const aqiRanges = ["0–50", "51–100", "101–150", "151–200", "201–300", "301+"]
+
 function airRamp(variable: AirKey): RampStop[] {
   const scale = variable === "usAqi" ? aqiScale : pm25Scale
   return steppedRamp(
@@ -102,6 +106,8 @@ export function useObservedLayers({
   theme,
   onShowModelRain,
 }: ObservedLayersOptions) {
+  // Subscribes the caller to the language: everything below is rebuilt on a switch.
+  const t = useT()
   const [airVariable, setAirVariable] = useLocalStorage<AirVariable>(
     "lanka-weather:air-variable",
     "usAqi",
@@ -136,7 +142,10 @@ export function useObservedLayers({
       ...layerStatus({
         layer: rainLayer,
         parts: rain.data
-          ? ["Satellite estimate", ...(counts?.fresh ? [count(counts.fresh, "point")] : [])]
+          ? [
+              t("rain.layer.satellite"),
+              ...(counts?.fresh ? [t("rain.layer.points", { count: counts.fresh })] : []),
+            ]
           : [],
         observedAt: rain.data?.newestValidAt,
         ageLabel: "image",
@@ -148,31 +157,36 @@ export function useObservedLayers({
   details[RAINFALL] = (
     <div className="flex flex-col gap-3 text-xs text-muted-foreground">
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium text-foreground">Satellite estimate</h3>
+        <h3 className="font-medium text-foreground">{t("rain.layer.satellite")}</h3>
         <p>
-          NASA IMERG, not a measurement. Images lag by hours
           {rain.data?.newestValidAt
-            ? `; the newest is ${formatAge(rain.data.newestValidAt)}.`
-            : "."}
+            ? t("rain.layer.satelliteTextNewest", { age: formatAge(rain.data.newestValidAt) })
+            : t("rain.layer.satelliteText")}
         </p>
         {rain.data && <RainImageScale data={rain.data} theme={theme} />}
       </section>
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium text-foreground">Measured, last 24 hours</h3>
+        <h3 className="font-medium text-foreground">{t("rain.layer.measuredTitle")}</h3>
         <p>
-          Circles are river gauges and squares Met stations. Hollow points are too old to be
-          current; open one for its date. Where a live rain gauge stands beside one, only the live
-          gauge shows while that layer is on.
+          {t("rain.layer.measuredText")}
           {observedRain.data &&
-            ` ${observedRain.data.meta.fresh} current, ${observedRain.data.meta.stale} old.`}
+            ` ${t("rain.layer.measuredCounts", {
+              fresh: observedRain.data.meta.fresh,
+              stale: observedRain.data.meta.stale,
+            })}`}
         </p>
         <RainfallLegend bare />
       </section>
       <section className="flex flex-col gap-1.5">
-        <h3 className="font-medium text-foreground">Forecast</h3>
-        <p>Rain ahead is in the weather field and the place panel. It is model data.</p>
-        <Button size="sm" variant="secondary" className="self-start" onClick={onShowModelRain}>
-          Show forecast rain
+        <h3 className="font-medium text-foreground">{t("rain.layer.forecastTitle")}</h3>
+        <p>{t("rain.layer.forecastText")}</p>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-auto min-h-8 self-start text-left whitespace-normal"
+          onClick={onShowModelRain}
+        >
+          {t("rain.layer.showForecast")}
         </Button>
       </section>
     </div>
@@ -193,10 +207,7 @@ export function useObservedLayers({
   details[RAIN_GAUGES] = (
     <div className="flex flex-col gap-3 text-xs text-muted-foreground">
       <RainGaugeLegend bare counts={gaugeCounts} />
-      <p>
-        Rolling 24-hour totals, measured. Zoom in for light rain, then for dry gauges; a hollow drop
-        has not reported for over 3 hours, which does not mean it has been dry.
-      </p>
+      <p>{t("rain.gauges.layerText")}</p>
       {gaugeMeta?.institutions && (
         <p>
           {Object.entries(gaugeMeta.institutions)
@@ -206,7 +217,10 @@ export function useObservedLayers({
           .
         </p>
       )}
-      <p>{gaugeLayer?.attribution}. Not an official warning.</p>
+      <p>
+        {gaugeLayer?.attribution && <span lang="en">{gaugeLayer.attribution}. </span>}
+        {t("terms.notOfficial")}
+      </p>
     </div>
   )
 
@@ -224,7 +238,9 @@ export function useObservedLayers({
     statuses[WEATHER_STATIONS] = {
       ...layerStatus({
         layer: stationLayer,
-        parts: shown ? ["Observed", count(shown.length, "station")] : [],
+        parts: shown
+          ? [t("stations.layer.observed"), t("stations.layer.count", { count: shown.length })]
+          : [],
         observedAt: newest,
         ageLabel: "newest",
         error: stations.error,
@@ -245,9 +261,9 @@ export function useObservedLayers({
       )}
       <p className="flex items-center gap-2">
         <LegendSwatch color="var(--temp-4)" />
-        Measured at Met stations, coloured by temperature. Faded squares are out of date.
+        {t("stations.layer.legendText")}
       </p>
-      <TemperatureLegend title="Temperature" bare className="md:hidden" />
+      <TemperatureLegend title={t("stations.layer.legendTitle")} bare className="md:hidden" />
     </div>
   )
 
@@ -256,7 +272,12 @@ export function useObservedLayers({
     const values = air.data?.values[airVariable]
     statuses[AIR_QUALITY] = layerStatus({
       layer: airLayer,
-      parts: values ? ["Estimate", airVariable === "usAqi" ? "US AQI" : "PM2.5"] : [],
+      parts: values
+        ? [
+            t("terms.estimate"),
+            airVariable === "usAqi" ? t("environment.air.usAqi") : t("environment.air.pm25"),
+          ]
+        : [],
       observedAt: air.data?.fetchedAt,
       error: air.error,
       pending: air.isPending,
@@ -265,24 +286,21 @@ export function useObservedLayers({
   const airLegend = (bare: boolean, className?: string) =>
     airVariable === "usAqi" ? (
       <MapLegend
-        title="US Air Quality Index"
-        unit="Estimate"
+        title={t("environment.air.legendTitle")}
+        unit={t("terms.estimate")}
         bare={bare}
         className={className ?? "w-64"}
       >
         <ul className="flex flex-col gap-1">
-          {[
-            ["--aqi-1", "Good", "0–50"],
-            ["--aqi-2", "Moderate", "51–100"],
-            ["--aqi-3", "Unhealthy for sensitive groups", "101–150"],
-            ["--aqi-4", "Unhealthy", "151–200"],
-            ["--aqi-5", "Very unhealthy", "201–300"],
-            ["--aqi-6", "Hazardous", "301+"],
-          ].map(([token, label, range]) => (
-            <li key={token} className="flex items-center justify-between gap-2">
-              <LegendSwatch color={`var(${token})`} label={label} />
+          {aqiBands.map((band, index) => (
+            <li key={band.token} className="flex items-center justify-between gap-2">
+              <LegendSwatch
+                color={`var(${band.token})`}
+                label={aqiLabel(band.category)}
+                className="min-w-0"
+              />
               <span className="numeric shrink-0 text-[0.6875rem] whitespace-nowrap text-muted-foreground">
-                {range}
+                {aqiRanges[index]}
               </span>
             </li>
           ))}
@@ -290,10 +308,14 @@ export function useObservedLayers({
       </MapLegend>
     ) : (
       <StepLegend
-        title="PM2.5 · Estimate"
+        title={t("environment.air.pm25Title")}
         unit="µg/m³"
         scale={pm25Scale}
-        names={{ 0: "Good", 3: "Unhealthy", 5: "Hazardous" }}
+        names={{
+          0: aqiLabel("good"),
+          3: aqiLabel("unhealthy"),
+          5: aqiLabel("hazardous"),
+        }}
         bare={bare}
         className={className}
       />
@@ -307,21 +329,19 @@ export function useObservedLayers({
         onValueChange={(value) => {
           if (value) setAirVariable(value as AirVariable)
         }}
-        aria-label="Air quality shows"
+        aria-label={t("environment.air.toggle")}
         className="w-full"
       >
         <ToggleGroupItem value="usAqi" className="flex-1">
-          US AQI
+          {t("environment.air.usAqi")}
         </ToggleGroupItem>
         <ToggleGroupItem value="pm25" className="flex-1">
-          PM2.5
+          {t("environment.air.pm25")}
         </ToggleGroupItem>
       </ToggleGroup>
       {airLegend(true, "md:hidden")}
       <p className="text-xs text-muted-foreground">
-        Estimate from the CAMS atmosphere model, about 40 km across. It does not measure the air at
-        any place. Air quality by Open-Meteo.com (CC BY 4.0), generated using Copernicus Atmosphere
-        Monitoring Service information.
+        {t("environment.air.note")} <span lang="en">{t("environment.air.credit")}</span>
       </p>
     </div>
   )
@@ -330,7 +350,7 @@ export function useObservedLayers({
   if (seaLayer) {
     statuses[SEA_CONDITIONS] = layerStatus({
       layer: seaLayer,
-      parts: sea.data ? ["Model", "wave height"] : [],
+      parts: sea.data ? [t("environment.sea.model"), t("environment.sea.waveHeight")] : [],
       observedAt: sea.data?.fetchedAt,
       error: sea.error,
       pending: sea.isPending,
@@ -338,11 +358,11 @@ export function useObservedLayers({
   }
   const seaLegend = (bare: boolean, className?: string) => (
     <RampLegend
-      title="Wave height · Model"
+      title={t("environment.sea.legendTitle")}
       unit="m"
       scale={waveScale}
       openSpan={0.5}
-      ends={["smooth", "high"]}
+      ends={[t("environment.seaState.smooth"), t("environment.seaState.high")]}
       bare={bare}
       className={className}
     />
@@ -351,9 +371,7 @@ export function useObservedLayers({
     <div className="flex flex-col gap-3">
       {seaLegend(true, "md:hidden")}
       <p className="text-xs text-muted-foreground">
-        Wave and swell model values on a 0.5° grid (about 55 km), not observations. Follow the
-        Department of Meteorology&apos;s sea-area warnings. Marine data by Open-Meteo.com (CC BY
-        4.0).
+        {t("environment.sea.note")} <span lang="en">{t("environment.sea.credit")}</span>
       </p>
     </div>
   )
@@ -375,7 +393,9 @@ export function useObservedLayers({
   const legends = (
     <>
       {rainTimeline}
-      {stationsOn && <TemperatureLegend title="Temperature, observed" className="w-60" />}
+      {stationsOn && (
+        <TemperatureLegend title={t("stations.layer.legendTitleObserved")} className="w-60" />
+      )}
       {airOn && airLegend(false)}
       {seaOn && seaLegend(false, "w-60")}
     </>
@@ -436,8 +456,11 @@ export function useObservedLayers({
       if (value !== null) {
         lines.push(
           airVariable === "usAqi"
-            ? `Air quality (estimate): ${aqiBandOf(value).label}, AQI ${Math.round(value)}`
-            : `PM2.5 (estimate): ${formatNumber(value, 1)} µg/m³`,
+            ? t("environment.air.hoverAqi", {
+                band: aqiLabel(aqiBandOf(value).category),
+                aqi: Math.round(value),
+              })
+            : t("environment.air.hoverPm25", { value: formatNumber(value, 1) }),
         )
       }
     }
@@ -445,7 +468,9 @@ export function useObservedLayers({
     if (seaOn && sea.data && waves) {
       const value = sampleGrid(sea.data.grid, waves, lon, lat)
       if (value !== null) {
-        lines.push(`Waves (model): ${formatNumber(value, 1)} m, ${seaStateOf(value).toLowerCase()}`)
+        lines.push(
+          t("environment.sea.hover", { height: formatNumber(value, 1), state: seaStateOf(value) }),
+        )
       }
     }
     return lines
@@ -461,8 +486,8 @@ export function useObservedLayers({
       ? [
           {
             id: "rain-gauges",
-            title: "Rain gauges",
-            unit: "last 24 h",
+            title: t("rain.gauges.legendTitle"),
+            unit: t("rain.gauges.legendUnit"),
             content: <RainGaugeLegend bare counts={gaugeCounts} />,
           },
         ]

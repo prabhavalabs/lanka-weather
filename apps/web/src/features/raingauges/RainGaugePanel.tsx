@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatAge, formatClock, formatDay, formatDayTime, formatNumber } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import { bandBadge, bandLabels, seriesPath } from "./present"
+import { bandBadge, bandLabel, seriesPath } from "./present"
 import { useRainGaugeDetail } from "./queries"
 import type { RainGaugeDetail } from "./types"
 
@@ -17,6 +18,7 @@ const height = 96
 
 /** The rolling 24-hour total over time. It is a running sum, so a fall is old rain leaving the window. */
 function RollingChart({ series }: { series: RainGaugeDetail["series"] }) {
+  const t = useT()
   const { points, peak, low } = seriesPath(series)
   if (points.length < 2) return null
   const path = points
@@ -34,7 +36,10 @@ function RollingChart({ series }: { series: RainGaugeDetail["series"] }) {
           viewBox={`0 0 ${width} ${height}`}
           className="h-24 w-full overflow-visible text-foreground"
           role="img"
-          aria-label={`Rolling 24-hour rain from ${formatNumber(low, 1)} to ${formatNumber(peak, 1)} mm`}
+          aria-label={t("rain.panel.chartLabel", {
+            low: formatNumber(low, 1),
+            peak: formatNumber(peak, 1),
+          })}
           preserveAspectRatio="none"
         >
           <path
@@ -52,7 +57,7 @@ function RollingChart({ series }: { series: RainGaugeDetail["series"] }) {
         <span>
           {formatDay(first.at)} {formatClock(first.at)}
         </span>
-        <span>up to {formatNumber(peak, 1)} mm</span>
+        <span className="text-center">{t("rain.panel.upTo", { peak: formatNumber(peak, 1) })}</span>
         <span>
           {formatDay(last.at)} {formatClock(last.at)}
         </span>
@@ -71,75 +76,82 @@ export function RainGaugePanel({
   onClose: () => void
   className?: string
 }) {
+  const t = useT()
   const detail = useRainGaugeDetail(id)
   const gauge = detail.data?.gauge.properties
   const meta = detail.data?.meta
   return (
     <Panel
       icon={<DropletsIcon />}
-      title={gauge?.name ?? (detail.error ? "Rain gauge" : "Loading…")}
-      subtitle={gauge ? `Rain gauge · ${gauge.institution}` : "Rain gauge"}
+      title={gauge?.name ?? (detail.error ? t("rain.panel.title") : t("common.loading"))}
+      subtitle={
+        gauge ? t("rain.panel.subtitle", { institution: gauge.institution }) : t("rain.panel.title")
+      }
       className={cn("w-full", className)}
       action={
-        <Button variant="outline" size="icon" onClick={onClose} aria-label="Close rain gauge">
+        <Button variant="outline" size="icon" onClick={onClose} aria-label={t("rain.panel.close")}>
           <XIcon />
         </Button>
       }
       footer={
         <p>
-          {meta?.attribution ?? "HMIS, via Sri Lanka Water Levels (waterlevels.lk)"}
-          {gauge && `. Run by ${gauge.institution}`}. Not an official warning. In an emergency call
-          117.
+          <span lang="en">
+            {meta?.attribution ?? "HMIS, via Sri Lanka Water Levels (waterlevels.lk)"}.
+          </span>{" "}
+          {gauge && `${t("rain.panel.runByNamed", { institution: gauge.institution })} `}
+          {t("terms.notOfficial")} {t("terms.emergency")}
         </p>
       }
     >
       {detail.isPending && <Skeleton className="h-24 w-full rounded-xl" />}
       {Boolean(detail.error) && !gauge && (
         <p role="alert" className="text-sm text-foreground">
-          This rain gauge could not be read just now.
+          {t("rain.panel.error")}
         </p>
       )}
       {gauge && (
         <>
           {gauge.rain24hMm !== null ? (
-            <StatValue value={formatNumber(gauge.rain24hMm, 1)} unit="mm in 24 h" />
+            <StatValue value={formatNumber(gauge.rain24hMm, 1)} unit={t("rain.panel.unit")} />
           ) : (
             <p className="rounded-xl border border-border bg-inset px-3 py-2 text-sm text-foreground">
-              This gauge has not reported for over 3 hours, so we cannot say how much rain has
-              fallen. That does not mean it has been dry.
+              {t("rain.panel.silent")}
               {gauge.lastRain24hMm !== null &&
                 gauge.observedAt &&
-                ` Its last figure was ${formatNumber(gauge.lastRain24hMm, 1)} mm, ${formatDayTime(gauge.observedAt)}.`}
+                ` ${t("rain.panel.lastFigure", {
+                  rain: formatNumber(gauge.lastRain24hMm, 1),
+                  time: formatDayTime(gauge.observedAt),
+                })}`}
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={bandBadge[gauge.band]}>{bandLabels[gauge.band]}</Badge>
+            <Badge variant={bandBadge[gauge.band]}>{bandLabel(gauge.band)}</Badge>
             <Badge variant="chip" className="text-foreground">
-              Measured
+              {t("rain.panel.measured")}
             </Badge>
           </div>
           <LabeledRows>
             <LabeledRow
-              label="Read"
+              label={t("rain.panel.read")}
               value={
                 gauge.observedAt
-                  ? `${formatDayTime(gauge.observedAt)} · ${formatAge(gauge.observedAt)}`
-                  : "No reading"
+                  ? t("rain.panel.readValue", {
+                      time: formatDayTime(gauge.observedAt),
+                      age: formatAge(gauge.observedAt),
+                    })
+                  : t("rain.panel.noReading")
               }
               tone={gauge.stale ? "warning" : "default"}
             />
-            <LabeledRow label="Run by" value={gauge.institution} numeric={false} />
+            <LabeledRow label={t("rain.panel.runBy")} value={gauge.institution} numeric={false} />
           </LabeledRows>
           {detail.data && detail.data.series.length > 1 && (
             <section className="flex flex-col gap-1.5">
               <h3 className="text-xs font-medium text-muted-foreground">
-                Rolling 24-hour total, up to 48 hours
+                {t("rain.panel.rolling")}
               </h3>
               <RollingChart series={detail.data.series} />
-              <p className="text-xs text-muted-foreground">
-                Each point is the sum of the 24 hours before it, so it says nothing about any one
-                hour.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("rain.panel.rollingNote")}</p>
             </section>
           )}
         </>

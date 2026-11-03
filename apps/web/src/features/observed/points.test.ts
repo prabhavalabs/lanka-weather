@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
 import { RAIN_GAUGE_POINTS, RAIN_MET_POINTS } from "../rainfall/ObservedRainLayer"
 import { RAIN_GAUGE_LAYERS } from "../raingauges/RainGaugesLayer"
 import { MET_STATIONS } from "../stations/MetStationsLayer"
@@ -66,6 +67,19 @@ describe("observedChip", () => {
 
   it("leaves other layers to the caller", () => {
     expect(observedChip(hit("other", {}))).toBeNull()
+  })
+
+  describe("in Sinhala", () => {
+    afterEach(() => setLocale("en"))
+
+    it("says the reading in the language, keeping the station's name", () => {
+      setLocale("si")
+      const chip = observedChip(
+        hit(MET_STATIONS, { name: "Colombo", shown: 28.1, reading: "3h", observedAt: null }),
+      )
+      expect(chip?.title).toBe("Colombo")
+      expect(chip?.lines[0]).toBe("නිරීක්ෂිත: 28.1 °C")
+    })
   })
 })
 

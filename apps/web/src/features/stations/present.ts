@@ -3,6 +3,7 @@
  * say a feed is old. Pure, so it is tested without a browser.
  */
 import { formatAge, formatNumber } from "@/lib/format"
+import { translate } from "@/lib/i18n"
 import type { MetMeta, MetStationProperties, ThreeHourlyReading } from "./types"
 
 /**
@@ -17,14 +18,16 @@ export function markerTemperature(
 
 /** "Rain, 3 h" or "Rain, 24 h to 08:30". */
 export function rainLabel(station: Pick<MetStationProperties, "reading" | "rainHours">): string {
-  return station.reading === "daily" ? "Rain, 24 h to 08:30" : `Rain, ${station.rainHours} h`
+  return station.reading === "daily"
+    ? translate("stations.rainLabel.daily")
+    : translate("stations.rainLabel.hours", { count: station.rainHours })
 }
 
 /** Which feed a reading came from, in words. */
 export function readingLabel(station: Pick<MetStationProperties, "reading">): string {
-  if (station.reading === "3h") return "3-hourly report"
-  if (station.reading === "daily") return "Daily report"
-  return "No readings"
+  if (station.reading === "3h") return translate("stations.reading.threeHourly")
+  if (station.reading === "daily") return translate("stations.reading.daily")
+  return translate("stations.reading.none")
 }
 
 /**
@@ -34,7 +37,7 @@ export function readingLabel(station: Pick<MetStationProperties, "reading">): st
 export function feedNotice(meta: MetMeta, now: Date = new Date()): string | null {
   if (!meta.stale) {
     if (meta.threeHourly.stale && !meta.daily.stale) {
-      return "The 3-hourly reports have stopped updating, so stations show the daily report."
+      return translate("stations.notice.dailyTakeover")
     }
     return null
   }
@@ -42,8 +45,8 @@ export function feedNotice(meta: MetMeta, now: Date = new Date()): string | null
     .filter((value): value is string => value !== null)
     .sort()
     .at(-1)
-  if (!newest) return "No Department of Meteorology readings have been collected yet."
-  return `Not current: the newest Department of Meteorology reading is ${formatAge(newest, now)}. Our source for these reports has stopped updating.`
+  if (!newest) return translate("stations.notice.nothing")
+  return translate("stations.notice.notCurrent", { age: formatAge(newest, now) })
 }
 
 /** A gap longer than this breaks the line: the source has days with no reports. */

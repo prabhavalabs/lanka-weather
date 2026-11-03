@@ -2,25 +2,30 @@
  * How the rain gauges read and which show at which zoom. Pure, so it is tested
  * without a browser.
  */
+import { getLocale, translate, translateIn, type Locale } from "@/lib/i18n"
 import type { ObservedRainCollection } from "../rainfall/types"
 import type { RainBand, RainGaugeCollection } from "./types"
 
-export const bandLabels: Record<RainBand, string> = {
-  very_heavy: "Very heavy",
-  heavy: "Heavy",
-  moderate: "Moderate",
-  light: "Light",
-  none: "No rain",
-  unknown: "Out of date",
+const bandKeys: Record<
+  RainBand,
+  "veryHeavy" | "heavy" | "moderate" | "light" | "none" | "unknown"
+> = {
+  very_heavy: "veryHeavy",
+  heavy: "heavy",
+  moderate: "moderate",
+  light: "light",
+  none: "none",
+  unknown: "unknown",
 }
 
-export const bandRanges: Record<RainBand, string> = {
-  very_heavy: "100 mm or more",
-  heavy: "50 to 100 mm",
-  moderate: "10 to 50 mm",
-  light: "under 10 mm",
-  none: "0 mm",
-  unknown: "newest reading over 3 h old",
+/** A band's name in the current language: "Heavy". */
+export function bandLabel(band: RainBand, locale: Locale = getLocale()): string {
+  return translateIn(locale, `rain.gauges.band.${bandKeys[band] ?? "unknown"}`)
+}
+
+/** What a band covers, in the current language: "50 to 100 mm". */
+export function bandRange(band: RainBand, locale: Locale = getLocale()): string {
+  return translateIn(locale, `rain.gauges.range.${bandKeys[band] ?? "unknown"}`)
 }
 
 export const bandOrder: RainBand[] = ["very_heavy", "heavy", "moderate", "light", "none", "unknown"]
@@ -79,7 +84,7 @@ export function countBands(features: { properties: { band: RainBand } }[]) {
 
 /** "258 of 275 current · 31 with 10 mm or more". */
 export function gaugesSummary(meta: RainGaugeCollection["meta"]) {
-  return `${meta.fresh} of ${meta.total} current · ${meta.wet} with 10 mm or more`
+  return translate("rain.gauges.summary", { fresh: meta.fresh, total: meta.total, wet: meta.wet })
 }
 
 function kilometresBetween([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]) {

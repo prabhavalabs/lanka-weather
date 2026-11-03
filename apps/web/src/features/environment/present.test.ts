@@ -1,19 +1,34 @@
 import { describe, expect, it } from "vitest"
 import { sampleRamp } from "@/lib/colour"
-import { aqiBand, aqiBandOf, fadeEdges, ringToPixels, seaStateOf, steppedRamp } from "./present"
+import {
+  aqiBand,
+  aqiBandOf,
+  aqiLabel,
+  fadeEdges,
+  ringToPixels,
+  seaStateLabel,
+  seaStateOf,
+  steppedRamp,
+} from "./present"
 
 const grid = { id: "g", lon0: 79, lat0: 5, step: 0.5, nx: 8, ny: 12 }
 
 describe("aqiBandOf", () => {
   it("follows the EPA's bands", () => {
-    expect(aqiBandOf(0).label).toBe("Good")
-    expect(aqiBandOf(50).label).toBe("Good")
-    expect(aqiBandOf(51).label).toBe("Moderate")
+    const label = (value: number) => aqiLabel(aqiBandOf(value).category)
+    expect(label(0)).toBe("Good")
+    expect(label(50)).toBe("Good")
+    expect(label(51)).toBe("Moderate")
     expect(aqiBandOf(150).category).toBe("unhealthy_sensitive")
-    expect(aqiBandOf(151).label).toBe("Unhealthy")
-    expect(aqiBandOf(300).label).toBe("Very unhealthy")
-    expect(aqiBandOf(301).label).toBe("Hazardous")
+    expect(label(151)).toBe("Unhealthy")
+    expect(label(300)).toBe("Very unhealthy")
+    expect(label(301)).toBe("Hazardous")
     expect(aqiBand("moderate").token).toBe("--aqi-2")
+  })
+
+  it("names the bands in Sinhala and Tamil", () => {
+    expect(aqiLabel("good", "si")).toBe("හොඳයි")
+    expect(aqiLabel("hazardous", "ta")).toBe("அபாயகரமானது")
   })
 })
 
@@ -27,6 +42,13 @@ describe("seaStateOf", () => {
     expect(seaStateOf(5)).toBe("Very rough")
     expect(seaStateOf(7)).toBe("High")
     expect(seaStateOf(10)).toBe("Very high")
+    expect(seaStateOf(3, "si")).toBe("රළු")
+  })
+
+  it("reads the API's word, falling back to the wave height", () => {
+    expect(seaStateLabel("very rough", 5)).toBe("Very rough")
+    expect(seaStateLabel("slight", 1, "ta")).toBe("சிறிதளவு கொந்தளிப்பு")
+    expect(seaStateLabel("choppy", 0.3)).toBe("Smooth")
   })
 })
 

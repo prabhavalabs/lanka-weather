@@ -4,6 +4,7 @@
  */
 import { formatClock, formatDay } from "@/lib/format"
 import { parseHex } from "@/lib/colour"
+import { getLocale, translateIn, type Locale } from "@/lib/i18n"
 import type { ResolvedTheme } from "@/lib/theme"
 import type { ObservedRainMethod, RainStep } from "./types"
 
@@ -60,13 +61,25 @@ export function liftedColour(hex: string, lift: number): string {
 }
 
 /** "Mon 2 Nov 19:00–19:30": the half hour an image covers, in Sri Lanka time. */
-export function stepLabel(step: Pick<RainStep, "validAt" | "endsAt">): string {
-  return `${formatDay(step.validAt)} ${formatClock(step.validAt)}–${formatClock(step.endsAt)}`
+export function stepLabel(
+  step: Pick<RainStep, "validAt" | "endsAt">,
+  locale: Locale = getLocale(),
+): string {
+  return translateIn(locale, "rain.step", {
+    day: formatDay(step.validAt, locale),
+    start: formatClock(step.validAt),
+    end: formatClock(step.endsAt),
+  })
 }
 
-/** How a station's total was reached, in words. */
-export const methodLabels: Record<ObservedRainMethod, string> = {
-  daily_report: "Department of Meteorology daily report, 24 h to 08:30",
-  sum_3h: "Sum of 3-hourly Department of Meteorology readings",
-  sum_gauge: "Sum of hourly river gauge readings",
+const methodKeys = {
+  daily_report: "rain.method.dailyReport",
+  sum_3h: "rain.method.sum3h",
+  sum_gauge: "rain.method.sumGauge",
+} as const satisfies Record<ObservedRainMethod, string>
+
+/** How a station's total was reached, in words; empty for a method we do not know. */
+export function methodLabel(method: ObservedRainMethod, locale: Locale = getLocale()): string {
+  const key = methodKeys[method] as (typeof methodKeys)[ObservedRainMethod] | undefined
+  return key ? translateIn(locale, key) : ""
 }

@@ -1,5 +1,6 @@
 import { DottedGrid } from "@/components/DottedGrid"
 import { formatClock, formatDay } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { rainBars, temperaturePaths } from "./present"
 import type { ThreeHourlyReading } from "./types"
 
@@ -15,12 +16,13 @@ export function TemperatureChart({
   readings: ThreeHourlyReading[]
   days: number
 }) {
+  const t = useT()
   const geometry = temperaturePaths(readings, width, height)
   const rain = rainBars(readings)
   if (geometry.paths.length === 0 && geometry.dots.length === 0) {
     return (
       <DottedGrid className="px-4 py-8 text-center text-xs text-muted-foreground">
-        No 3-hourly readings in the {days} days to the newest report.
+        {t("stations.chart.empty", { count: days })}
       </DottedGrid>
     )
   }
@@ -33,7 +35,12 @@ export function TemperatureChart({
           viewBox={`0 0 ${width} ${height}`}
           className="h-32 w-full overflow-visible text-foreground"
           role="img"
-          aria-label={`Observed temperature from ${geometry.yMin.toFixed(1)} to ${geometry.yMax.toFixed(1)} °C over the ${days} days to the newest report${rain.peak > 0 ? `, with rain up to ${rain.peak.toFixed(1)} mm in 3 hours` : ""}`}
+          aria-label={t(rain.peak > 0 ? "stations.chart.labelRain" : "stations.chart.label", {
+            count: days,
+            min: geometry.yMin.toFixed(1),
+            max: geometry.yMax.toFixed(1),
+            rain: rain.peak.toFixed(1),
+          })}
           preserveAspectRatio="none"
         >
           {rain.bars.map((bar) => (
@@ -77,9 +84,12 @@ export function TemperatureChart({
         <time dateTime={first.observedAt}>
           {formatDay(first.observedAt)} {formatClock(first.observedAt)}
         </time>
-        <span>
-          {geometry.yMin.toFixed(0)}–{geometry.yMax.toFixed(0)} °C
-          {rain.peak > 0 && ` · rain to ${rain.peak.toFixed(1)} mm`}
+        <span className="text-center">
+          {t(rain.peak > 0 ? "stations.chart.rangeRain" : "stations.chart.range", {
+            min: geometry.yMin.toFixed(0),
+            max: geometry.yMax.toFixed(0),
+            rain: rain.peak.toFixed(1),
+          })}
         </span>
         <time dateTime={last.observedAt}>
           {formatDay(last.observedAt)} {formatClock(last.observedAt)}
