@@ -22,3 +22,4 @@ supersedes the old one, not by editing an accepted record.
 | [0013](0013-reservoirs-and-extra-gauges.md) | Reservoirs and extra river gauges through waterlevels.lk | Accepted; its `data` branch rule superseded in part by 0015 |
 | [0014](0014-situation-overview.md) | Situation overview | Accepted |
 | [0015](0015-flood-hub-language-and-all-live-gauges.md) | Flood Hub's language, Extended coverage, live rain gauges and Colombo's canals | Accepted |
+| [0018](0018-push-alerts.md) | Push alerts | Accepted |
