@@ -334,3 +334,19 @@ describe("in Sinhala and Tamil", () => {
     expect(formatCoordinates(7.5, 80)).toBe("7.5000° උ, 80.0000° නැ")
   })
 })
+
+describe("region names in Sinhala and Tamil", () => {
+  it("mends the cut-short level word the boundary data carries", () => {
+    setLocale("si")
+    try {
+      expect(regionLabel({ level: "district", name: "Kandy", nameSi: "මහනුවර දිස්ත්‍රික" })).toBe(
+        "මහනුවර දිස්ත්‍රික්කය",
+      )
+    } finally {
+      setLocale("en")
+    }
+    expect(regionLabel({ level: "district", name: "Kandy", nameSi: "මහනුවර දිස්ත්‍රික" })).toBe(
+      "Kandy District",
+    )
+  })
+})

@@ -4,11 +4,47 @@
  * province, two for a district, four for a DS division and seven for a GN
  * division, each starting with its parent's digits.
  */
-import { translate } from "@/lib/i18n"
+import { foldName, getLocale, translate, type Locale } from "@/lib/i18n"
 import { rainfallScale, temperatureScale, windScale, type ScaleStep } from "@/lib/tokens"
 import type { RegionLevel, RegionWeather } from "./types"
 
 export const regionLevels: RegionLevel[] = ["province", "district", "ds", "gn"]
+
+/** The level words that Sinhala and Tamil names of provinces and districts end with. */
+const localLevelWords: Partial<Record<Locale, Partial<Record<RegionLevel, string>>>> = {
+  si: { province: "පළාත", district: "දිස්ත්‍රික්කය" },
+  ta: { province: "மாகாணம்", district: "மாவட்டம்" },
+}
+
+/**
+ * A Sinhala or Tamil province or district name without its level word. The
+ * boundary data writes the word in, often cut short ("මහනුවර දිස්ත්‍රික",
+ * "அம்பாந்தோட்டை மாவ"), so any start of the word of three letters or more is
+ * taken off, and callers add the whole word.
+ */
+export function withoutLevelWord(name: string, level: RegionLevel, locale: Locale): string {
+  const word = localLevelWords[locale]?.[level]
+  const words = name.trim().split(/\s+/)
+  if (!word || words.length < 2) return name.trim()
+  const last = foldName(words.at(-1)!)
+  return last.length >= 3 && foldName(word).startsWith(last)
+    ? words.slice(0, -1).join(" ")
+    : name.trim()
+}
+
+/**
+ * A region's own name in a language, without a level word, else the English
+ * name: "මහනුවර" for Kandy in Sinhala.
+ */
+export function regionBareName(
+  region: { level: RegionLevel; name: string; nameSi?: string | null; nameTa?: string | null },
+  locale: Locale = getLocale(),
+): string {
+  const local = locale === "si" ? region.nameSi : locale === "ta" ? region.nameTa : null
+  return typeof local === "string" && local.trim() !== ""
+    ? withoutLevelWord(local, region.level, locale)
+    : region.name
+}
 
 const digitsByLevel: Record<RegionLevel, number> = { province: 1, district: 2, ds: 4, gn: 7 }
 

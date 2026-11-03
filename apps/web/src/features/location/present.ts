@@ -18,10 +18,12 @@ import {
   getLocale,
   localName,
   translate,
+  translateIn,
   type LocalNames,
   type Locale,
   type MessageKey,
 } from "@/lib/i18n"
+import { regionBareName } from "../regions/present"
 import type { RegionDetail } from "../regions/types"
 import type { Selection } from "./selection"
 import type {
@@ -65,10 +67,8 @@ export const levelWords: Readonly<Record<RegionLevel, string>> = {
 export function regionLabel(
   region: Pick<RegionRef, "level" | "name"> & Partial<Pick<LocalNames, "nameSi" | "nameTa">>,
 ): string {
-  const name = localName(region)
-  if (region.level !== "district" && region.level !== "province") return name
-  if (name !== region.name && name.endsWith(levelWord(region.level))) return name
-  return translate(`location.region.${region.level}`, { name })
+  if (region.level !== "district" && region.level !== "province") return localName(region)
+  return translate(`location.region.${region.level}`, { name: regionBareName(region) })
 }
 
 /** The regions containing a place, smallest first: "Katukele › Gangawata Korale › Kandy District › Central Province". */
@@ -98,9 +98,18 @@ export function formatCoordinates(lat: number, lon: number): string {
 function otherName(
   names: LocalNames,
   locale: Locale = getLocale(),
+  level?: RegionLevel,
 ): Pick<Place, "localName" | "localNameLang"> {
   if (locale === "en") {
-    return names.nameSi ? { localName: names.nameSi, localNameLang: "si" } : {}
+    if (!names.nameSi) return {}
+    // A province's or district's Sinhala name, mended and with its whole level word.
+    const localName =
+      level === "district" || level === "province"
+        ? translateIn("si", `location.region.${level}`, {
+            name: regionBareName({ level, ...names }, "si"),
+          })
+        : names.nameSi
+    return { localName, localNameLang: "si" }
   }
   return localName(names, locale) !== names.name
     ? { localName: names.name, localNameLang: "en" }
@@ -133,7 +142,7 @@ export function placeFor(
     return {
       ...base,
       name: regionLabel({ level: region.level, ...names }),
-      ...otherName(names),
+      ...otherName(names, getLocale(), region.level),
       area: [levelWord(region.level), parents].filter(Boolean).join(" · "),
     }
   }

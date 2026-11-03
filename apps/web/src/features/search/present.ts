@@ -10,6 +10,7 @@
 import type { SearchResult } from "@/components/weather/types"
 import { foldName, getLocale, localName, translateIn, type Locale } from "@/lib/i18n"
 import type { RegionLevel } from "../location/types"
+import { regionBareName } from "../regions/present"
 import { riverSearchNames } from "../river-risk/present"
 import type { RiskLevel, RiverRisk } from "../river-risk/types"
 import type { ReservoirFeature, ReservoirStatus } from "../reservoirs/types"
@@ -85,33 +86,13 @@ function usable(name: string | null | undefined): name is string {
 
 const same = (a: string, b: string) => foldName(a) === foldName(b)
 
-/** The level words that Sinhala and Tamil names of provinces and districts end with. */
-const levelWords: Partial<Record<Locale, Partial<Record<RegionLevel, string>>>> = {
-  si: { province: "පළාත", district: "දිස්ත්‍රික්කය" },
-  ta: { province: "மாகாணம்", district: "மாவட்டம்" },
-}
-
-/**
- * A Sinhala or Tamil province or district name without its level word. The
- * data writes the word in, sometimes cut short ("මහනුවර දිස්ත්‍රික",
- * "அம்பாந்தோட்டை மாவ"), so any start of the word is taken off.
- */
-function withoutLevelWord(name: string, level: RegionLevel, locale: Locale): string {
-  const word = levelWords[locale]?.[level]
-  const words = name.trim().split(/\s+/)
-  if (!word || words.length < 2) return name.trim()
-  const last = foldName(words.at(-1)!)
-  return last.length >= 3 && foldName(word).startsWith(last) ? words.slice(0, -1).join(" ") : name
-}
-
 /** A region's name as people say it, in a language: "Kandy District", "மத்திய மாகாணம்". */
 function regionName(
   level: RegionLevel,
   names: { en: string; si?: string | null; ta?: string | null },
   locale: Locale,
 ): string {
-  const local = locale === "si" ? names.si : locale === "ta" ? names.ta : null
-  const name = usable(local) ? withoutLevelWord(local, level, locale) : names.en
+  const name = regionBareName({ level, name: names.en, nameSi: names.si, nameTa: names.ta }, locale)
   if (level === "province" || level === "district") {
     return translateIn(locale, `search.regionName.${level}`, { name })
   }
