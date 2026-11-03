@@ -1,7 +1,24 @@
 import { formatClock } from "@/lib/format"
+import { translate, type MessageKey } from "@/lib/i18n"
 import type { LevelUnit, NextHour, RiverStatus, RiverTrend, StationProperties } from "./types"
 
 export { formatAge } from "@/lib/format"
+
+/**
+ * A record of labels read in the current language each time a value is
+ * looked up, so `labels[status]` stays a plain lookup at every call site.
+ * The component that shows it must subscribe with `useT()` or `useLocale()`.
+ */
+export function liveLabels<K extends string>(
+  keys: readonly K[],
+  key: (name: K) => MessageKey,
+): Readonly<Record<K, string>> {
+  const record = {} as Record<K, string>
+  for (const name of keys) {
+    Object.defineProperty(record, name, { enumerable: true, get: () => translate(key(name)) })
+  }
+  return record
+}
 
 /**
  * Theme tokens by status, from calm to severe (src/styles/theme.css): blue,
@@ -26,13 +43,20 @@ export const statusColors: Record<RiverStatus, string> = {
   unknown: "var(--status-unknown)",
 }
 
-export const statusLabels: Record<RiverStatus, string> = {
-  normal: "Normal",
-  alert: "Alert",
-  minor_flood: "Minor flood",
-  major_flood: "Major flood",
-  unknown: "No thresholds",
-}
+/** The Irrigation Department's status words, in the current language. */
+export const statusLabels = liveLabels<RiverStatus>(
+  ["normal", "alert", "minor_flood", "major_flood", "unknown"],
+  (status) => `terms.riverStatus.${status}`,
+)
+
+/** The thresholds a gauge publishes, lowest first. */
+export type Threshold = "alert" | "minor_flood" | "major_flood"
+
+/** "Alert level", "Minor flood level", "Major flood level", in the current language. */
+export const thresholdLabels = liveLabels<Threshold>(
+  ["alert", "minor_flood", "major_flood"],
+  (threshold) => `terms.riverLevel.${threshold}`,
+)
 
 /** Display order for legends and summaries, most severe first. */
 export const statusOrder: RiverStatus[] = [
@@ -43,12 +67,10 @@ export const statusOrder: RiverStatus[] = [
   "unknown",
 ]
 
-export const trendLabels: Record<RiverTrend, string> = {
-  rising: "Rising",
-  falling: "Falling",
-  steady: "Steady",
-  unknown: "Trend unknown",
-}
+export const trendLabels = liveLabels<RiverTrend>(
+  ["rising", "falling", "steady", "unknown"],
+  (trend) => `terms.trend.${trend}`,
+)
 
 export const trendArrows: Record<RiverTrend, string> = {
   rising: "↑",
@@ -93,11 +115,18 @@ export function nextHourLine(
   const age = now.getTime() - new Date(forecast.issuedAt).getTime()
   if (!Number.isFinite(age) || age > nextHourMaxAgeMs) return null
   const level = formatLevel(forecast.level, forecast.unit)
-  const range =
+  const value =
     forecast.low !== null && forecast.high !== null
-      ? `, range ${levelNumber(forecast.low, forecast.unit)}–${levelNumber(forecast.high, forecast.unit)}`
-      : ""
-  return { value: `${level}${range}`, issued: `issued ${formatClock(forecast.issuedAt)}` }
+      ? translate("rivers.nextHour.range", {
+          level,
+          low: levelNumber(forecast.low, forecast.unit),
+          high: levelNumber(forecast.high, forecast.unit),
+        })
+      : level
+  return {
+    value,
+    issued: translate("rivers.nextHour.issued", { time: formatClock(forecast.issuedAt) }),
+  }
 }
 
 /**
@@ -120,10 +149,10 @@ export function headroom(
   ) {
     return null
   }
-  const steps: [number, number, string][] = [
+  const steps: [number, number, Threshold][] = [
     [0, alertLevel, "alert"],
-    [alertLevel, minorFloodLevel, "minor flood"],
-    [minorFloodLevel, majorFloodLevel, "major flood"],
+    [alertLevel, minorFloodLevel, "minor_flood"],
+    [minorFloodLevel, majorFloodLevel, "major_flood"],
   ]
   for (const [from, to, next] of steps) {
     if (waterLevel < to) {
@@ -135,6 +164,25 @@ export function headroom(
     }
   }
   return null
+}
+
+/**
+ * A gauge's published thresholds as chart lines and rows, lowest first,
+ * named in the current language.
+ */
+export function stationThresholds(
+  station: Pick<StationProperties, "alertLevel" | "minorFloodLevel" | "majorFloodLevel">,
+) {
+  const levels: [Threshold, number | null][] = [
+    ["alert", station.alertLevel],
+    ["minor_flood", station.minorFloodLevel],
+    ["major_flood", station.majorFloodLevel],
+  ]
+  return levels.flatMap(([threshold, value]) =>
+    value === null
+      ? []
+      : [{ label: thresholdLabels[threshold], value, color: statusColors[threshold] }],
+  )
 }
 
 /** Count of stations per status. */

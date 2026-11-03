@@ -6,7 +6,9 @@ import { StatValue } from "@/components/StatValue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { Template } from "../rivers/Template"
 import {
   flowNote,
   flowShort,
@@ -25,21 +27,31 @@ const historyDays = 60
 
 /** The small print every reservoir panel carries. */
 export function ReservoirSources({ reservoir }: { reservoir?: ReservoirProperties }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-1">
       <p>
-        Source: {reservoir?.agency ?? "Irrigation Department and Mahaweli Authority"}, compiled by{" "}
-        <a
-          href={reservoir?.sourceUrl ?? "https://waterlevels.lk/reservoirs"}
-          target="_blank"
-          rel="noreferrer"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          Sri Lanka Water Levels (waterlevels.lk)
-        </a>
-        .{reservoir?.mapped && " Position © OpenStreetMap contributors."}
+        <Template
+          text={t("reservoirs.sources.source")}
+          values={{
+            agency: reservoir?.agency ?? t("reservoirs.sources.agencies"),
+            link: (
+              <a
+                href={reservoir?.sourceUrl ?? "https://waterlevels.lk/reservoirs"}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                {t("reservoirs.sources.link")}
+              </a>
+            ),
+          }}
+        />
+        {reservoir?.mapped && ` ${t("reservoirs.sources.position")}`}
       </p>
-      <p>Not an official warning. In an emergency call 117.</p>
+      <p>
+        {t("terms.notOfficial")} {t("terms.emergency")}
+      </p>
     </div>
   )
 }
@@ -52,6 +64,7 @@ interface ReservoirPanelProps {
 
 /** One reservoir: status in the source's words, storage, flow, age and history. */
 export function ReservoirPanel({ reservoir, onClose, className }: ReservoirPanelProps) {
+  const t = useT()
   const history = useReservoirHistory(reservoir.id, historyDays)
   const storage = storageView(reservoir)
   const note = reservoir.flow ? flowNote(reservoir.flow) : null
@@ -67,7 +80,7 @@ export function ReservoirPanel({ reservoir, onClose, className }: ReservoirPanel
           variant="outline"
           size="icon"
           onClick={onClose}
-          aria-label="Close reservoir details"
+          aria-label={t("reservoirs.panel.close")}
         >
           <XIcon />
         </Button>
@@ -79,13 +92,13 @@ export function ReservoirPanel({ reservoir, onClose, className }: ReservoirPanel
           <Badge variant={reservoir.status}>{reservoirStatusLabels[reservoir.status]}</Badge>
           {reservoir.stale && (
             <Badge variant="chip" className="text-foreground">
-              Out of date
+              {t("common.outOfDate")}
             </Badge>
           )}
         </div>
         <p className="text-sm text-muted-foreground">{reservoirStatusMeanings[reservoir.status]}</p>
         <StatValue
-          label="Storage"
+          label={t("reservoirs.storage.label")}
           value={storage.value}
           unit={storage.value === "–" ? undefined : "%"}
           caption={storage.caption}
@@ -93,48 +106,64 @@ export function ReservoirPanel({ reservoir, onClose, className }: ReservoirPanel
         {storage.current && reservoir.storagePercent !== null && (
           <ProgressBar
             value={Math.min(1, reservoir.storagePercent / 100)}
-            label="Storage as a share of capacity"
+            label={t("reservoirs.storage.bar")}
           />
         )}
       </div>
 
       <LabeledRows>
-        {reservoir.river && <LabeledRow label="River" value={reservoir.river} numeric={false} />}
+        {reservoir.river && (
+          <LabeledRow label={t("reservoirs.panel.river")} value={reservoir.river} numeric={false} />
+        )}
         <LabeledRow
-          label="Flow"
-          value={reservoir.flow ? flowShort(reservoir.flow) : "Not reported"}
+          label={t("reservoirs.panel.flow")}
+          value={reservoir.flow ? flowShort(reservoir.flow) : t("reservoirs.panel.notReported")}
           numeric={Boolean(reservoir.flow)}
         />
         {reservoir.flow?.agency && (
-          <LabeledRow label="Flow reported by" value={reservoir.flow.agency} numeric={false} />
+          <LabeledRow
+            label={t("reservoirs.panel.flowBy")}
+            value={reservoir.flow.agency}
+            numeric={false}
+          />
         )}
         <LabeledRow
-          label="Reading day"
+          label={t("reservoirs.panel.readingDay")}
           value={
             reservoir.readingDay
-              ? `${formatReadingDay(reservoir.readingDay)} · ${readingDayAge(reservoir.readingDay)}`
-              : "Not known"
+              ? [formatReadingDay(reservoir.readingDay), readingDayAge(reservoir.readingDay)].join(
+                  t("common.separator"),
+                )
+              : t("common.notKnown")
           }
           tone={reservoir.stale ? "warning" : "default"}
         />
         {reservoir.agency && (
-          <LabeledRow label="Reported by" value={reservoir.agency} numeric={false} />
+          <LabeledRow
+            label={t("reservoirs.panel.reportedBy")}
+            value={reservoir.agency}
+            numeric={false}
+          />
         )}
         {!reservoir.mapped && (
-          <LabeledRow label="On the map" value="Location not mapped" numeric={false} />
+          <LabeledRow
+            label={t("reservoirs.panel.onMap")}
+            value={t("reservoirs.panel.notMapped")}
+            numeric={false}
+          />
         )}
       </LabeledRows>
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
 
       <div>
         <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-          Storage, last {historyDays} days
+          {t("reservoirs.panel.history", { days: historyDays })}
         </h3>
         {history.isPending && (
           <Skeleton
             className="h-32 w-full rounded-2xl"
             role="status"
-            aria-label="Loading history"
+            aria-label={t("reservoirs.panel.loadingHistory")}
           />
         )}
         {history.error && (
@@ -142,7 +171,7 @@ export function ReservoirPanel({ reservoir, onClose, className }: ReservoirPanel
             className="rounded-2xl border border-border bg-inset py-6 text-center text-xs text-muted-foreground"
             role="alert"
           >
-            History is unavailable.
+            {t("reservoirs.panel.historyUnavailable")}
           </p>
         )}
         {history.data && <StorageChart readings={history.data.readings} days={historyDays} />}

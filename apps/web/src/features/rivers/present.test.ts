@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
 import {
   countByStatus,
   formatAge,
@@ -6,7 +7,34 @@ import {
   formatRate,
   headroom,
   nextHourLine,
+  statusLabels,
+  thresholdLabels,
+  trendLabels,
 } from "./present"
+
+afterEach(() => setLocale("en"))
+
+describe("labels", () => {
+  it("use the Irrigation Department's words in the current language", () => {
+    expect(statusLabels.minor_flood).toBe("Minor flood")
+    expect(thresholdLabels.alert).toBe("Alert level")
+    setLocale("si")
+    expect(statusLabels.minor_flood).toBe("සුළු ගංවතුර")
+    expect(trendLabels.rising).toBe("ඉහළ යමින්")
+    setLocale("ta")
+    expect(statusLabels.major_flood).toBe("பெரு வெள்ளம்")
+  })
+
+  it("list every status", () => {
+    expect(Object.keys(statusLabels)).toEqual([
+      "normal",
+      "alert",
+      "minor_flood",
+      "major_flood",
+      "unknown",
+    ])
+  })
+})
 
 describe("formatLevel", () => {
   it("uses two decimals for metres and one for feet", () => {
@@ -44,7 +72,7 @@ describe("headroom", () => {
       fraction: 0.5,
     })
     expect(headroom({ waterLevel: 6, ...thresholds })).toEqual({
-      next: "major flood",
+      next: "major_flood",
       remaining: 1,
       fraction: 0.5,
     })
@@ -118,6 +146,13 @@ describe("next-hour line", () => {
       new Date("2026-11-02T19:00:00Z"),
     )
     expect(line?.value).toBe("1.80 m")
+  })
+
+  it("words the range in the reader's language", () => {
+    setLocale("ta")
+    const line = nextHourLine(forecast, new Date("2026-11-02T19:00:00Z"))
+    expect(line?.value).toContain("1.76–1.85")
+    expect(line?.value).not.toContain("range")
   })
 
   it("hides a missing or old forecast", () => {

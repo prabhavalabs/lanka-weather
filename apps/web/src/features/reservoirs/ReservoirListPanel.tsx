@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { GaugeList, type GaugeListItem } from "@/components/weather/GaugeList"
 import { formatAge } from "@/lib/format"
+import { translate, useT } from "@/lib/i18n"
 import {
   activeReservoirs,
   flowShort,
@@ -34,11 +35,11 @@ function item(feature: ReservoirFeature, onSelect: (id: string) => void): GaugeL
       district,
       flow ? flowShort(flow) : null,
       readingDay ? readingDayAge(readingDay) : null,
-      stale ? "out of date" : null,
-      mapped ? null : "not on the map",
+      stale ? translate("reservoirs.list.outOfDate") : null,
+      mapped ? null : translate("reservoirs.list.notOnMap"),
     ]
       .filter(Boolean)
-      .join(" · "),
+      .join(translate("common.separator")),
     value: storage.value === "–" ? undefined : `${storage.value}%`,
     badge: { variant: status, label: reservoirStatusLabels[status] },
     onSelect: () => onSelect(id),
@@ -56,6 +57,7 @@ export function ReservoirListPanel({
   onSelect,
   onClose,
 }: ReservoirListPanelProps) {
+  const t = useT()
   const features = data?.features ?? []
   const active = activeReservoirs(features)
   const activeIds = new Set(active.map((feature) => feature.id))
@@ -64,9 +66,11 @@ export function ReservoirListPanel({
   return (
     <Panel
       icon={<ContainerIcon />}
-      title="Reservoirs spilling or releasing"
+      title={t("reservoirs.list.title")}
       subtitle={
-        data ? `Daily figures · fetched ${formatAge(data.meta.fetchedAt)}` : "Daily figures"
+        data
+          ? t("reservoirs.list.subtitle", { age: formatAge(data.meta.fetchedAt) })
+          : t("reservoirs.list.subtitleEmpty")
       }
       className="w-full"
       action={
@@ -74,7 +78,7 @@ export function ReservoirListPanel({
           variant="outline"
           size="icon"
           onClick={onClose}
-          aria-label="Close the reservoir list"
+          aria-label={t("reservoirs.list.close")}
         >
           <XIcon />
         </Button>
@@ -83,42 +87,40 @@ export function ReservoirListPanel({
     >
       {stale && (
         <div className="flex items-center gap-2">
-          <Badge variant="chip" className="text-foreground">
-            Out of date
+          <Badge variant="chip" className="shrink-0 text-foreground">
+            {t("common.outOfDate")}
           </Badge>
-          <p className="text-xs text-muted-foreground">
-            These figures have not been updated recently.
-          </p>
+          <p className="min-w-0 text-xs text-muted-foreground">{t("reservoirs.list.staleNote")}</p>
         </div>
       )}
       {pending && (
         <Skeleton
           className="h-32 w-full rounded-2xl"
           role="status"
-          aria-label="Loading reservoirs"
+          aria-label={t("reservoirs.list.loading")}
         />
       )}
       {data && (
         <GaugeList
-          title={`Now (${active.length})`}
+          title={t("reservoirs.list.now", { count: active.length })}
           items={active.map((feature) => item(feature, onSelect))}
           emptyText={
             features.length === 0
-              ? "Reservoir figures have not been collected yet."
+              ? t("reservoirs.list.emptyNone")
               : stale
-                ? "No current figures to say whether any reservoir is spilling or releasing."
-                : "None spilling or releasing on the latest readings."
+                ? t("reservoirs.list.emptyStale")
+                : t("reservoirs.list.emptyCalm")
           }
         />
       )}
       {data && others.length > 0 && (
         <details className="group rounded-xl">
           <summary className="cursor-pointer rounded-lg py-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-            All other reservoirs ({others.length}), including those not on the map
+            {t("reservoirs.list.others", { count: others.length })}
           </summary>
           <GaugeList
             className="mt-2"
-            title="Holding, no data or out of date"
+            title={t("reservoirs.list.othersTitle")}
             items={others.map((feature) => item(feature, onSelect))}
           />
         </details>

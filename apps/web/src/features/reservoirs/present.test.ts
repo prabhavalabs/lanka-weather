@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
 import {
   activeReservoirs,
   hasCurrentFigures,
@@ -7,6 +8,7 @@ import {
   formatReadingDay,
   isActive,
   readingDayAge,
+  reservoirStatusLabels,
   reservoirSubtitle,
   reservoirSummary,
   storageView,
@@ -168,4 +170,31 @@ it("writes a subtitle from what is known", () => {
     reservoirSubtitle(reservoir({ district: "Kurunegala", river: "Deduru Oya", type: "major" })),
   ).toBe("Major reservoir · Kurunegala")
   expect(reservoirSubtitle(reservoir({ type: "mahaweli" }))).toBe("Mahaweli reservoir")
+})
+
+describe("in Sinhala and Tamil", () => {
+  afterEach(() => setLocale("en"))
+  const now = new Date("2026-11-02T19:39:00Z")
+
+  it("uses the Sri Lankan words for spilling and keeps cusecs", () => {
+    setLocale("si")
+    expect(reservoirStatusLabels.spilling).toBe("වාන් දමමින්")
+    expect(flowShort({ kind: "spill", cusecs: 1551, agency: "x" })).toBe("වාන් දැමීම: 1,551 cusecs")
+    setLocale("ta")
+    expect(flowShort({ kind: "spill", cusecs: null, agency: "x" })).toBe("வான் பாய்தல்")
+  })
+
+  it("counts reading days in the language", () => {
+    setLocale("si")
+    expect(readingDayAge("2026-11-03", now)).toBe("අද")
+    expect(readingDayAge("2026-11-02", now)).toBe("ඊයේ")
+    setLocale("ta")
+    expect(readingDayAge("2026-10-29", now)).toBe("5 நாட்களுக்கு முன்")
+  })
+
+  it("says the summary in the language", () => {
+    setLocale("ta")
+    const counts = { total: 1, mapped: 1, spilling: 0, releasing: 0, holding: 1, nodata: 0 }
+    expect(reservoirSummary(counts, 0, true)).toBe("1 நீர்த்தேக்கம் · தரவு காலாவதியானது")
+  })
 })
