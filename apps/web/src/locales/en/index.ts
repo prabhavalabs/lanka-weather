@@ -2,6 +2,7 @@
  * The English catalogue, one namespace per file. Add a namespace here and in
  * `si/index.ts` and `ta/index.ts` together.
  */
+import { alerts } from "./alerts"
 import { common } from "./common"
 
-export const en = { common }
+export const en = { common, alerts }

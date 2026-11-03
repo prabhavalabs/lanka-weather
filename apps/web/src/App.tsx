@@ -115,6 +115,7 @@ import { RiverLegend } from "./features/rivers/RiverLegend"
 import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsLayer"
 import { StationPanel } from "./features/rivers/StationPanel"
 import { MetStationPanel } from "./features/stations/MetStationPanel"
+import { AlertsButton } from "./features/alerts/AlertsButton"
 import { OverviewButton } from "./features/overview/OverviewButton"
 import { OverviewPanel } from "./features/overview/OverviewPanel"
 import { overviewAction } from "./features/overview/present"
@@ -1516,6 +1517,7 @@ export function App() {
                 <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
                 <OverviewButton compact onClick={openOverview} />
                 {hazards.button(true)}
+                <AlertsButton compact />
               </>
             }
           />
@@ -1530,6 +1532,7 @@ export function App() {
             />
             <OverviewButton onClick={openOverview} className="pointer-events-auto" />
             {hazards.button(false)}
+            <AlertsButton className="pointer-events-auto" />
             {regionsOn && (
               <div className="pointer-events-auto hidden rounded-full border border-border bg-card/95 p-1 shadow-panel backdrop-blur-md @2xl:block">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />

@@ -30,6 +30,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/v1": apiTarget,
+      "/api": apiTarget,
       "/healthz": apiTarget,
     },
   },
