@@ -10,7 +10,7 @@ export function useRiverRisk(layer: Layer | undefined, enabled: boolean) {
     queryFn: ({ signal }) => apiGet<RiskDocument>(layer?.dataPath ?? "/v1/rivers/risk", signal),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 900 }),
-    meta: { label: "river risk" },
+    meta: { label: "app.data.riverRisk" },
   })
 }
 
@@ -23,7 +23,7 @@ export function useRiverDetail(id: string | null) {
     staleTime: 60_000,
     refetchInterval: 15 * 60_000,
     // Readings are large, and only of use while the panel is open.
-    meta: { label: "river details", persist: false },
+    meta: { label: "app.data.riverDetail", persist: false },
   })
 }
 
@@ -34,7 +34,7 @@ export function useFloodBasins(layer: Layer | undefined, enabled: boolean) {
     queryFn: ({ signal }) => apiGet<BasinsDocument>("/v1/floods/basins", signal),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions({ refreshSeconds: 900 }),
-    meta: { label: "flood basins" },
+    meta: { label: "app.data.basins" },
   })
 }
 
@@ -46,6 +46,6 @@ export function usePastFloods(layer: Layer | undefined, enabled: boolean) {
       apiGet<PastFloodsDocument>(layer?.dataPath ?? "/v1/floods/past", signal),
     enabled: enabled && Boolean(layer),
     staleTime: 60 * 60_000,
-    meta: { label: "past floods" },
+    meta: { label: "app.data.pastFloods" },
   })
 }

@@ -15,6 +15,6 @@ export function useFloodForecast(layer: Layer | undefined, enabled: boolean) {
       ),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 3600 }),
-    meta: { label: "flood forecasts" },
+    meta: { label: "app.data.floods" },
   })
 }

@@ -15,7 +15,7 @@ export function useMetStations(layer: Layer | undefined, enabled: boolean) {
       ),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 3600 }),
-    meta: { label: "weather stations" },
+    meta: { label: "app.data.stations" },
   })
 }
 
@@ -28,6 +28,6 @@ export function useMetStation(id: string | null) {
     enabled: id !== null,
     staleTime: 5 * 60_000,
     refetchInterval: 30 * 60_000,
-    meta: { label: "the weather station" },
+    meta: { label: "app.data.station" },
   })
 }

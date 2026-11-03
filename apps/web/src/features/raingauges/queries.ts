@@ -15,7 +15,7 @@ export function useRainGauges(layer: Layer | undefined, enabled: boolean) {
       ),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 1800 }),
-    meta: { label: "the rain gauges" },
+    meta: { label: "app.data.rainGauges" },
   })
 }
 
@@ -26,6 +26,6 @@ export function useRainGaugeDetail(id: string) {
     queryFn: ({ signal }) =>
       apiGet<RainGaugeDetail>(`/v1/rain/gauges/${encodeURIComponent(id)}`, signal),
     ...layerQueryOptions({ refreshSeconds: 1800 }),
-    meta: { label: "the rain gauge" },
+    meta: { label: "app.data.rainGauge" },
   })
 }

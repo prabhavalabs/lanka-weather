@@ -10,7 +10,7 @@ export function useRainSteps(layer: Layer | undefined, enabled: boolean) {
     queryFn: ({ signal }) => apiGetBare<RainSteps>(layer?.dataPath ?? "/v1/rain/steps", signal),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 1800 }),
-    meta: { label: "the satellite rain images" },
+    meta: { label: "app.data.rainImages" },
   })
 }
 
@@ -22,6 +22,6 @@ export function useObservedRain(enabled: boolean) {
       apiGetBare<ObservedRainCollection>("/v1/rain/observed", signal, "application/geo+json"),
     enabled,
     ...layerQueryOptions({ refreshSeconds: 900 }),
-    meta: { label: "observed rainfall" },
+    meta: { label: "app.data.observedRain" },
   })
 }

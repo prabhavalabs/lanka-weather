@@ -27,7 +27,7 @@ export function useSummary(location: LatLon | null) {
     enabled: location !== null,
     staleTime: 2 * 60_000,
     refetchInterval: 10 * 60_000,
-    meta: { label: "the location summary" },
+    meta: { label: "app.data.locationSummary" },
   })
 }
 
@@ -40,7 +40,7 @@ export function usePointForecast(location: LatLon | null) {
     enabled: location !== null,
     staleTime: 5 * 60_000,
     refetchInterval: 15 * 60_000,
-    meta: { label: "the forecast" },
+    meta: { label: "app.data.forecast" },
   })
 }
 

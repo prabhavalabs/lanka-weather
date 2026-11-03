@@ -14,7 +14,7 @@ function windQuery(layer: Layer | undefined, time: number) {
       apiGetBare<WindResponse>(`${path}?t=${encodeURIComponent(iso)}`, signal),
     ...layerQueryOptions(layer ?? { refreshSeconds: 3600 }),
     // Fields are 39 KB each and change with every run: kept in memory only (ADR 0002).
-    meta: { persist: false, label: "the wind forecast" },
+    meta: { persist: false, label: "app.data.wind" as const },
   }
 }
 

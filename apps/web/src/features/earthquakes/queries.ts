@@ -11,6 +11,6 @@ export function useEarthquakes(layer: Layer | undefined, enabled: boolean) {
       apiGetBare<EarthquakeCollection>(layer!.dataPath!, signal, "application/geo+json"),
     enabled: enabled && Boolean(layer?.dataPath),
     ...(layer ? layerQueryOptions(layer) : {}),
-    meta: { label: "earthquakes" },
+    meta: { label: "app.data.earthquakes" },
   })
 }

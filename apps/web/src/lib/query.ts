@@ -4,6 +4,7 @@ import type { PersistQueryClientProviderProps } from "@tanstack/react-query-pers
 import { del, get, set } from "idb-keyval"
 import { toast } from "sonner"
 import { isNotReady, isRetryable } from "./api"
+import { translate, type MessageKey } from "./i18n"
 
 const day = 24 * 60 * 60 * 1000
 
@@ -12,8 +13,8 @@ declare module "@tanstack/react-query" {
     queryMeta: {
       /** False keeps a large payload (wind fields, GN weather) out of IndexedDB. */
       persist?: boolean
-      /** What the query loads, for the failure toast, e.g. "river levels". */
-      label?: string
+      /** What the query loads, for the failure toast: a message key, e.g. "app.data.riverRisk". */
+      label?: MessageKey
     }
   }
 }
@@ -29,11 +30,10 @@ function announceFailure(error: unknown, query: Query<unknown, unknown, unknown>
   const label = query.meta?.label
   if (!label) return
   const hasData = query.state.data !== undefined
-  toast.error(`Could not update ${label}`, {
+  // Shown in the language in effect when the request fails.
+  toast.error(translate("app.failure.title", { what: translate(label) }), {
     id: query.queryHash,
-    description: hasData
-      ? "Showing the last data received. It will be retried shortly."
-      : "It will be retried shortly.",
+    description: translate(hasData ? "app.failure.keep" : "app.failure.retry"),
   })
 }
 

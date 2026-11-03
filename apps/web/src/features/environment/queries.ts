@@ -10,7 +10,7 @@ export function useAirGrid(layer: Layer | undefined, enabled: boolean) {
     queryFn: ({ signal }) => apiGetBare<AirGrid>(layer?.dataPath ?? "/v1/air/current", signal),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 10800 }),
-    meta: { label: "air quality" },
+    meta: { label: "app.data.air" },
   })
 }
 
@@ -21,6 +21,6 @@ export function useSeaGrid(layer: Layer | undefined, enabled: boolean) {
     queryFn: ({ signal }) => apiGetBare<SeaGrid>(layer?.dataPath ?? "/v1/sea/current", signal),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 10800 }),
-    meta: { label: "sea conditions" },
+    meta: { label: "app.data.sea" },
   })
 }

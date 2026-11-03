@@ -26,7 +26,7 @@ export function useWarnings(layer: Layer | undefined, filter: WarningsFilter = {
     queryFn: ({ signal }) => apiGet<WarningsOverview>(overviewPath(filter), signal),
     enabled: Boolean(layer?.dataPath),
     ...(layer ? layerQueryOptions(layer) : {}),
-    meta: { label: "official warnings" },
+    meta: { label: "app.data.warnings" },
   })
 }
 
@@ -38,7 +38,7 @@ export function useLandslides(layer: Layer | undefined, enabled: boolean) {
       apiGetBare<LandslideLayerData>(layer!.dataPath!, signal, "application/geo+json"),
     enabled: enabled && Boolean(layer?.dataPath),
     ...(layer ? layerQueryOptions(layer) : {}),
-    meta: { label: "landslide warnings" },
+    meta: { label: "app.data.landslides" },
   })
 }
 
@@ -50,6 +50,6 @@ export function useDivision(id: string | null) {
       apiGet<Division>(`/v1/warnings/landslides/${encodeURIComponent(id!)}`, signal),
     enabled: id !== null,
     staleTime: 5 * 60_000,
-    meta: { label: "the division's landslide warnings" },
+    meta: { label: "app.data.divisionLandslides" },
   })
 }
