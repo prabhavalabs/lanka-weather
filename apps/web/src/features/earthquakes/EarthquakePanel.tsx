@@ -5,7 +5,9 @@ import { StatValue } from "@/components/StatValue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatAge, formatDayTime, formatNumber } from "@/lib/format"
-import { formatDistance, tsunamiNote } from "./present"
+import { useT } from "@/lib/i18n"
+import { colourWord } from "../warnings/present"
+import { formatDistance, reviewLabel, tsunamiNote } from "./present"
 import type { Earthquake } from "./types"
 
 interface EarthquakePanelProps {
@@ -16,27 +18,29 @@ interface EarthquakePanelProps {
 
 /** One earthquake: magnitude, place, time, depth and distance from Sri Lanka. */
 export function EarthquakePanel({ event, stale = false, onClose }: EarthquakePanelProps) {
+  const t = useT()
   return (
     <Panel
       icon={<ActivityIcon />}
-      title={event.place || "Earthquake"}
-      subtitle="Earthquake · USGS"
+      title={event.place || t("earthquakes.earthquake")}
+      subtitle={t("earthquakes.panel.subtitle")}
       className="w-full"
       action={
         <Button
           variant="outline"
           size="icon"
           onClick={onClose}
-          aria-label="Close earthquake details"
+          aria-label={t("earthquakes.panel.close")}
         >
           <XIcon />
         </Button>
       }
       footer={
         <p>
-          Source: U.S. Geological Survey. Revised{" "}
-          <span className="numeric">{formatAge(event.updatedAt)}</span>, fetched{" "}
-          <span className="numeric">{formatAge(event.fetchedAt)}</span>.
+          {t("earthquakes.panel.footer", {
+            revised: formatAge(event.updatedAt),
+            fetched: formatAge(event.fetchedAt),
+          })}
         </p>
       }
     >
@@ -44,15 +48,15 @@ export function EarthquakePanel({ event, stale = false, onClose }: EarthquakePan
         <StatValue
           value={formatNumber(event.magnitude, 1)}
           unit={event.magType}
-          caption="Magnitude"
+          caption={t("earthquakes.panel.magnitude")}
         />
         <div className="flex flex-col items-end gap-1.5">
-          <Badge variant="chip" className="text-foreground capitalize">
-            {event.status}
+          <Badge variant="chip" className="text-foreground">
+            {reviewLabel(event.status)}
           </Badge>
           {stale && (
             <Badge variant="chip" className="text-foreground">
-              Out of date
+              {t("common.outOfDate")}
             </Badge>
           )}
         </div>
@@ -64,7 +68,7 @@ export function EarthquakePanel({ event, stale = false, onClose }: EarthquakePan
         >
           <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p>
-            {tsunamiNote}{" "}
+            {tsunamiNote()}{" "}
             <a
               className="underline underline-offset-2"
               href="https://www.dmc.gov.lk/"
@@ -78,12 +82,24 @@ export function EarthquakePanel({ event, stale = false, onClose }: EarthquakePan
       )}
       <LabeledRows>
         <LabeledRow
-          label="Time"
-          value={`${formatDayTime(event.time)} · ${formatAge(event.time)}`}
+          label={t("earthquakes.panel.time")}
+          value={`${formatDayTime(event.time)}${t("common.separator")}${formatAge(event.time)}`}
         />
-        <LabeledRow label="Depth" value={`${formatNumber(event.depthKm)} km`} />
-        <LabeledRow label="From Sri Lanka's coast" value={formatDistance(event.distanceKm)} />
-        {event.alert && <LabeledRow label="USGS PAGER alert" value={event.alert} numeric={false} />}
+        <LabeledRow
+          label={t("earthquakes.panel.depth")}
+          value={`${formatNumber(event.depthKm)} km`}
+        />
+        <LabeledRow
+          label={t("earthquakes.panel.fromCoast")}
+          value={formatDistance(event.distanceKm)}
+        />
+        {event.alert && (
+          <LabeledRow
+            label={t("earthquakes.panel.pager")}
+            value={colourWord(event.alert)}
+            numeric={false}
+          />
+        )}
       </LabeledRows>
       {event.url && (
         <a
@@ -92,15 +108,12 @@ export function EarthquakePanel({ event, stale = false, onClose }: EarthquakePan
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 self-start rounded-sm text-sm font-medium text-brand-text underline underline-offset-2 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
-          USGS event page
+          {t("earthquakes.panel.eventPage")}
           <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
-          <span className="sr-only">(opens in a new tab)</span>
+          <span className="sr-only">{t("earthquakes.newTab")}</span>
         </a>
       )}
-      <p className="text-xs text-muted-foreground">
-        Lanka Weather generates no tsunami warnings. Official warnings come from the DMC and the
-        Department of Meteorology.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("earthquakes.panel.noWarnings")}</p>
     </Panel>
   )
 }

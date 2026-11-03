@@ -11,13 +11,16 @@ import { DetailPlaceholder } from "@/components/DetailPlaceholder"
 import { Button } from "@/components/ui/button"
 import { GaugeList, type GaugeListItem } from "@/components/weather/GaugeList"
 import { formatAge } from "@/lib/format"
+import { useLocale, useT } from "@/lib/i18n"
 import { isStale, type Layer } from "@/lib/layers"
-import { count, layerStatus, type LayerStatus } from "../layers/status"
+import { layerStatus, type LayerStatus } from "../layers/status"
 import type { Selection } from "../location/selection"
 import { CycloneLegend } from "../cyclones/CycloneLegend"
 import { CyclonePanel } from "../cyclones/CyclonePanel"
 import {
+  alertText,
   boundsWithSriLanka,
+  cycloneStatusNote,
   cycloneSummary,
   evaluationNote,
   isCalm,
@@ -28,18 +31,19 @@ import { CYCLONE_POSITIONS, CyclonesLayer } from "../cyclones/CyclonesLayer"
 import type { CyclonePosition } from "../cyclones/types"
 import { EarthquakeLegend } from "../earthquakes/EarthquakeLegend"
 import { EarthquakePanel } from "../earthquakes/EarthquakePanel"
-import { earthquakeParts, formatDistance } from "../earthquakes/present"
+import { distanceFromSriLanka, earthquakeParts, magnitude } from "../earthquakes/present"
 import { useEarthquakes } from "../earthquakes/queries"
 import { EARTHQUAKES, EarthquakesLayer } from "../earthquakes/EarthquakesLayer"
 import { LandslidePanel } from "../warnings/LandslidePanel"
 import { LANDSLIDE_FILL, LandslideLayer } from "../warnings/LandslideLayer"
 import { OFFICIAL_FILL, OfficialDistrictsLayer } from "../warnings/OfficialDistrictsLayer"
 import {
+  districtName,
   highlightLines,
+  landslideStatusNote,
   landslideSummary,
-  levelActions,
   levelBadge,
-  levelLabels,
+  levelWords,
   type LandslideLevel,
 } from "../warnings/present"
 import { useLandslides, useWarnings } from "../warnings/queries"
@@ -88,6 +92,8 @@ export function useHazards({
   setSelection,
   fitBox,
 }: HazardsOptions) {
+  const t = useT()
+  const locale = useLocale()
   const landslideLayer = available(LANDSLIDE_WARNINGS)
   const officialLayer = available(OFFICIAL_WARNINGS)
   const earthquakeLayer = available(EARTHQUAKE_LAYER)
@@ -199,38 +205,36 @@ export function useHazards({
           return {
             title: String(properties.name),
             lines: [
-              `GDACS ${properties.alertLevel} alert`,
-              `${formatDistance(Number(properties.distanceKm))} from Sri Lanka`,
+              alertText(String(properties.alertLevel), locale),
+              distanceFromSriLanka(Number(properties.distanceKm)),
             ],
           }
         }
         if (feature.layer.id === EARTHQUAKES) {
           return {
-            title: `M${Number(properties.magnitude).toFixed(1)} earthquake`,
-            lines: [
-              String(properties.place),
-              `${formatDistance(Number(properties.distanceKm))} from Sri Lanka`,
-            ],
+            title: t("earthquakes.hoverTitle", {
+              magnitude: magnitude(Number(properties.magnitude)),
+            }),
+            lines: [String(properties.place), distanceFromSriLanka(Number(properties.distanceKm))],
           }
         }
         if (feature.layer.id === LANDSLIDE_FILL) {
           const level = Number(properties.level) as LandslideLevel
+          const nameSi = properties.nameSi ? String(properties.nameSi) : undefined
+          // The chip marks its second name as Sinhala; a Sinhala reader gets it as the title.
           return {
-            title: String(properties.name),
-            local: properties.nameSi ? String(properties.nameSi) : undefined,
-            lines: [
-              `${levelLabels[level]} · ${levelActions[level]}`,
-              `${properties.district} District`,
-            ],
+            title: locale === "si" && nameSi ? nameSi : String(properties.name),
+            local: locale === "si" ? undefined : nameSi,
+            lines: [levelWords(level, locale), districtName(String(properties.district))],
           }
         }
         const district = highlighted?.find((item) => item.id === properties.id)
         return district
-          ? { title: `${district.name} District`, lines: highlightLines(district) }
+          ? { title: districtName(district.name), lines: highlightLines(district) }
           : null
       },
     }),
-    [highlighted],
+    [highlighted, locale, t],
   )
 
   // Layer list.
@@ -252,19 +256,25 @@ export function useHazards({
         .slice(0, 8)
         .map(({ properties }) => ({
           id: properties.id,
-          title: properties.name,
-          subtitle: `${properties.district} District`,
-          badge: { variant: levelBadge[properties.level], label: `Level ${properties.level}` },
+          title: locale === "si" && properties.nameSi ? properties.nameSi : properties.name,
+          subtitle: districtName(properties.district),
+          badge: {
+            variant: levelBadge[properties.level],
+            label: t("warnings.landslide.levelShort", { level: properties.level }),
+          },
           onSelect: () => setSelection({ kind: "landslide", id: properties.id }),
         }))
+      const note = landslideStatusNote(meta, meta.fetchedAt)
       details[LANDSLIDE_WARNINGS] = (
         <div className="flex flex-col gap-2.5">
-          <p className="text-xs text-foreground">{meta.note}</p>
+          <p className="text-xs text-foreground" lang={note.lang}>
+            {note.text}
+          </p>
           <LandslideLegend
             bare
             counts={landslides.data?.features.length ? meta.counts : undefined}
           />
-          <GaugeList title="Most serious divisions" items={divisionItems} />
+          <GaugeList title={t("warnings.landslide.mostSerious")} items={divisionItems} />
           {meta.pdfUrl && (
             <a
               href={meta.pdfUrl}
@@ -272,13 +282,10 @@ export function useHazards({
               rel="noreferrer"
               className="self-start text-xs font-medium text-brand-text underline underline-offset-2 hover:text-foreground"
             >
-              Latest official report (PDF)
+              {t("warnings.landslide.latestReport")}
             </a>
           )}
-          <p className="text-xs text-muted-foreground">
-            Reports state a validity of about 24 hours and are reissued while a risk lasts. A place
-            not named is not a place said to be safe.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("warnings.landslide.validityNote")}</p>
         </div>
       )
     }
@@ -291,8 +298,10 @@ export function useHazards({
       layer: officialLayer,
       parts: data
         ? [
-            count(data.activeCount, "in force", "in force"),
-            mentioned > 0 ? count(mentioned, "district") : "no district highlighted",
+            t("warnings.details.inForce", { count: data.activeCount }),
+            mentioned > 0
+              ? t("terms.adminCount.district", { count: mentioned })
+              : t("warnings.details.noDistrict"),
           ]
         : [],
       observedAt: data?.meta.fetchedAt,
@@ -302,13 +311,14 @@ export function useHazards({
     details[OFFICIAL_WARNINGS] = (
       <div className="flex flex-col gap-2.5">
         <OfficialDistrictsLegend />
-        <p className="text-xs text-muted-foreground">
-          Highlights come only from landslide levels and from warnings or advisories whose clean
-          English text names a district by exact word. A bulletin whose text cannot be read cleanly
-          highlights nothing, so an unmarked district is not a clear one.
-        </p>
-        <Button variant="secondary" size="sm" className="self-start" onClick={() => openWarnings()}>
-          Read official warnings
+        <p className="text-xs text-muted-foreground">{t("warnings.details.highlights")}</p>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-auto min-h-8 self-start whitespace-normal"
+          onClick={() => openWarnings()}
+        >
+          {t("warnings.details.read")}
         </Button>
       </div>
     )
@@ -327,14 +337,18 @@ export function useHazards({
       <div className="flex flex-col gap-2.5">
         <EarthquakeLegend bare />
         <GaugeList
-          title="Latest"
+          title={t("earthquakes.details.latest")}
           items={(data?.features ?? []).slice(0, 5).map(({ properties }) => ({
             id: properties.id,
-            title: `M${properties.magnitude.toFixed(1)} ${properties.place}`,
+            title: t("earthquakes.listTitle", {
+              magnitude: magnitude(properties.magnitude),
+              place: properties.place,
+            }),
             subtitle: (
               <span className="numeric">
-                {formatAge(properties.time)} · {formatDistance(properties.distanceKm)} from Sri
-                Lanka
+                {formatAge(properties.time)}
+                {t("common.separator")}
+                {distanceFromSriLanka(properties.distanceKm)}
               </span>
             ),
             onSelect: () => setSelection({ kind: "quake", id: properties.id }),
@@ -343,18 +357,15 @@ export function useHazards({
         <Button
           variant="secondary"
           size="sm"
-          className="self-start"
+          className="h-auto min-h-8 self-start whitespace-normal"
           onClick={() => {
             enable(EARTHQUAKE_LAYER)
             fitBox([60, -15, 105, 25])
           }}
         >
-          Show the Indian Ocean
+          {t("earthquakes.details.showOcean")}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          M4.5 and above from 15° S to 25° N and 60° to 105° E, and whatever smaller USGS lists near
-          Sri Lanka. Lanka Weather generates no tsunami warnings.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("earthquakes.details.coverage")}</p>
       </div>
     )
   }
@@ -375,11 +386,13 @@ export function useHazards({
             className="rounded-xl border border-border bg-inset px-3 py-2 text-xs text-foreground"
             data-calm={isCalm(data.meta.status) ? "true" : "false"}
           >
-            {data.meta.note}
+            {cycloneStatusNote(data.meta) || <span lang="en">{data.meta.note}</span>}
             {data.meta.fetchedAt && (
               <>
-                {" · checked "}
-                <span className="numeric">{formatAge(data.meta.fetchedAt)}</span>
+                {t("common.separator")}
+                <span className="numeric">
+                  {t("cyclones.checked", { age: formatAge(data.meta.fetchedAt) })}
+                </span>
               </>
             )}
           </p>
@@ -389,14 +402,17 @@ export function useHazards({
             key={item.eventId}
             variant="secondary"
             size="sm"
-            className="self-start"
+            className="h-auto min-h-8 self-start whitespace-normal"
             onClick={() => setSelection({ kind: "cyclone", id: item.eventId })}
           >
-            {item.name} · {formatDistance(item.distanceKm)} from Sri Lanka
+            {t("cyclones.listItem", {
+              name: item.name,
+              distance: distanceFromSriLanka(item.distanceKm),
+            })}
           </Button>
         ))}
         {systems.length > 0 && <CycloneLegend bare />}
-        <p className="text-xs text-muted-foreground">{evaluationNote}</p>
+        <p className="text-xs text-muted-foreground">{evaluationNote()}</p>
       </div>
     )
   }
@@ -406,21 +422,21 @@ export function useHazards({
   if (landslidesOn && Boolean(landslides.data?.features.length))
     keySections.push({
       id: "landslides",
-      title: "Landslide warnings",
+      title: t("warnings.landslide.layerTitle"),
       unit: "NBRO",
       content: <LandslideLegend bare counts={landslides.data?.meta.counts} />,
     })
   if (earthquakesOn && Boolean(earthquakes.data?.features.length))
     keySections.push({
       id: "earthquakes",
-      title: "Earthquakes",
+      title: t("earthquakes.title"),
       unit: "USGS",
       content: <EarthquakeLegend bare />,
     })
   if (cyclonesOn && systems.length > 0)
     keySections.push({
       id: "cyclones",
-      title: "Cyclones",
+      title: t("cyclones.title"),
       unit: "GDACS",
       content: <CycloneLegend bare />,
     })
@@ -461,7 +477,7 @@ export function useHazards({
   let detail: ReactNode = null
   let detailLabel: string | null = null
   if (selection?.kind === "warnings") {
-    detailLabel = "Official warnings"
+    detailLabel = t("warnings.panel.title")
     detail = (
       <WarningsPanel
         layer={officialLayer}
@@ -473,33 +489,29 @@ export function useHazards({
       />
     )
   } else if (selection?.kind === "landslide") {
-    detailLabel = "Landslide warning"
+    detailLabel = t("warnings.division.title")
     detail = <LandslidePanel id={selection.id} onClose={close} />
   } else if (selection?.kind === "quake") {
-    detailLabel = "Earthquake"
+    detailLabel = t("earthquakes.earthquake")
     detail = quake ? (
       <EarthquakePanel event={quake} stale={earthquakes.data?.meta.stale} onClose={close} />
     ) : (
       <DetailPlaceholder
         icon={<ActivityIcon />}
-        title="Earthquake"
-        message={
-          earthquakes.isPending
-            ? undefined
-            : "This event is not in the last 30 days of USGS's list. It may have been revised or deleted."
-        }
+        title={t("earthquakes.earthquake")}
+        message={earthquakes.isPending ? undefined : t("earthquakes.missing")}
         onClose={close}
       />
     )
   } else if (selection?.kind === "cyclone") {
-    detailLabel = "Cyclone"
+    detailLabel = t("cyclones.cyclone")
     detail = system ? (
       <CyclonePanel system={system} stale={cyclones.data?.meta.stale} onClose={close} />
     ) : (
       <DetailPlaceholder
         icon={<TornadoIcon />}
-        title="Cyclone"
-        message={cyclones.isPending ? undefined : "This system is no longer listed as active."}
+        title={t("cyclones.cyclone")}
+        message={cyclones.isPending ? undefined : t("cyclones.missing")}
         onClose={close}
       />
     )
@@ -515,7 +527,12 @@ export function useHazards({
       isStale(officialLayer, new Date(warnings.dataUpdatedAt)))
   const activeCount = warnings.data?.activeCount ?? 0
   const banner = warnings.data ? (
-    <WarningBanner items={warnings.data.banner} stale={stale} onOpen={() => openWarnings()} />
+    <WarningBanner
+      items={warnings.data.banner}
+      bulletins={warnings.data.bulletins}
+      stale={stale}
+      onOpen={() => openWarnings()}
+    />
   ) : null
   const button = (compact: boolean) => (
     <WarningsButton
