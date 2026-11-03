@@ -21,7 +21,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AdminLevelSelector } from "@/components/weather/AdminLevelSelector"
-import { MapKey } from "@/components/weather/MapKey"
+import { MapKey, type MapKeySection } from "@/components/weather/MapKey"
 import { SearchTrigger } from "@/components/weather/SearchTrigger"
 import { isNotReady } from "@/lib/api"
 import type { Layer } from "@/lib/layers"
@@ -1349,6 +1349,43 @@ export function App() {
   // Legends for the layers that are on (wide screens; phones show them in the layer sheet).
   // What colours the whole map keeps its own card; the rest share the map key.
   const legendClass = "w-60"
+  const keySections: MapKeySection[] = [
+    ...(riverNetworkOn
+      ? [{ id: "river-risk", title: "River risk", unit: "Estimate", content: <RiverRiskLegend /> }]
+      : []),
+    ...(floodsOn && floodGauges.length > 0
+      ? [
+          {
+            id: "flood-forecast",
+            title: "Flood forecast",
+            unit: "Google",
+            content: <FloodLegend bare {...floodLegendProps} />,
+          },
+        ]
+      : []),
+    ...(riversOn
+      ? [
+          {
+            id: "river-levels",
+            title: "River levels",
+            unit: "status",
+            content: <RiverLegend bare counts={riverCounts} />,
+          },
+        ]
+      : []),
+    ...(reservoirsOn
+      ? [
+          {
+            id: "reservoirs",
+            title: "Reservoirs",
+            unit: "status",
+            content: <ReservoirLegend bare counts={reservoirCounts} />,
+          },
+        ]
+      : []),
+    ...observedLayers.keySections,
+    ...hazards.keySections,
+  ]
   const legends = (
     <>
       {windTimeline}
@@ -1357,14 +1394,7 @@ export function App() {
       {fillVariable && (
         <RegionLegend variable={fillVariable} level={level} className={legendClass} />
       )}
-      <MapKey>
-        {riverNetworkOn && <RiverRiskLegend card />}
-        {floodsOn && floodGauges.length > 0 && <FloodLegend {...floodLegendProps} />}
-        {riversOn && <RiverLegend counts={riverCounts} />}
-        {reservoirsOn && <ReservoirLegend counts={reservoirCounts} />}
-        {observedLayers.legendsInKey}
-        {hazards.legends}
-      </MapKey>
+      <MapKey sections={keySections} />
     </>
   )
 

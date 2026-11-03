@@ -3,6 +3,7 @@
  * add to the map, the layer list, the legends, the detail panel and the click
  * and hover handling. App.tsx composes the result with everything else.
  */
+import type { MapKeySection } from "@/components/weather/MapKey"
 import type { MapGeoJSONFeature, Map as MapLibreMap } from "maplibre-gl"
 import { ActivityIcon, TornadoIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react"
@@ -400,16 +401,29 @@ export function useHazards({
     )
   }
 
-  // Legends over the map on wide screens.
-  const legends = (
-    <>
-      {landslidesOn && Boolean(landslides.data?.features.length) && (
-        <LandslideLegend counts={landslides.data?.meta.counts} />
-      )}
-      {earthquakesOn && Boolean(earthquakes.data?.features.length) && <EarthquakeLegend />}
-      {cyclonesOn && systems.length > 0 && <CycloneLegend />}
-    </>
-  )
+  // Legends in the map key on wide screens.
+  const keySections: MapKeySection[] = []
+  if (landslidesOn && Boolean(landslides.data?.features.length))
+    keySections.push({
+      id: "landslides",
+      title: "Landslide warnings",
+      unit: "NBRO",
+      content: <LandslideLegend bare counts={landslides.data?.meta.counts} />,
+    })
+  if (earthquakesOn && Boolean(earthquakes.data?.features.length))
+    keySections.push({
+      id: "earthquakes",
+      title: "Earthquakes",
+      unit: "USGS",
+      content: <EarthquakeLegend bare />,
+    })
+  if (cyclonesOn && systems.length > 0)
+    keySections.push({
+      id: "cyclones",
+      title: "Cyclones",
+      unit: "GDACS",
+      content: <CycloneLegend bare />,
+    })
 
   // Map layers.
   const fills = (
@@ -516,7 +530,7 @@ export function useHazards({
   return {
     statuses,
     details,
-    legends,
+    keySections,
     fills,
     points,
     detail,

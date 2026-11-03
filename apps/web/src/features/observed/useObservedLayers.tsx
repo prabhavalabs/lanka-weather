@@ -3,6 +3,7 @@
  * map, in the list and in the legends. Kept apart from App, which only asks
  * for what goes in each slot.
  */
+import type { MapKeySection } from "@/components/weather/MapKey"
 import type { ExpressionSpecification } from "maplibre-gl"
 import { useCallback, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
@@ -456,7 +457,16 @@ export function useObservedLayers({
     statuses,
     details,
     legends,
-    legendsInKey: gaugesOn ? <RainGaugeLegend counts={gaugeCounts} /> : null,
+    keySections: (gaugesOn
+      ? [
+          {
+            id: "rain-gauges",
+            title: "Rain gauges",
+            unit: "last 24 h",
+            content: <RainGaugeLegend bare counts={gaugeCounts} />,
+          },
+        ]
+      : []) satisfies MapKeySection[],
     rainTimeline,
     mapLayers,
     lineAt,
