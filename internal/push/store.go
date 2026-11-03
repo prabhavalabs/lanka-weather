@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,15 +81,29 @@ func (cache *districtCache) load(ctx context.Context, queries *store.Queries, no
 	for _, row := range rows {
 		entry := [3]string{row.Name}
 		if row.NameSi != nil {
-			entry[1] = *row.NameSi
+			entry[1] = ShortDistrictName(*row.NameSi)
 		}
 		if row.NameTa != nil {
-			entry[2] = *row.NameTa
+			entry[2] = ShortDistrictName(*row.NameTa)
 		}
 		names[row.ID] = entry
 	}
 	cache.names, cache.readAt = names, now
 	return names, nil
+}
+
+// districtWord matches the word "district" and what follows it in Sinhala
+// (දිස්ත්‍රික්කය) and Tamil (மாவட்டம்). The regions source cuts these names at
+// a fixed length, so the word is often cut short: "අනුරාධපුර දිස්ත්‍".
+var districtWord = regexp.MustCompile(`\s+(දිස්|மாவ)\S*$`)
+
+// ShortDistrictName drops the trailing word "district" from a Sinhala or Tamil
+// district name: a notice's title says "Landslide Level 3 · රත්නපුර".
+func ShortDistrictName(name string) string {
+	if short := strings.TrimSpace(districtWord.ReplaceAllString(name, "")); short != "" {
+		return short
+	}
+	return name
 }
 
 // known is the set of district codes, or nil before regions are loaded.

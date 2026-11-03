@@ -241,3 +241,19 @@ func TestSameSecretIgnoresBase64Flavour(t *testing.T) {
 		t.Error("different secret")
 	}
 }
+
+func TestShortDistrictNameDropsTheCutWordDistrict(t *testing.T) {
+	cases := map[string]string{
+		"අනුරාධපුර දිස්ත්‍": "අනුරාධපුර",
+		"කොළඹ දිස්ත්‍රික්ක": "කොළඹ",
+		"ත්‍රිකුණාමළය දිස්": "ත්‍රිකුණාමළය",
+		"அம்பாந்தோட்டை மாவ": "அம்பாந்தோட்டை",
+		"கொழும்பு மாவட்டம்": "கொழும்பு",
+		"Ratnapura": "Ratnapura",
+	}
+	for name, want := range cases {
+		if got := ShortDistrictName(name); got != want {
+			t.Errorf("%q: %q, want %q", name, got, want)
+		}
+	}
+}
