@@ -42,7 +42,7 @@ export function LayerPanel({
     )
 
   return (
-    <div className={cn("flex flex-col gap-5", className)}>
+    <div className={cn("flex flex-col gap-4", className)}>
       {isPending && (
         <div className="flex flex-col gap-3" role="status" aria-label="Loading layers">
           {[0, 1, 2].map((row) => (
@@ -69,11 +69,11 @@ export function LayerPanel({
           <section key={group.category} aria-labelledby={`${uid}-group-${group.category}`}>
             <h2
               id={`${uid}-group-${group.category}`}
-              className="mb-1.5 px-1 text-xs font-medium text-muted-foreground"
+              className="sticky top-0 z-10 -mx-1 mb-1.5 bg-(--panel-bg,transparent) px-2 py-1.5 text-xs font-medium text-muted-foreground"
             >
               {group.label}
             </h2>
-            <ul className="flex flex-col">
+            <ul className="flex flex-col gap-1.5">
               {group.layers.map((layer) => {
                 const planned = layer.status === "planned"
                 const on = enabled.includes(layer.id)
@@ -85,7 +85,10 @@ export function LayerPanel({
                 return (
                   <li
                     key={layer.id}
-                    className={cn("rounded-2xl transition-colors", on && !planned && "bg-accent")}
+                    className={cn(
+                      "rounded-2xl border border-transparent transition-colors",
+                      on && !planned && "border-border bg-accent",
+                    )}
                   >
                     <div
                       className={cn(

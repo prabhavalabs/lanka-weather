@@ -73,8 +73,9 @@ export function AppSidebar({
       </header>
       {top && <div className="px-5 pb-4">{top}</div>}
       <div className="h-px bg-sidebar-border" />
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="px-4 py-4">{children}</div>
+      {/* Group headings stick to the top of the list on this colour. */}
+      <ScrollArea type="auto" className="min-h-0 flex-1 [--panel-bg:var(--color-sidebar)]">
+        <div className="px-4 pt-2 pb-4">{children}</div>
       </ScrollArea>
       <footer
         className={cn(
