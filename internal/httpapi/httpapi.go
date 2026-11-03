@@ -118,6 +118,8 @@ type Dependencies struct {
 	Canals     Canals
 	// Overview composes the others into one first look.
 	Overview Overviews
+	// Push manages Web Push alert subscriptions under /api/push.
+	Push Push
 	// Now is the clock for requests without an explicit time; nil is
 	// time.Now.
 	Now func() time.Time
@@ -183,6 +185,8 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/reservoirs/areas", api.reservoirAreas)
 		r.Get("/reservoirs/{id}/readings", api.reservoirReadings)
 	})
+
+	api.pushRoutes(r)
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "resource not found")
