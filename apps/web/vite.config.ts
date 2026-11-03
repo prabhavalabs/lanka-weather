@@ -58,6 +58,13 @@ export default defineConfig({
     chunkSizeWarningLimit: 1600,
     rolldownOptions: {
       output: {
+        // MapLibre's worker ships as .mjs, a type many servers send as octet-stream, and a
+        // module worker with that type never runs (the map stays blank). As .js it gets
+        // JavaScript's type everywhere.
+        assetFileNames: (asset) =>
+          asset.names.some((name) => name.endsWith(".mjs"))
+            ? "assets/[name]-[hash].js"
+            : "assets/[name]-[hash][extname]",
         // MapLibre GL gets a chunk of its own: it changes only with upgrades, so browsers keep
         // it cached across app releases, and the app's own chunk stays small. Search, the
         // location panel, the wind renderer and the design kit load on demand (React.lazy).
