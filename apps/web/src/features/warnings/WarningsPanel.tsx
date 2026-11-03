@@ -1,9 +1,10 @@
 import { BellIcon, ExternalLinkIcon, XIcon } from "lucide-react"
-import type { ReactNode } from "react"
+import { useEffect, useRef, type ReactNode } from "react"
 import { Panel } from "@/components/Panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatAge, formatDayTime } from "@/lib/format"
 import type { Layer } from "@/lib/layers"
@@ -171,6 +172,21 @@ export function WarningsPanel({
   const current = bulletins.filter((bulletin) => inForce.has(bulletin.id))
   const rest = bulletins.filter((bulletin) => !inForce.has(bulletin.id))
 
+  // Bring the chosen filter into view when it sits past the edge of its row,
+  // e.g. when a link opens the panel on one. Only the row moves, not the panel.
+  const filterRow = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const row = filterRow.current
+    const item = row?.querySelector<HTMLElement>('[data-state="on"]')
+    if (!row || !item) return
+    const box = item.getBoundingClientRect()
+    const origin = row.getBoundingClientRect().left - row.scrollLeft
+    const left = box.left - origin - 8
+    const right = box.right - origin + 8
+    if (left < row.scrollLeft) row.scrollLeft = left
+    else if (right > row.scrollLeft + row.clientWidth) row.scrollLeft = right - row.clientWidth
+  }, [type])
+
   return (
     <Panel
       icon={<BellIcon />}
@@ -190,25 +206,34 @@ export function WarningsPanel({
     >
       {data && <LandslideStatusCard meta={data.landslide} />}
 
-      <ToggleGroup
-        type="single"
-        size="sm"
-        value={type ?? "all"}
-        onValueChange={(value) => {
-          if (value) onFilter({ type: value === "all" ? undefined : value, district })
-        }}
-        aria-label="Show bulletins of type"
-        className="w-full"
+      {/* One row that scrolls sideways: the names stay whole on a narrow panel. */}
+      <ScrollArea
+        type="auto"
+        orientation="horizontal"
+        className="shrink-0 rounded-xl border border-border bg-muted"
+        scrollbarClassName="data-horizontal:h-1.5 data-horizontal:p-0 data-horizontal:px-2"
+        viewportProps={{ ref: filterRow }}
       >
-        <ToggleGroupItem value="all" className="flex-1">
-          All
-        </ToggleGroupItem>
-        {bulletinTypeOrder.map((value: BulletinType) => (
-          <ToggleGroupItem key={value} value={value} className="flex-1 px-1.5 text-xs">
-            {bulletinTypeLabels[value]}
+        <ToggleGroup
+          type="single"
+          size="sm"
+          value={type ?? "all"}
+          onValueChange={(value) => {
+            if (value) onFilter({ type: value === "all" ? undefined : value, district })
+          }}
+          aria-label="Show bulletins of type"
+          className="w-max min-w-full rounded-none border-0 bg-transparent p-1 pb-1.5"
+        >
+          <ToggleGroupItem value="all" className="flex-auto px-2.5">
+            All
           </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
+          {bulletinTypeOrder.map((value: BulletinType) => (
+            <ToggleGroupItem key={value} value={value} className="flex-auto px-2.5 text-xs">
+              {bulletinTypeLabels[value]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </ScrollArea>
 
       {district && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-inset px-3 py-2 text-sm">

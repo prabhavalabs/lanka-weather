@@ -7,6 +7,10 @@ interface ScrollAreaProps extends React.ComponentProps<typeof ScrollAreaPrimitiv
   viewportClassName?: string
   /** Props for the element that scrolls: a ref to jump within it, or a scroll listener. */
   viewportProps?: Omit<React.ComponentProps<typeof ScrollAreaPrimitive.Viewport>, "className">
+  /** Which way the content scrolls. */
+  orientation?: "vertical" | "horizontal"
+  /** Classes for the scrollbar, e.g. a thinner one under a row of chips. */
+  scrollbarClassName?: string
 }
 
 function ScrollArea({
@@ -14,6 +18,8 @@ function ScrollArea({
   children,
   viewportClassName,
   viewportProps,
+  orientation = "vertical",
+  scrollbarClassName,
   ...props
 }: ScrollAreaProps) {
   return (
@@ -32,7 +38,7 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
+      <ScrollBar orientation={orientation} className={scrollbarClassName} />
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   )
