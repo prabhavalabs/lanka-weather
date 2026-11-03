@@ -1,6 +1,7 @@
 import type * as React from "react"
 
 import { DetailSheet } from "@/components/DetailSheet"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
 import { cn } from "@/lib/utils"
 
@@ -110,9 +111,13 @@ export function AppShell({
 
       {detail && desktop && (
         <div className="pointer-events-none absolute top-0 right-0 bottom-0 z-30 flex w-(--detail-w) flex-col p-3">
-          <div className="pointer-events-auto min-h-0 overflow-y-auto overscroll-contain rounded-3xl [scrollbar-width:thin]">
+          <ScrollArea
+            type="auto"
+            className="pointer-events-auto flex min-h-0 flex-col rounded-3xl"
+            viewportClassName="min-h-0 flex-1"
+          >
             {detail}
-          </div>
+          </ScrollArea>
         </div>
       )}
 

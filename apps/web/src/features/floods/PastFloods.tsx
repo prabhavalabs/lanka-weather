@@ -1,3 +1,4 @@
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
 import { HistoryIcon, XIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
@@ -167,26 +168,32 @@ export function PastFloodsList({ data, selectedId, onSelect }: PastFloodsListPro
         Past events, not a current forecast. {data?.meta.attribution ?? "Irrigation Department"}.
       </p>
       {data ? (
-        <ul className="flex max-h-56 flex-col divide-y divide-border overflow-y-auto rounded-xl border border-border">
-          {data.events.map((event) => (
-            <li key={event.id}>
-              <button
-                type="button"
-                aria-pressed={selectedId === event.id}
-                onClick={() => onSelect(event.id)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent",
-                  selectedId === event.id && "bg-accent",
-                )}
-              >
-                <span className="min-w-0 truncate text-foreground">{event.name}</span>
-                <span className="numeric shrink-0 text-muted-foreground">
-                  {Math.round(event.areaKm2).toLocaleString("en-GB")} km²
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <ScrollArea
+          type="auto"
+          className="rounded-xl border border-border"
+          viewportClassName="max-h-56"
+        >
+          <ul className="flex flex-col divide-y divide-border">
+            {data.events.map((event) => (
+              <li key={event.id}>
+                <button
+                  type="button"
+                  aria-pressed={selectedId === event.id}
+                  onClick={() => onSelect(event.id)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent",
+                    selectedId === event.id && "bg-accent",
+                  )}
+                >
+                  <span className="min-w-0 truncate text-foreground">{event.name}</span>
+                  <span className="numeric shrink-0 text-muted-foreground">
+                    {Math.round(event.areaKm2).toLocaleString("en-GB")} km²
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
       ) : (
         <Skeleton
           className="h-24 w-full rounded-xl"

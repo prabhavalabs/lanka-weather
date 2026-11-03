@@ -4,6 +4,7 @@ import { LayersIcon } from "lucide-react"
 import { AppLogo } from "@/components/AppLogo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Drawer,
   DrawerContent,
@@ -52,9 +53,12 @@ export function MobileBar({ layers, activeCount = 0, footer, actions }: MobileBa
               <DrawerDescription>Choose what the map shows.</DrawerDescription>
             </div>
           </DrawerHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 [scrollbar-width:thin]">
-            {layers}
-          </div>
+          <ScrollArea
+            className="flex min-h-0 flex-1 flex-col [--panel-bg:var(--color-popover)]"
+            viewportClassName="min-h-0 flex-1"
+          >
+            <div className="px-4 pb-4">{layers}</div>
+          </ScrollArea>
           <div className="flex flex-col gap-3 border-t border-border px-5 py-4 text-xs text-muted-foreground">
             {footer}
             <ThemeToggle showLabels />
