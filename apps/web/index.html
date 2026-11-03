@@ -26,6 +26,20 @@
         document.documentElement.classList.toggle("dark", dark)
         document.documentElement.style.colorScheme = dark ? "dark" : "light"
       })()
+      // Sets the saved or device language before first paint (see src/lib/i18n).
+      ;(function () {
+        var tags = { si: "si-LK", ta: "ta-LK", en: "en-GB" }
+        var locale = null
+        try {
+          locale = localStorage.getItem("lanka-weather:locale")
+        } catch (error) {}
+        if (!tags[locale]) {
+          var languages = navigator.languages || []
+          for (var i = 0; i < languages.length && !tags[locale]; i++)
+            locale = languages[i].toLowerCase().split("-")[0]
+        }
+        document.documentElement.lang = tags[locale] || "en-GB"
+      })()
     </script>
   </head>
   <body>
