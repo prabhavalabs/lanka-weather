@@ -1,4 +1,4 @@
-import type { StyleSpecification } from "maplibre-gl"
+import type { ExpressionSpecification, StyleSpecification } from "maplibre-gl"
 import { describe, expect, it } from "vitest"
 import { labelFields, localisedLabel, tuneBasemap, type BasemapPalette } from "./basemap"
 
@@ -88,7 +88,7 @@ describe("tuneBasemap", () => {
 })
 
 describe("basemap labels and scripts", () => {
-  const nameField = ["coalesce", ["get", "name_en"], ["get", "name"]]
+  const nameField: ExpressionSpecification = ["coalesce", ["get", "name_en"], ["get", "name"]]
   const labelled: StyleSpecification = {
     ...style,
     layers: [
