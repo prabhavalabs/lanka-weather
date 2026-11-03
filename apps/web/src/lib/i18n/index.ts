@@ -139,6 +139,11 @@ function fill(text: string, values: MessageValues | undefined): string {
   )
 }
 
+/** Whether a message exists, e.g. for words keyed by an id the API may add to. */
+export function hasMessage(key: string, locale: Locale = "en"): boolean {
+  return lookup(catalogues[locale], key) !== undefined
+}
+
 /** A message in a given language, falling back to English. */
 export function translateIn(locale: Locale, key: MessageKey, values?: MessageValues): string {
   const message = lookup(catalogues[locale], key) ?? lookup(catalogues.en, key)

@@ -1,4 +1,5 @@
 import { isNotReady } from "./api"
+import { hasMessage, translate, type MessageKey } from "./i18n"
 
 /** Mirrors internal/layers.Layer in the Go service. */
 export type LayerCategory = "hydrology" | "weather" | "hazard" | "geography"
@@ -31,11 +32,24 @@ export interface Layer {
 
 export const categoryOrder: LayerCategory[] = ["hazard", "hydrology", "weather", "geography"]
 
-export const categoryLabels: Record<LayerCategory, string> = {
-  hazard: "Hazards and warnings",
-  hydrology: "Rivers and floods",
-  weather: "Weather",
-  geography: "Geography",
+/** "Hazards and warnings", in the current language. */
+export function categoryLabel(category: LayerCategory): string {
+  return translate(`layers.category.${category}`)
+}
+
+/**
+ * A layer's name in the current language. The catalogue comes from the API
+ * in English; a layer the app has no words for keeps the API's title.
+ */
+export function layerTitle(layer: Pick<Layer, "id" | "title">): string {
+  const key = `layers.title.${layer.id}`
+  return hasMessage(key) ? translate(key as MessageKey) : layer.title
+}
+
+/** A layer's one-line description in the current language, else the API's. */
+export function layerDescription(layer: Pick<Layer, "id" | "description">): string {
+  const key = `layers.description.${layer.id}`
+  return hasMessage(key) ? translate(key as MessageKey) : layer.description
 }
 
 /** Floor for refetching so a misconfigured layer cannot hammer the API. */
@@ -100,7 +114,7 @@ export function groupByCategory(layers: Layer[]) {
   return categoryOrder
     .map((category) => ({
       category,
-      label: categoryLabels[category],
+      label: categoryLabel(category),
       layers: layers
         .filter((layer) => layer.category === category)
         .toSorted((a, b) => orderOf(a) - orderOf(b)),

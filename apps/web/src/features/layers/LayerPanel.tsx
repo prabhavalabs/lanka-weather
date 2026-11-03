@@ -4,7 +4,8 @@ import { IconTile } from "@/components/IconTile"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
-import { groupByCategory } from "@/lib/layers"
+import { useT } from "@/lib/i18n"
+import { groupByCategory, layerDescription, layerTitle } from "@/lib/layers"
 import { cn } from "@/lib/utils"
 import { layerIcon } from "./layerIcons"
 import { useLayers } from "./useLayers"
@@ -31,6 +32,7 @@ export function LayerPanel({
   className,
 }: LayerPanelProps) {
   const { data, error, isPending } = useLayers()
+  const t = useT()
   // The panel can be mounted twice (sidebar and phone sheet), so ids are unique per instance.
   const uid = useId()
   // Ten layers open at once would fill the list with notes, so a layer's details
@@ -44,7 +46,7 @@ export function LayerPanel({
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       {isPending && (
-        <div className="flex flex-col gap-3" role="status" aria-label="Loading layers">
+        <div className="flex flex-col gap-3" role="status" aria-label={t("layers.panel.loading")}>
           {[0, 1, 2].map((row) => (
             <div key={row} className="flex items-center gap-3">
               <Skeleton className="size-10 rounded-xl" />
@@ -61,7 +63,7 @@ export function LayerPanel({
           className="rounded-xl border border-border bg-inset px-3 py-3 text-sm text-foreground"
           role="alert"
         >
-          Layers are unavailable: {error.message}
+          {t("layers.panel.failed", { message: error.message })}
         </p>
       )}
       {data &&
@@ -82,6 +84,8 @@ export function LayerPanel({
                 const detail = on && !planned ? details[layer.id] : undefined
                 const detailOpen = opened.includes(layer.id)
                 const detailId = `${uid}-detail-${layer.id}`
+                const title = layerTitle(layer)
+                const description = layerDescription(layer)
                 return (
                   <li
                     key={layer.id}
@@ -95,7 +99,7 @@ export function LayerPanel({
                         "flex items-center gap-3 rounded-2xl px-1 py-2",
                         !planned && !on && "hover:bg-accent/60",
                       )}
-                      title={layer.description || undefined}
+                      title={description || undefined}
                     >
                       <IconTile className={cn(planned && "text-muted-foreground")}>
                         <Icon />
@@ -113,13 +117,13 @@ export function LayerPanel({
                             planned && "text-muted-foreground",
                           )}
                         >
-                          <span className="truncate">{layer.title}</span>
+                          <span className="min-w-0 truncate">{title}</span>
                           {on && !planned && stale[layer.id] && (
                             <Badge
                               variant="chip"
                               className="h-5 px-1.5 text-[0.6875rem] text-foreground"
                             >
-                              Out of date
+                              {t("common.outOfDate")}
                             </Badge>
                           )}
                         </span>
@@ -132,7 +136,12 @@ export function LayerPanel({
                           type="button"
                           aria-expanded={detailOpen}
                           aria-controls={detailOpen ? detailId : undefined}
-                          aria-label={`${detailOpen ? "Hide" : "Show"} details of ${layer.title}`}
+                          aria-label={t(
+                            detailOpen
+                              ? "layers.panel.hideDetailsOf"
+                              : "layers.panel.showDetailsOf",
+                            { title },
+                          )}
                           onClick={() => setOpen(layer.id, !detailOpen)}
                           className="-mr-1 flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                         >
@@ -147,13 +156,13 @@ export function LayerPanel({
                       )}
                       {planned ? (
                         <Badge variant="chip" className="mr-1">
-                          Soon
+                          {t("layers.panel.soon")}
                         </Badge>
                       ) : (
                         <Switch
                           id={switchId}
                           checked={on}
-                          aria-label={layer.title}
+                          aria-label={title}
                           onCheckedChange={() => {
                             setOpen(layer.id, !on)
                             onToggle(layer.id)
