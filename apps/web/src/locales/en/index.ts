@@ -3,5 +3,6 @@
  * `si/index.ts` and `ta/index.ts` together.
  */
 import { common } from "./common"
+import { pwa } from "./pwa"
 
-export const en = { common }
+export const en = { common, pwa }
