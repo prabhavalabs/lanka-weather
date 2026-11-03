@@ -11,7 +11,7 @@ import {
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command"
-import { useT } from "@/lib/i18n"
+import { useT, scriptLang } from "@/lib/i18n"
 
 import type { SearchResult, SearchResultKind } from "./types"
 
@@ -131,7 +131,7 @@ export function SearchCommand({
                           {result.localName && (
                             <span
                               className="ml-2 text-muted-foreground"
-                              lang={result.localNameLang ?? "si"}
+                              lang={result.localNameLang ?? scriptLang(result.localName)}
                             >
                               {result.localName}
                             </span>

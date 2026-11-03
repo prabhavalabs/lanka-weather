@@ -233,3 +233,10 @@ export function namesMatch(names: Array<string | null | undefined>, query: strin
   if (folded === "") return false
   return names.some((name) => usable(name) && foldName(name).includes(folded))
 }
+
+/** The `lang` tag of a name by its script: Sinhala, Tamil, else English. */
+export function scriptLang(text: string): string {
+  if (/[඀-෿]/.test(text)) return locales.si.tag
+  if (/[஀-௿]/.test(text)) return locales.ta.tag
+  return locales.en.tag
+}
