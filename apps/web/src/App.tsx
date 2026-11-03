@@ -64,6 +64,8 @@ import {
   type Selection,
 } from "./features/location/selection"
 import { useUrlSelection } from "./features/location/useUrlSelection"
+import { InstallHost } from "./features/install"
+import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
 import { HoverChip } from "./features/map/HoverChip"
@@ -1141,6 +1143,7 @@ export function App() {
     regionsOn && isNotReady(level === "gn" ? gnWeather.error : levelWeather.error),
     observedLayers.waiting,
   ].some(Boolean)
+  const offlineNotice = useOfflineNotice()
   let notice: ReactNode = null
   if (riverRisk.data?.meta.seeded || floods.data?.meta.seeded || basins.data?.meta.seeded) {
     // Local test data must never pass as a real flood.
@@ -1550,9 +1553,10 @@ export function App() {
           </div>
         }
         notice={
-          hazards.banner || notice ? (
+          hazards.banner || offlineNotice || notice ? (
             <div className="flex w-full flex-col items-center gap-2">
               {hazards.banner}
+              {offlineNotice}
               {notice}
             </div>
           ) : null
@@ -1592,6 +1596,7 @@ export function App() {
         </Suspense>
       )}
       <Toaster position={desktop ? "bottom-center" : "top-center"} />
+      <InstallHost />
     </TooltipProvider>
   )
 }

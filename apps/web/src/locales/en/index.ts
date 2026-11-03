@@ -23,6 +23,8 @@ import { overview } from "./overview"
 import { stations } from "./stations"
 import { rain } from "./rain"
 import { environment } from "./environment"
+import { install } from "./install"
+import { pwa } from "./pwa"
 
 export const en = {
   common,
@@ -46,4 +48,6 @@ export const en = {
   stations,
   rain,
   environment,
+  install,
+  pwa,
 }

@@ -1,14 +1,28 @@
 {
+  "id": "/",
   "name": "Lanka Weather",
   "short_name": "Lanka Weather",
-  "description": "Weather and disaster early-warning map for Sri Lanka.",
-  "start_url": "/",
+  "description": "Weather and disaster early-warning map for Sri Lanka: official warnings, rivers, floods, rain and wind, with alerts.",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#050505",
-  "theme_color": "#050505",
   "lang": "en",
+  "dir": "ltr",
+  "categories": ["weather", "news", "utilities"],
+  "theme_color": "#050505",
+  "background_color": "#050505",
+  "user_preferences": {
+    "color_scheme_dark": {
+      "theme_color": "#050505",
+      "background_color": "#050505"
+    },
+    "color_scheme_light": {
+      "theme_color": "#efefed",
+      "background_color": "#efefed"
+    }
+  },
   "icons": [
     {
       "src": "/icon-192.png",
@@ -33,6 +47,45 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Official warnings",
+      "short_name": "Warnings",
+      "description": "Warnings from the Department of Meteorology and the DMC",
+      "url": "/?warnings=all&source=shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "River and flood warnings",
+      "short_name": "Rivers",
+      "description": "Official water-level warnings for rivers",
+      "url": "/?warnings=water_level&source=shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Reservoirs spilling or releasing",
+      "short_name": "Reservoirs",
+      "description": "Reservoirs that are spilling or releasing water",
+      "url": "/?reservoirs=active&source=shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/map-narrow.webp",
+      "sizes": "1080x1920",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "The map on a phone, with official warnings and river levels"
+    },
+    {
+      "src": "/screenshots/map-wide.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "The map on a computer, with layers, warnings and the situation overview"
     }
   ]
 }

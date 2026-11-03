@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * Generates the favicon set, touch icon, PWA icons and web manifest in
- * public/ from the SVG sources in /brand. Run after changing the brand:
+ * Generates the favicon set, touch icons, PWA icons and the notification
+ * badge in public/ from the SVG sources in /brand. Run after changing the
+ * brand:
  *
  *   pnpm --filter @lanka-weather/web icons
  *
  * The outputs are committed, so a build needs neither this script nor resvg.
+ * The web manifest (public/site.webmanifest) is written by hand and checked
+ * by src/features/pwa/manifest.test.ts.
  */
 import { Resvg } from "@resvg/resvg-js"
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
@@ -20,6 +23,15 @@ const source = (name) => readFileSync(path.join(brand, name), "utf8")
 /** The same artwork on a square, full-bleed tile, for platforms that apply their own mask. */
 const fullBleed = (svg) =>
   svg.replace(/<rect width="64" height="64" rx="14"/, '<rect width="64" height="64"')
+
+/** The mark alone in white on a transparent square, from the dark app icon's geometry. */
+const badge = (svg) =>
+  svg
+    .replace(/<title>[^<]*<\/title>/, "")
+    .replace(/<rect width="64" height="64" rx="14" fill="#0A0A0A"\/>/, "")
+    .replace(/scale\(0\.8\)/, "scale(1.02)")
+    .replace(/fill="#F2F2F2"/g, 'fill="#FFFFFF"')
+    .replace(/fill="#FF5A1F"/g, 'fill="#FFFFFF"')
 
 function png(svg, size) {
   const resvg = new Resvg(svg, {
@@ -75,29 +87,15 @@ write(
   ]),
 )
 write("apple-touch-icon.png", png(fullBleed(icon), 180))
+// iPad (167) and older iPad (152) Home Screen sizes; iPhones use the 180 above.
+write("apple-touch-icon-167.png", png(fullBleed(icon), 167))
+write("apple-touch-icon-152.png", png(fullBleed(icon), 152))
 write("icon-192.png", png(icon, 192))
 write("icon-512.png", png(icon, 512))
 write("icon-maskable-512.png", png(maskable, 512))
-
-const manifest = {
-  name: "Lanka Weather",
-  short_name: "Lanka Weather",
-  description: "Weather and disaster early-warning map for Sri Lanka.",
-  start_url: "/",
-  scope: "/",
-  display: "standalone",
-  orientation: "any",
-  background_color: "#050505",
-  theme_color: "#050505",
-  lang: "en",
-  icons: [
-    { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-    { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-    { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-    { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-  ],
-}
-write("site.webmanifest", JSON.stringify(manifest, null, 2) + "\n")
+// Notification badge: Android draws only its alpha, in the status bar, so the
+// mark is solid white on transparent with the wave cut out.
+write("badge-96.png", png(badge(icon), 96))
 
 // resvg's native module can keep the event loop alive.
 process.exit(0)

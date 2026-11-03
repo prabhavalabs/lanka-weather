@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useT } from "@/lib/i18n"
+import { InstallButton } from "@/features/install"
 import { cn } from "@/lib/utils"
 
 interface AppSidebarProps {
@@ -86,6 +87,7 @@ export function AppSidebar({
         )}
       >
         {footer}
+        <InstallButton />
         <div className="flex items-center justify-between gap-3">
           <span className="min-w-0">{t("common.appearance")}</span>
           <ThemeToggle />

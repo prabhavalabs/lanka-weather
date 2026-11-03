@@ -3,6 +3,8 @@ import { lazy, StrictMode, Suspense, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import { App } from "./App"
 import "./index.css"
+// Registers the service worker and offers updates (ADR 0017).
+import "./features/pwa/register"
 // Applies the saved theme and follows the device setting.
 import "./lib/theme"
 import { persistOptions, queryClient } from "./lib/query"

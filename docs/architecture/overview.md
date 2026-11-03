@@ -56,33 +56,33 @@ source is reached only by the worker.
 A single binary with sub-commands, following the modular-monolith
 pattern used in TerraGuard:
 
-| Command | Role |
-|---|---|
-| `serve` | HTTP API and, in production, the built web application |
-| `worker` | Scheduler and connectors; one leader elected with a Postgres advisory lock |
-| `migrate` | Database migrations (goose) |
-| `collect` | Run every collector once and exit |
+| Command   | Role                                                                       |
+| --------- | -------------------------------------------------------------------------- |
+| `serve`   | HTTP API and, in production, the built web application                     |
+| `worker`  | Scheduler and connectors; one leader elected with a Postgres advisory lock |
+| `migrate` | Database migrations (goose)                                                |
+| `collect` | Run every collector once and exit                                          |
 
 Internal packages:
 
-| Package | Responsibility |
-|---|---|
-| `internal/layers` | Catalogue of map layers: identifier, kind, source, refresh cadence, staleness limit, attribution |
-| `internal/source` | Contract every connector implements, and the HTTP client: identifying User-Agent, form posts, large downloads with per-request timeouts, back-off after HTTP 429. Decoding is pure: no network or database, so recorded payloads can be replayed in tests |
-| `internal/connectors/<name>` | One package per source: `irrigation`, `adminregions`, `osmplaces`, `openmeteo`, `gfs` and `googleflood` today; dmc, meteo, nbro, gdacs and usgs planned |
-| `internal/regions` | Region codes and crosswalk; boundaries as GeoJSON and vector tiles, region detail, point lookup |
-| `internal/places` | Place and region search |
-| `internal/geo` | TopoJSON decoding, simplification along shared edges, well-known binary |
-| `internal/ingest` | Scheduler, leader election, retry after a failed run (15 minutes by default, longer for the weekly geography collectors), fetch log, hourly retention pruning |
-| `internal/store` | Database access (pgx, sqlc) |
-| `internal/httpapi` | Routes, request validation, response envelopes, caching headers, gzip for grids |
-| `internal/grid` | The 0.2° weather grid over Sri Lanka, its land mask and bilinear interpolation |
-| `internal/meteo` | Derived quantities: dew point, day or night, heat index, wind components |
-| `internal/grib2` | GRIB2 decoder for GFS messages (from TerraGuard) |
-| `internal/weather` | Weather read side: the newest runs held in memory, the current grid, point forecasts, region aggregates, wind fields |
-| `internal/floods` | Google flood-forecast layer and flood areas at a point |
-| `internal/rivers` | River-levels layer: status and trend per gauge |
-| `internal/summary` | Location summary and derived alerts |
+| Package                      | Responsibility                                                                                                                                                                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/layers`            | Catalogue of map layers: identifier, kind, source, refresh cadence, staleness limit, attribution                                                                                                                                                          |
+| `internal/source`            | Contract every connector implements, and the HTTP client: identifying User-Agent, form posts, large downloads with per-request timeouts, back-off after HTTP 429. Decoding is pure: no network or database, so recorded payloads can be replayed in tests |
+| `internal/connectors/<name>` | One package per source: `irrigation`, `adminregions`, `osmplaces`, `openmeteo`, `gfs` and `googleflood` today; dmc, meteo, nbro, gdacs and usgs planned                                                                                                   |
+| `internal/regions`           | Region codes and crosswalk; boundaries as GeoJSON and vector tiles, region detail, point lookup                                                                                                                                                           |
+| `internal/places`            | Place and region search                                                                                                                                                                                                                                   |
+| `internal/geo`               | TopoJSON decoding, simplification along shared edges, well-known binary                                                                                                                                                                                   |
+| `internal/ingest`            | Scheduler, leader election, retry after a failed run (15 minutes by default, longer for the weekly geography collectors), fetch log, hourly retention pruning                                                                                             |
+| `internal/store`             | Database access (pgx, sqlc)                                                                                                                                                                                                                               |
+| `internal/httpapi`           | Routes, request validation, response envelopes, caching headers, gzip for grids                                                                                                                                                                           |
+| `internal/grid`              | The 0.2° weather grid over Sri Lanka, its land mask and bilinear interpolation                                                                                                                                                                            |
+| `internal/meteo`             | Derived quantities: dew point, day or night, heat index, wind components                                                                                                                                                                                  |
+| `internal/grib2`             | GRIB2 decoder for GFS messages (from TerraGuard)                                                                                                                                                                                                          |
+| `internal/weather`           | Weather read side: the newest runs held in memory, the current grid, point forecasts, region aggregates, wind fields                                                                                                                                      |
+| `internal/floods`            | Google flood-forecast layer and flood areas at a point                                                                                                                                                                                                    |
+| `internal/rivers`            | River-levels layer: status and trend per gauge                                                                                                                                                                                                            |
+| `internal/summary`           | Location summary and derived alerts                                                                                                                                                                                                                       |
 
 ### `apps/web` (TypeScript)
 
@@ -92,6 +92,14 @@ shown immediately on a return visit or on a poor connection, then
 refreshed in the background. Each layer's `staleTime` and refetch
 interval come from the layer catalogue served by the API, so cadence is
 defined once.
+
+It is an installable Progressive Web App (ADR 0017). A service worker
+(`src/sw.ts`, Workbox) precaches the app shell, so the app opens with no
+connection, and keeps bounded caches of map tiles, the OpenFreeMap
+basemap and API data. Updates wait until the person taps Reload. The
+same worker shows push alerts. An install guide (`features/install`)
+walks people through adding the app on their phone or computer, which
+iPhones require before they allow alerts.
 
 The map uses MapLibre GL with OpenFreeMap basemaps, vector tiles from the
 API for administrative regions (coloured by weather through feature
@@ -170,12 +178,12 @@ weather-grid cells can be joined to regions by code or by
 A region's id is its Department of Census and Statistics (DCS) code with
 one hyphen after the country prefix; each code starts with its parent's:
 
-| Level | DCS id | Compact (lanka-data-layer) | ISO 3166-2 |
-|---|---|---|---|
-| Province | `LK-1` | `LK1` | `LK-1` |
-| District | `LK-11` | `LK11` | `LK-11`, except Northern Province (below) |
-| DS division | `LK-1103` | `LK1103` | none |
-| GN division | `LK-1103005` | `LK1103005` | none |
+| Level       | DCS id       | Compact (lanka-data-layer) | ISO 3166-2                                |
+| ----------- | ------------ | -------------------------- | ----------------------------------------- |
+| Province    | `LK-1`       | `LK1`                      | `LK-1`                                    |
+| District    | `LK-11`      | `LK11`                     | `LK-11`, except Northern Province (below) |
+| DS division | `LK-1103`    | `LK1103`                   | none                                      |
+| GN division | `LK-1103005` | `LK1103005`                | none                                      |
 
 The crosswalk is in `internal/regions`: `ParseID` accepts the compact
 and fully hyphenated (`LK-1-1-03`) forms and returns the DCS id, and
