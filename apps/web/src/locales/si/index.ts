@@ -1,5 +1,6 @@
 import type { Translation } from "@/lib/i18n"
 import type { en } from "../en"
+import { alerts } from "./alerts"
 import { common } from "./common"
 import { format } from "./format"
 import { terms } from "./terms"
@@ -48,4 +49,5 @@ export const si: Translation<typeof en> = {
   environment,
   install,
   pwa,
+  alerts,
 }

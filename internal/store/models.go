@@ -291,6 +291,68 @@ type PlaceStaging struct {
 	Lat        float64  `json:"lat"`
 }
 
+type PushAlertState struct {
+	Subject      string     `json:"subject"`
+	Kind         string     `json:"kind"`
+	Level        int16      `json:"level"`
+	AlertedLevel int16      `json:"alerted_level"`
+	AlertedAt    *time.Time `json:"alerted_at"`
+	BelowSince   *time.Time `json:"below_since"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type PushDelivery struct {
+	SubscriptionID int64     `json:"subscription_id"`
+	EventKey       string    `json:"event_key"`
+	NoticeID       int64     `json:"notice_id"`
+	Severity       string    `json:"severity"`
+	SentAt         time.Time `json:"sent_at"`
+}
+
+type PushEvent struct {
+	DedupeKey  string    `json:"dedupe_key"`
+	Kind       string    `json:"kind"`
+	Variant    string    `json:"variant"`
+	Topic      string    `json:"topic"`
+	Severity   string    `json:"severity"`
+	Subject    string    `json:"subject"`
+	National   bool      `json:"national"`
+	Districts  []string  `json:"districts"`
+	Lon        *float64  `json:"lon"`
+	Lat        *float64  `json:"lat"`
+	Facts      []byte    `json:"facts"`
+	Url        string    `json:"url"`
+	Tag        string    `json:"tag"`
+	DetectedAt time.Time `json:"detected_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+}
+
+type PushSubscription struct {
+	ID                  int64      `json:"id"`
+	Endpoint            string     `json:"endpoint"`
+	P256dh              string     `json:"p256dh"`
+	Auth                string     `json:"auth"`
+	Locale              string     `json:"locale"`
+	UserAgent           string     `json:"user_agent"`
+	Topics              []string   `json:"topics"`
+	MinSeverity         string     `json:"min_severity"`
+	WholeCountry        bool       `json:"whole_country"`
+	Districts           []string   `json:"districts"`
+	NearLon             *float64   `json:"near_lon"`
+	NearLat             *float64   `json:"near_lat"`
+	NearRadiusKm        *int32     `json:"near_radius_km"`
+	NearDistricts       []string   `json:"near_districts"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	LastSuccessAt       *time.Time `json:"last_success_at"`
+	LastFailureAt       *time.Time `json:"last_failure_at"`
+	SuccessCount        int32      `json:"success_count"`
+	FailureCount        int32      `json:"failure_count"`
+	ConsecutiveFailures int32      `json:"consecutive_failures"`
+	RetryAfter          *time.Time `json:"retry_after"`
+	LastTestAt          *time.Time `json:"last_test_at"`
+}
+
 type RainGauge struct {
 	ID               string     `json:"id"`
 	Device           string     `json:"device"`

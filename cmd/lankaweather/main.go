@@ -7,6 +7,7 @@
 //	lankaweather worker    run the scheduler that collects data sources
 //	lankaweather collect   run every collector once and exit
 //	lankaweather collect NAME...   run the named collectors once and exit
+//	lankaweather vapid-keys  print a new VAPID key pair for Web Push alerts
 //
 // Configuration comes from the environment; see .env.example.
 package main
@@ -25,6 +26,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/alerts"
 	"github.com/prabhavalabs/lanka-weather/internal/canals"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/dmcbulletins"
@@ -54,6 +56,8 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/overview"
 	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
+	"github.com/prabhavalabs/lanka-weather/internal/push"
+	"github.com/prabhavalabs/lanka-weather/internal/push/webpush"
 	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
 	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/regions"
@@ -68,7 +72,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
-const usage = "usage: lankaweather migrate|serve|worker|collect [NAME...]"
+const usage = "usage: lankaweather migrate|serve|worker|vapid-keys|collect [NAME...]"
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -87,6 +91,13 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	}
 	databaseURL := os.Getenv("LANKAWEATHER_DATABASE_URL")
 	switch args[0] {
+	case "vapid-keys":
+		public, private, err := webpush.GenerateKeys()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s=%s\n%s=%s\n%s=mailto:alerts@example.org\n", push.EnvPublicKey, public, push.EnvPrivateKey, private, push.EnvSubject)
+		return nil
 	case "migrate":
 		if databaseURL == "" {
 			return errors.New("LANKAWEATHER_DATABASE_URL is not set")
@@ -110,8 +121,15 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 		}
 		defer pool.Close()
 		scheduler := &ingest.Scheduler{Pool: pool, Collectors: collectors(pool, logger), Logger: logger}
+		// The alert engine sends notices, so it runs in the worker, after every
+		// collector, and in collect only when named.
+		engine := alertEngine(pool, logger)
 		if args[0] == "collect" {
-			chosen, err := chooseCollectors(scheduler.Collectors, args[1:])
+			all := scheduler.Collectors
+			if engine != nil && slices.Contains(args[1:], alerts.SourceName) {
+				all = append(all, engine)
+			}
+			chosen, err := chooseCollectors(all, args[1:])
 			if err != nil {
 				return err
 			}
@@ -120,6 +138,9 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 			}
 			scheduler.Prune(ctx)
 			return nil
+		}
+		if engine != nil {
+			scheduler.Collectors = append(scheduler.Collectors, engine)
 		}
 		logger.Info("worker started")
 		scheduler.Run(ctx)
@@ -188,6 +209,46 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 	return append(list, &rivernet.Collector{Pool: pool, Logger: logger})
 }
 
+// pushIdentity reads the VAPID keys. Without them push alerts are off: the API
+// says so and the worker sends nothing.
+func pushIdentity(logger *slog.Logger) *webpush.VAPID {
+	vapid, err := push.VAPIDFromEnv()
+	if errors.Is(err, push.ErrNotConfigured) {
+		logger.Info("VAPID keys are not set; push alerts are off")
+		return nil
+	}
+	if err != nil {
+		logger.Error("VAPID keys are not usable; push alerts are off", "error", err)
+		return nil
+	}
+	return vapid
+}
+
+// alertEngine builds the alert engine over the same services the API serves,
+// or nil when push alerts are off.
+func alertEngine(pool *pgxpool.Pool, logger *slog.Logger) *alerts.Engine {
+	vapid := pushIdentity(logger)
+	if vapid == nil {
+		return nil
+	}
+	staleAfter := func(id string) time.Duration {
+		layer, _ := layers.ByID(id)
+		return time.Duration(layer.StaleAfterSeconds) * time.Second
+	}
+	return &alerts.Engine{
+		Pool: pool,
+		Warnings: &warnings.Service{Pool: pool, LandslideStaleAfter: staleAfter("landslide-warnings"),
+			BulletinStaleAfter: staleAfter("official-warnings")},
+		Rivers: &rivers.Service{Pool: pool, StaleAfter: staleAfter("river-levels")},
+		Floods: &floods.Service{Pool: pool, Configured: os.Getenv("LANKAWEATHER_GOOGLE_API_KEY") != "",
+			StaleAfter: staleAfter("flood-forecast")},
+		Hazards:    &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")},
+		Reservoirs: &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")},
+		Dispatcher: &push.Dispatcher{Pool: pool, Sender: push.NewClient(vapid), Logger: logger},
+		Logger:     logger,
+	}
+}
+
 // regionSource is the source of administrative regions for
 // /v1/weather/regions: the admin_regions view over the regions table
 // (migration 00004), or the relation named by
@@ -242,6 +303,11 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	rainGaugeService := &raingauges.Service{Pool: pool, StaleAfter: staleAfter("rain-gauges")}
 	canalService := &canals.Service{Pool: pool}
 	hazardService := &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")}
+	// Always present, so a subscription can be deleted even with push off.
+	pushService := &push.Service{Pool: pool}
+	if vapid := pushIdentity(logger); vapid != nil {
+		pushService.VAPID, pushService.Sender = vapid, push.NewClient(vapid)
+	}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
@@ -267,6 +333,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 			Reservoirs:  reservoirService,
 			RainGauges:  rainGaugeService,
 			Canals:      canalService,
+			Push:        pushService,
 			Ready:       pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,

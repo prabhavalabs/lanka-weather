@@ -56,12 +56,13 @@ source is reached only by the worker.
 A single binary with sub-commands, following the modular-monolith
 pattern used in TerraGuard:
 
-| Command   | Role                                                                       |
-| --------- | -------------------------------------------------------------------------- |
-| `serve`   | HTTP API and, in production, the built web application                     |
-| `worker`  | Scheduler and connectors; one leader elected with a Postgres advisory lock |
-| `migrate` | Database migrations (goose)                                                |
-| `collect` | Run every collector once and exit                                          |
+| Command      | Role                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `serve`      | HTTP API and, in production, the built web application                                      |
+| `worker`     | Scheduler and connectors; one leader elected with a Postgres advisory lock                  |
+| `migrate`    | Database migrations (goose)                                                                 |
+| `collect`    | Run every collector once and exit; the alert engine only when named (`collect push-alerts`) |
+| `vapid-keys` | Print a new VAPID key pair for push alerts                                                  |
 
 Internal packages:
 
@@ -83,6 +84,10 @@ Internal packages:
 | `internal/floods`            | Google flood-forecast layer and flood areas at a point                                                                                                                                                                                                    |
 | `internal/rivers`            | River-levels layer: status and trend per gauge                                                                                                                                                                                                            |
 | `internal/summary`           | Location summary and derived alerts                                                                                                                                                                                                                       |
+| `internal/alerts`            | The alert engine: reads the services above, applies hysteresis per subject and raises push events (ADR 0018)                                                                                                                                              |
+| `internal/push`              | Push subscriptions and preferences, matching events to subscribers, batching, the hourly cap and delivery                                                                                                                                                 |
+| `internal/push/webpush`      | Web Push on the standard library: RFC 8291 encryption, RFC 8292 VAPID, TTL, Urgency and Topic                                                                                                                                                             |
+| `internal/push/messages`     | Notice texts per event kind in English, Sinhala and Tamil                                                                                                                                                                                                 |
 
 ### `apps/web` (TypeScript)
 
@@ -164,6 +169,25 @@ ADR 0007 records the decisions behind this flow.
 
    The contract is in [the API document](../api/weather-and-floods.md).
 
+## Data flow: push alerts
+
+ADR 0018 records the decisions; [the API document](../api/push-alerts.md) the contract.
+
+1. **Subscribing.** The settings ask for notification permission when someone turns alerts on,
+   subscribe with the server's VAPID key and post the subscription with its preferences and
+   language to `/api/push/subscriptions`. A "near me" point is rounded to about a kilometre; no IP
+   address or account is kept.
+2. **Detecting.** In the worker holding the scheduler's lock, the alert engine runs every 30
+   seconds beside the collectors. It reads warnings, landslide levels, gauges, Google's forecasts,
+   cyclones, earthquakes and reservoirs through the same services the API uses, gives each subject
+   a level, and stores an event when a level rises above the one last alerted. Hysteresis holds a
+   subject at its alerted level until it has stayed below it for hours; stale data changes nothing.
+3. **Delivering.** Events are matched to subscribers by topic, minimum severity and area, gathered
+   into one notice per kind, capped at four an hour except danger, written in the subscriber's
+   language and sent by a pool of four with `TTL`, `Urgency` and `Topic`. Deliveries are recorded
+   per event and subscription, so nothing is sent twice; a 404 or 410 deletes the subscription.
+4. **Showing.** The service worker shows the notice and opens its `url`, a panel of the map.
+
 ## Geography and identifiers
 
 Administrative regions come from `nuuuwan/lk_admin_regions` (ADR 0006):
@@ -200,7 +224,8 @@ searchable with typo tolerance (`pg_trgm`).
 
 ## Non-goals for the first release
 
-- User accounts, alert subscriptions and push notifications.
+- User accounts. Push alerts (ADR 0018) need none: a subscription is identified by its endpoint.
+- SMS or e-mail alerts.
 - Our own hydrological or meteorological models.
 - Social-media ingestion. News and public reports are evaluated later,
   subject to each platform's terms.
@@ -210,3 +235,4 @@ searchable with typo tolerance (`pg_trgm`).
 - [Data-source catalogue](../data-sources.md)
 - [Architecture decision records](../decisions/)
 - [Weather and flood API contract](../api/weather-and-floods.md)
+- [Push alerts API contract](../api/push-alerts.md)

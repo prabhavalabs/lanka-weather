@@ -366,3 +366,9 @@ func InForce(bulletins []Bulletin) []Bulletin {
 	}
 	return out
 }
+
+// WarningKey identifies a warning across its Tamil edition and numbered
+// updates, as InForce does: the same key is the same warning.
+func WarningKey(bulletin Bulletin) string {
+	return bulletin.Type + "|" + sameWarning(bulletin.Title)
+}

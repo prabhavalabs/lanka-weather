@@ -24,3 +24,4 @@ supersedes the old one, not by editing an accepted record.
 | [0015](0015-flood-hub-language-and-all-live-gauges.md) | Flood Hub's language, Extended coverage, live rain gauges and Colombo's canals | Accepted                                                    |
 | [0016](0016-languages.md)                              | The interface in Sinhala, Tamil and English                                    | Accepted                                                    |
 | [0017](0017-pwa-offline-and-install.md)                | Installable, offline-capable app, and an install guide                         | Accepted                                                    |
+| [0018](0018-push-alerts.md)                            | Push alerts                                                                    | Accepted                                                    |

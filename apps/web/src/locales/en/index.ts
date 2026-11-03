@@ -2,6 +2,7 @@
  * The English catalogue, one namespace per file. Add a namespace here and in
  * `si/index.ts` and `ta/index.ts` together.
  */
+import { alerts } from "./alerts"
 import { common } from "./common"
 import { format } from "./format"
 import { terms } from "./terms"
@@ -50,4 +51,5 @@ export const en = {
   environment,
   install,
   pwa,
+  alerts,
 }
