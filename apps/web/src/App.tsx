@@ -63,6 +63,7 @@ import {
   type Selection,
 } from "./features/location/selection"
 import { useUrlSelection } from "./features/location/useUrlSelection"
+import { InstallHost } from "./features/install"
 import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
@@ -1583,6 +1584,7 @@ export function App() {
         </Suspense>
       )}
       <Toaster position={desktop ? "bottom-center" : "top-center"} />
+      <InstallHost />
     </TooltipProvider>
   )
 }

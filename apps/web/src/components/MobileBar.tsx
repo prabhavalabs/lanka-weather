@@ -13,6 +13,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
+import { InstallButton } from "@/features/install"
 
 interface MobileBarProps {
   /** Layer list, shown in a bottom sheet. */
@@ -61,6 +62,7 @@ export function MobileBar({ layers, activeCount = 0, footer, actions }: MobileBa
           </ScrollArea>
           <div className="flex flex-col gap-3 border-t border-border px-5 py-4 text-xs text-muted-foreground">
             {footer}
+            <InstallButton />
             <ThemeToggle showLabels />
           </div>
         </DrawerContent>
