@@ -55,24 +55,28 @@ function Line({ item, onOpen }: { item: OverviewItem; onOpen: (target: OverviewT
             <Parts parts={detailIn(locale, item.detail)} between=" · " />
           </span>
         )}
+        {(item.badge || item.estimate) && (
+          // Under the title rather than beside it: Sinhala and Tamil badges are long, and
+          // beside the title they would squeeze it into a narrow column.
+          <span className="mt-1 flex flex-wrap gap-1">
+            {item.badge && (
+              <Badge variant={toneBadge[item.tone]} className="h-auto max-w-full whitespace-normal">
+                <Words prose={proseIn(locale, item.badge)} />
+              </Badge>
+            )}
+            {item.estimate && (
+              <Badge variant="chip" className="h-5 px-1.5 text-[0.6875rem] text-foreground">
+                {t("terms.estimate")}
+              </Badge>
+            )}
+          </span>
+        )}
         <span className="mt-0.5 block text-[0.6875rem] break-words text-muted-foreground">
           <Age at={item.at} />
           {separator}
           <Words prose={proseIn(locale, item.source)} />
           {item.stale && `${separator}${t("overview.panel.lineOutOfDate")}`}
         </span>
-      </span>
-      <span className="flex max-w-[45%] shrink-0 flex-col items-end gap-1">
-        {item.badge && (
-          <Badge variant={toneBadge[item.tone]} className="h-auto max-w-full whitespace-normal">
-            <Words prose={proseIn(locale, item.badge)} />
-          </Badge>
-        )}
-        {item.estimate && (
-          <Badge variant="chip" className="h-5 px-1.5 text-[0.6875rem] text-foreground">
-            {t("terms.estimate")}
-          </Badge>
-        )}
       </span>
       {item.target && (
         <ChevronRightIcon
