@@ -6,15 +6,17 @@ import {
   windScale,
   type ScaleStep,
 } from "@/lib/tokens"
+import { translate } from "@/lib/i18n"
 import type { GridValueKey } from "./types"
 
 /** What the weather field shows. */
 export type GridVariable = "temperature" | "precipitation" | "humidity" | "cloud" | "wind"
 
 export interface GridVariableSpec {
-  label: string
-  /** Short label for a segmented control. */
-  short: string
+  /** In the current language: read it while a subscribed component renders. */
+  readonly label: string
+  /** Short label for a segmented control, in the current language. */
+  readonly short: string
   key: GridValueKey
   unit: string
   scale: ScaleStep[]
@@ -25,10 +27,15 @@ export interface GridVariableSpec {
   decimals: number
 }
 
+/** Labels are getters, so they read the current language each time. */
 export const gridVariables: Record<GridVariable, GridVariableSpec> = {
   temperature: {
-    label: "Temperature",
-    short: "Temp",
+    get label() {
+      return translate("grid.variable.temperature.label")
+    },
+    get short() {
+      return translate("grid.variable.temperature.short")
+    },
     key: "temperatureC",
     unit: "°C",
     scale: temperatureScale,
@@ -37,8 +44,12 @@ export const gridVariables: Record<GridVariable, GridVariableSpec> = {
     decimals: 1,
   },
   precipitation: {
-    label: "Rain, this hour",
-    short: "Rain",
+    get label() {
+      return translate("grid.variable.precipitation.label")
+    },
+    get short() {
+      return translate("grid.variable.precipitation.short")
+    },
     key: "precipitationMm",
     unit: "mm",
     scale: rainRateScale,
@@ -47,8 +58,12 @@ export const gridVariables: Record<GridVariable, GridVariableSpec> = {
     decimals: 1,
   },
   humidity: {
-    label: "Relative humidity",
-    short: "Humid",
+    get label() {
+      return translate("grid.variable.humidity.label")
+    },
+    get short() {
+      return translate("grid.variable.humidity.short")
+    },
     key: "relativeHumidityPct",
     unit: "%",
     scale: humidityScale,
@@ -57,8 +72,12 @@ export const gridVariables: Record<GridVariable, GridVariableSpec> = {
     decimals: 0,
   },
   cloud: {
-    label: "Cloud cover",
-    short: "Cloud",
+    get label() {
+      return translate("grid.variable.cloud.label")
+    },
+    get short() {
+      return translate("grid.variable.cloud.short")
+    },
     key: "cloudCoverPct",
     unit: "%",
     scale: cloudScale,
@@ -67,8 +86,12 @@ export const gridVariables: Record<GridVariable, GridVariableSpec> = {
     decimals: 0,
   },
   wind: {
-    label: "Wind speed",
-    short: "Wind",
+    get label() {
+      return translate("grid.variable.wind.label")
+    },
+    get short() {
+      return translate("grid.variable.wind.short")
+    },
     key: "windSpeedKmh",
     unit: "km/h",
     scale: windScale,

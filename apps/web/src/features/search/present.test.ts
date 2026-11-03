@@ -4,6 +4,7 @@ import type { StationFeature } from "../rivers/types"
 import {
   addRecent,
   maxRecent,
+  relabel,
   reservoirEntries,
   riverEntries,
   searchEntry,
@@ -300,5 +301,66 @@ describe("reservoirEntries", () => {
         },
       ]),
     ).toHaveLength(0)
+  })
+})
+
+describe("in Sinhala and Tamil", () => {
+  it("names a place in the reader's language, with the English name beside it", () => {
+    expect(searchEntry(kandyCity, "si")).toMatchObject({
+      title: "මහනුවර",
+      localName: "Kandy",
+      subtitle: "නගරය · Gangawata Korale, Kandy දිස්ත්‍රික්කය",
+    })
+    expect(searchEntry(kandyCity, "ta")).toMatchObject({ title: "கண்டி", localName: "Kandy" })
+  })
+
+  it("mends a district name the data cuts short, and falls back to English", () => {
+    expect(searchEntry(kandyDistrict, "si").title).toBe("මහනුවර දිස්ත්‍රික්කය")
+    expect(searchEntry(kandyDistrict, "si").subtitle).toBe("දිස්ත්‍රික්කය · Central පළාත")
+    expect(
+      searchEntry({ ...kandyDistrict, names: { en: "Kandy", ta: "கண்டி மாவ" } }, "ta").title,
+    ).toBe("கண்டி மாவட்டம்")
+    expect(searchEntry({ ...kandyDistrict, names: { en: "Kandy" } }, "ta").title).toBe(
+      "Kandy மாவட்டம்",
+    )
+  })
+
+  it("shows the name the query matched when it is in another script", () => {
+    const entry = searchEntry({ ...kandyCity, matchedName: "கண்டி" }, "en")
+    expect(entry).toMatchObject({ title: "Kandy", localName: "கண்டி" })
+  })
+
+  it("finds a river by its Sinhala name, ignoring joiners, and shows it in Sinhala", () => {
+    const river: RiverRisk = {
+      id: "kalu-ganga",
+      name: "Kalu Ganga",
+      nameSi: "කළු ගඟ",
+      aliases: [],
+      named: true,
+      parentId: null,
+      level: "watch",
+      reasons: [],
+      uplandKm2: 2900,
+      lengthKm: 129,
+      bbox: [80, 6.4, 80.8, 6.9],
+      reaches: [],
+      gaugedReaches: 0,
+      observedAt: null,
+    }
+    const [en] = riverEntries([river], "කළු", 5, "en")
+    expect(en).toMatchObject({ title: "Kalu Ganga", localName: "කළු ගඟ" })
+    const [si] = riverEntries([river], "කළු", 5, "si")
+    expect(si).toMatchObject({ title: "කළු ගඟ", localName: "Kalu Ganga", subtitle: "ගඟ" })
+    const zwj = [{ ...river, nameSi: "ප්‍රධාන ඇළ" }]
+    expect(riverEntries(zwj, "ප්රධාන", 5, "si")).toHaveLength(1)
+  })
+
+  it("labels a recent search again in the language of the moment", () => {
+    const [stored] = validRecent(JSON.parse(JSON.stringify([searchEntry(kandyCity, "en")])))
+    expect(relabel(stored!, "ta")).toMatchObject({
+      title: "கண்டி",
+      subtitle: expect.stringContaining("நகரம்"),
+    })
+    expect(relabel({ ...stored!, from: { type: "result" } as never }, "ta").title).toBe("Kandy")
   })
 })

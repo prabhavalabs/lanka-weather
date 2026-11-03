@@ -4,6 +4,7 @@
  * province, two for a district, four for a DS division and seven for a GN
  * division, each starting with its parent's digits.
  */
+import { translate } from "@/lib/i18n"
 import { rainfallScale, temperatureScale, windScale, type ScaleStep } from "@/lib/tokens"
 import type { RegionLevel, RegionWeather } from "./types"
 
@@ -41,9 +42,10 @@ export function ancestorId(id: string, level: RegionLevel): string | null {
 export type RegionVariable = "temperature" | "rain" | "wind"
 
 export interface RegionVariableSpec {
-  label: string
-  /** Short label for a segmented control. */
-  short: string
+  /** In the current language: read it while a subscribed component renders. */
+  readonly label: string
+  /** Short label for a segmented control, in the current language. */
+  readonly short: string
   unit: string
   scale: ScaleStep[]
   value: (region: RegionWeather) => number | null
@@ -51,26 +53,39 @@ export interface RegionVariableSpec {
   decimals: number
 }
 
+/** Labels are getters, so they read the current language each time. */
 export const regionVariables: Record<RegionVariable, RegionVariableSpec> = {
   temperature: {
-    label: "Temperature now",
-    short: "Temp",
+    get label() {
+      return translate("regions.variable.temperature.label")
+    },
+    get short() {
+      return translate("regions.variable.temperature.short")
+    },
     unit: "°C",
     scale: temperatureScale,
     value: (region) => region.temperatureC,
     decimals: 1,
   },
   rain: {
-    label: "Rain today",
-    short: "Rain",
+    get label() {
+      return translate("regions.variable.rain.label")
+    },
+    get short() {
+      return translate("regions.variable.rain.short")
+    },
     unit: "mm",
     scale: rainfallScale,
     value: (region) => region.precipitationTodayMm,
     decimals: 1,
   },
   wind: {
-    label: "Strongest wind now",
-    short: "Wind",
+    get label() {
+      return translate("regions.variable.wind.label")
+    },
+    get short() {
+      return translate("regions.variable.wind.short")
+    },
     unit: "km/h",
     scale: windScale,
     value: (region) => region.windSpeedMaxKmh,

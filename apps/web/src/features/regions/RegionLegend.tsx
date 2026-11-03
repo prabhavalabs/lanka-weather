@@ -1,17 +1,10 @@
 import { RainfallLegend } from "@/components/weather/RainfallLegend"
 import { StepLegend } from "@/components/weather/StepLegend"
 import { WindLegend } from "@/components/weather/WindLegend"
+import { useT } from "@/lib/i18n"
 import { temperatureScale } from "@/lib/tokens"
-import { levelWords } from "../location/present"
 import type { RegionVariable } from "./present"
 import type { RegionLevel } from "./types"
-
-const by: Record<RegionLevel, string> = {
-  province: "by province",
-  district: "by district",
-  ds: "by DS division",
-  gn: "by GN division",
-}
 
 /** The legend of the region colours: the variable's steps, per region of the level. */
 export function RegionLegend({
@@ -25,12 +18,13 @@ export function RegionLegend({
   bare?: boolean
   className?: string
 }) {
-  const each = by[level] ?? levelWords[level].toLowerCase()
+  const t = useT()
+  const by = t(`regions.by.${level}`)
   switch (variable) {
     case "temperature":
       return (
         <StepLegend
-          title={`Temperature ${each}`}
+          title={t("regions.legend.temperature", { by })}
           unit="°C"
           scale={temperatureScale}
           bare={bare}
@@ -39,9 +33,21 @@ export function RegionLegend({
       )
     case "rain":
       return (
-        <RainfallLegend title={`Rain today ${each}`} unit="mm" bare={bare} className={className} />
+        <RainfallLegend
+          title={t("regions.legend.rain", { by })}
+          unit="mm"
+          bare={bare}
+          className={className}
+        />
       )
     case "wind":
-      return <WindLegend title={`Max wind ${each}`} unit="km/h" bare={bare} className={className} />
+      return (
+        <WindLegend
+          title={t("regions.legend.wind", { by })}
+          unit="km/h"
+          bare={bare}
+          className={className}
+        />
+      )
   }
 }

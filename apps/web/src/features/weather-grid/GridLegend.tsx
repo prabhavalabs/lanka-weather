@@ -2,6 +2,7 @@ import { RainfallLegend } from "@/components/weather/RainfallLegend"
 import { RampLegend } from "@/components/weather/RampLegend"
 import { TemperatureLegend } from "@/components/weather/TemperatureLegend"
 import { WindLegend } from "@/components/weather/WindLegend"
+import { useT } from "@/lib/i18n"
 import { cloudScale, humidityScale, rainRateScale } from "@/lib/tokens"
 import type { GridVariable } from "./variables"
 
@@ -15,16 +16,23 @@ export function GridLegend({
   bare?: boolean
   className?: string
 }) {
+  const t = useT()
   switch (variable) {
     case "temperature":
-      return <TemperatureLegend title="Temperature now" bare={bare} className={className} />
+      return (
+        <TemperatureLegend title={t("grid.legend.temperature")} bare={bare} className={className} />
+      )
     case "precipitation":
       return (
         <RainfallLegend
-          title="Rain, this hour"
+          title={t("grid.legend.precipitation")}
           unit="mm/h"
           scale={rainRateScale}
-          names={{ 0: "Light", 3: "Heavy", 5: "Violent" }}
+          names={{
+            0: t("grid.legend.light"),
+            3: t("grid.legend.heavy"),
+            5: t("grid.legend.violent"),
+          }}
           bare={bare}
           className={className}
         />
@@ -32,11 +40,11 @@ export function GridLegend({
     case "humidity":
       return (
         <RampLegend
-          title="Relative humidity"
+          title={t("grid.legend.humidity")}
           unit="%"
           scale={humidityScale}
           openSpan={10}
-          ends={["sand", "blue"]}
+          ends={[t("grid.legend.humidityLow"), t("grid.legend.humidityHigh")]}
           bare={bare}
           className={className}
         />
@@ -44,15 +52,15 @@ export function GridLegend({
     case "cloud":
       return (
         <RampLegend
-          title="Cloud cover"
+          title={t("grid.legend.cloud")}
           unit="%"
           scale={cloudScale}
-          ends={["clear", "overcast"]}
+          ends={[t("grid.legend.cloudLow"), t("grid.legend.cloudHigh")]}
           bare={bare}
           className={className}
         />
       )
     case "wind":
-      return <WindLegend title="Wind speed now" bare={bare} className={className} />
+      return <WindLegend title={t("grid.legend.wind")} bare={bare} className={className} />
   }
 }

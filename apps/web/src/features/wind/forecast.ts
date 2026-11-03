@@ -3,6 +3,7 @@
  * nearest now to three days ahead, no further than the newest model run
  * reaches. Ported from TerraGuard. Pure, so it is tested without a browser.
  */
+import { getLocale, translateIn, type Locale } from "@/lib/i18n"
 
 const HOUR = 3_600_000
 export const STEP_MS = 3 * HOUR
@@ -32,12 +33,14 @@ export function stepAt(steps: number[], offset: number): number {
   return steps[Math.max(0, Math.min(steps.length - 1, Math.round(offset)))]!
 }
 
-/** "Now", "+3 h", "+2 d 6 h": how far a step is from now's. */
-export function leadLabel(step: number, now: number): string {
+/** "Now", "+3 h", "+2 d 6 h": how far a step is from now's, in the current language. */
+export function leadLabel(step: number, now: number, locale: Locale = getLocale()): string {
   const hours = Math.round((step - nearestStep(now)) / HOUR)
-  if (hours <= 0) return "Now"
+  if (hours <= 0) return translateIn(locale, "grid.timeline.now")
   const days = Math.floor(hours / 24)
   const rest = hours % 24
-  if (!days) return `+${hours} h`
-  return rest ? `+${days} d ${rest} h` : `+${days} d`
+  if (!days) return translateIn(locale, "grid.timeline.leadHours", { hours })
+  return rest
+    ? translateIn(locale, "grid.timeline.leadDaysHours", { days, hours: rest })
+    : translateIn(locale, "grid.timeline.leadDays", { days })
 }
