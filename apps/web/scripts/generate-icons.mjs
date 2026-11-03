@@ -24,15 +24,6 @@ const source = (name) => readFileSync(path.join(brand, name), "utf8")
 const fullBleed = (svg) =>
   svg.replace(/<rect width="64" height="64" rx="14"/, '<rect width="64" height="64"')
 
-/** The mark alone in white on a transparent square, from the dark app icon's geometry. */
-const badge = (svg) =>
-  svg
-    .replace(/<title>[^<]*<\/title>/, "")
-    .replace(/<rect width="64" height="64" rx="14" fill="#0A0A0A"\/>/, "")
-    .replace(/scale\(0\.8\)/, "scale(1.02)")
-    .replace(/fill="#F2F2F2"/g, 'fill="#FFFFFF"')
-    .replace(/fill="#FF5A1F"/g, 'fill="#FFFFFF"')
-
 function png(svg, size) {
   const resvg = new Resvg(svg, {
     fitTo: { mode: "width", value: size },
@@ -69,6 +60,7 @@ function ico(images) {
 const icon = source("app-icon-dark.svg")
 const small = source("app-icon-small.svg")
 const maskable = source("app-icon-maskable.svg")
+const badge = source("badge.svg")
 
 mkdirSync(publicDir, { recursive: true })
 const write = (name, data) => {
@@ -82,7 +74,7 @@ write(
   "favicon.ico",
   ico([
     { size: 16, data: png(small, 16) },
-    { size: 32, data: png(icon, 32) },
+    { size: 32, data: png(small, 32) },
     { size: 48, data: png(icon, 48) },
   ]),
 )
@@ -93,9 +85,9 @@ write("apple-touch-icon-152.png", png(fullBleed(icon), 152))
 write("icon-192.png", png(icon, 192))
 write("icon-512.png", png(icon, 512))
 write("icon-maskable-512.png", png(maskable, 512))
-// Notification badge: Android draws only its alpha, in the status bar, so the
-// mark is solid white on transparent with the wave cut out.
-write("badge-96.png", png(badge(icon), 96))
+// Notification badge: Android draws only its alpha, in the status bar, so
+// brand/badge.svg is the island and two rings in solid white on transparent.
+write("badge-96.png", png(badge, 96))
 
 // resvg's native module can keep the event loop alive.
 process.exit(0)
