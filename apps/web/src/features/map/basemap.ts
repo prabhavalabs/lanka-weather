@@ -1,4 +1,10 @@
-import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from "maplibre-gl"
+import type {
+  ExpressionSpecification,
+  FontFacesSpecification,
+  LayerSpecification,
+  StyleSpecification,
+} from "maplibre-gl"
+import type { Locale } from "@/lib/i18n"
 
 /** Basemap colours, read from the theme tokens (src/styles/theme.css). */
 export interface BasemapPalette {
@@ -39,15 +45,90 @@ function repaint<T extends LayerSpecification>(layer: T, paint: Record<string, u
   return { ...layer, paint: { ...(layer.paint ?? {}), ...paint } } as T
 }
 
+/** Where a label layer keeps the style's own `text-field`, to localise it again later. */
+export const labelFieldKey = "lanka-weather:text-field"
+
+/** Files for the scripts the style's glyphs URL cannot draw: Sinhala and Tamil. */
+export interface ScriptFonts {
+  sinhala: string
+  tamil: string
+}
+
+const sinhalaRange = ["U+0D80-0DFF", "U+111E0-111FF"]
+const tamilRange = ["U+0B80-0BFF", "U+11FC0-11FFF"]
+/** Joiners Sinhala uses for conjuncts (yansaya, rakaransaya, touching letters). */
+const joinerRange = ["U+200C-200D"]
+
+/**
+ * `font-faces` for every font the style names, pointing Sinhala and Tamil
+ * at the app's own Noto files. OpenFreeMap's glyph files have neither
+ * script, and a glyph URL serves one codepoint at a time where these
+ * scripts need a letter and its marks drawn together; MapLibre draws text
+ * covered by `font-faces` a grapheme cluster at a time with the browser's
+ * text engine.
+ */
+export function scriptFontFaces(stacks: Iterable<string>, fonts: ScriptFonts) {
+  const faces: FontFacesSpecification = {}
+  for (const stack of stacks) {
+    faces[stack] = [
+      { url: fonts.sinhala, "unicode-range": [...sinhalaRange, ...joinerRange] },
+      { url: fonts.tamil, "unicode-range": tamilRange },
+    ]
+  }
+  return faces
+}
+
+/** Every font stack the style's text layers name, plus the one our own layers use. */
+function fontStacks(layers: LayerSpecification[]): Set<string> {
+  const stacks = new Set(["Noto Sans Regular", "Noto Sans Bold", "Noto Sans Italic"])
+  for (const layer of layers) {
+    if (layer.type !== "symbol") continue
+    const font = layer.layout?.["text-font"]
+    if (Array.isArray(font) && font.every((name) => typeof name === "string")) {
+      for (const name of font as string[]) stacks.add(name)
+    }
+  }
+  return stacks
+}
+
+/** Whether a `text-field` shows a name (rather than, say, a road number). */
+function showsName(field: unknown): boolean {
+  return JSON.stringify(field ?? null).includes('"name')
+}
+
+/**
+ * A label's text in the reader's language: the tiles' `name:ta` (or
+ * `name:si`, which OpenFreeMap does not carry today) where a place has one,
+ * else the style's own label.
+ */
+export function localisedLabel(original: unknown, locale: Locale): unknown {
+  if (locale === "en") return original
+  return ["coalesce", ["get", `name:${locale}`], original]
+}
+
+/** The label layers to localise, with the style's own `text-field` of each. */
+export function labelFields(layers: LayerSpecification[]): { id: string; original: unknown }[] {
+  return layers.flatMap((layer) => {
+    const original = (layer.metadata as Record<string, unknown> | undefined)?.[labelFieldKey]
+    return original === undefined ? [] : [{ id: layer.id, original }]
+  })
+}
+
 /**
  * Tunes an OpenFreeMap style to the app's theme: land and water in the
  * palette's near-neutral tones, muted labels with a halo in the land colour,
  * quiet boundaries. Roads and buildings keep the style's own colours. Layers
  * the palette does not cover are returned unchanged; the input is not mutated.
+ *
+ * With `locale`, name labels read in that language where the tiles have it,
+ * and keep the style's own field in their metadata so a later language change
+ * can be applied without reloading the style. With `fonts`, Sinhala and Tamil
+ * are drawn from those files.
  */
 export function tuneBasemap(
   style: StyleSpecification,
   palette: BasemapPalette,
+  options: { locale?: Locale; fonts?: ScriptFonts } = {},
 ): StyleSpecification {
   const layers = style.layers.map((layer): LayerSpecification => {
     const source = sourceLayer(layer)
@@ -93,5 +174,33 @@ export function tuneBasemap(
         return layer
     }
   })
-  return { ...style, layers }
+  const localised = options.locale
+    ? layers.map((layer): LayerSpecification => {
+        if (layer.type !== "symbol" || !showsName(layer.layout?.["text-field"])) return layer
+        const original = layer.layout!["text-field"]
+        return {
+          ...layer,
+          metadata: {
+            ...((layer.metadata as object | undefined) ?? {}),
+            [labelFieldKey]: original,
+          },
+          layout: {
+            ...layer.layout,
+            "text-field": localisedLabel(original, options.locale!),
+          },
+        } as LayerSpecification
+      })
+    : layers
+  return {
+    ...style,
+    layers: localised,
+    ...(options.fonts
+      ? {
+          "font-faces": {
+            ...(style["font-faces"] ?? {}),
+            ...scriptFontFaces(fontStacks(localised), options.fonts),
+          },
+        }
+      : {}),
+  }
 }

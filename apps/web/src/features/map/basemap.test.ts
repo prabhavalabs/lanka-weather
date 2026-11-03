@@ -1,6 +1,6 @@
 import type { StyleSpecification } from "maplibre-gl"
 import { describe, expect, it } from "vitest"
-import { tuneBasemap, type BasemapPalette } from "./basemap"
+import { labelFields, localisedLabel, tuneBasemap, type BasemapPalette } from "./basemap"
 
 const palette: BasemapPalette = {
   land: "#111111",
@@ -84,5 +84,64 @@ describe("tuneBasemap", () => {
     expect(paint(result, "highway_major_inner")).toEqual({ "line-color": "#fff", "line-width": 2 })
     expect(paint(result, "building")).toBeUndefined()
     expect(paint(style, "background")?.["background-color"]).toBe("#f2f3f0")
+  })
+})
+
+describe("basemap labels and scripts", () => {
+  const nameField = ["coalesce", ["get", "name_en"], ["get", "name"]]
+  const labelled: StyleSpecification = {
+    ...style,
+    layers: [
+      {
+        id: "label_town",
+        type: "symbol",
+        source: "openmaptiles",
+        "source-layer": "place",
+        layout: { "text-field": nameField, "text-font": ["Noto Sans Bold"] },
+      },
+      {
+        id: "road_shield",
+        type: "symbol",
+        source: "openmaptiles",
+        "source-layer": "transportation_name",
+        layout: { "text-field": ["to-string", ["get", "ref"]] },
+      },
+    ],
+  }
+  const layout = (result: StyleSpecification, id: string) =>
+    result.layers.find((layer) => layer.id === id)?.layout as Record<string, unknown>
+
+  it("reads place names in Tamil where the tiles have them, else as the style does", () => {
+    const tuned = tuneBasemap(labelled, palette, { locale: "ta" })
+    expect(layout(tuned, "label_town")["text-field"]).toEqual([
+      "coalesce",
+      ["get", "name:ta"],
+      nameField,
+    ])
+    expect(layout(tuned, "road_shield")["text-field"]).toEqual(["to-string", ["get", "ref"]])
+  })
+
+  it("keeps the style's own label in English and remembers it for a later switch", () => {
+    const tuned = tuneBasemap(labelled, palette, { locale: "en" })
+    expect(layout(tuned, "label_town")["text-field"]).toEqual(nameField)
+    expect(labelFields(tuned.layers)).toEqual([{ id: "label_town", original: nameField }])
+    expect(localisedLabel(nameField, "si")).toEqual(["coalesce", ["get", "name:si"], nameField])
+  })
+
+  it("draws Sinhala and Tamil from the app's fonts for every font the style names", () => {
+    const tuned = tuneBasemap(labelled, palette, {
+      fonts: { sinhala: "/si.woff2", tamil: "/ta.woff2" },
+    })
+    const faces = tuned["font-faces"] as Record<
+      string,
+      { url: string; "unicode-range": string[] }[]
+    >
+    expect(Object.keys(faces)).toEqual(
+      expect.arrayContaining(["Noto Sans Regular", "Noto Sans Bold", "Noto Sans Italic"]),
+    )
+    expect(faces["Noto Sans Bold"]).toEqual([
+      { url: "/si.woff2", "unicode-range": ["U+0D80-0DFF", "U+111E0-111FF", "U+200C-200D"] },
+      { url: "/ta.woff2", "unicode-range": ["U+0B80-0BFF", "U+11FC0-11FFF"] },
+    ])
   })
 })

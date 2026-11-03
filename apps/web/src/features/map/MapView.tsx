@@ -1,9 +1,12 @@
 import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
+import sinhalaFontUrl from "@fontsource-variable/noto-sans-sinhala/files/noto-sans-sinhala-sinhala-wght-normal.woff2?url"
+import tamilFontUrl from "@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2?url"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { getLocale, useLocale, useT } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
-import { basemapTokens, tuneBasemap } from "./basemap"
+import { basemapTokens, labelFields, localisedLabel, tuneBasemap } from "./basemap"
 import { mapStyles, minimumZoom, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
 
@@ -13,12 +16,21 @@ import { MapContext } from "./MapContext"
 maplibregl.setWorkerUrl(workerUrl)
 
 /**
- * Tunes each fetched basemap to the theme in effect. The `dark` class is set
- * before a theme change reaches React, so the tokens read here already
- * belong to the new theme.
+ * The app's own Sinhala and Tamil fonts, for map text in those scripts
+ * (basemap.ts). Absolute, because MapLibre loads them outside the page.
+ */
+const scriptFonts = {
+  sinhala: new URL(sinhalaFontUrl, window.location.href).href,
+  tamil: new URL(tamilFontUrl, window.location.href).href,
+}
+
+/**
+ * Tunes each fetched basemap to the theme and language in effect. The `dark`
+ * class is set before a theme change reaches React, so the tokens read here
+ * already belong to the new theme.
  */
 const transformStyle: maplibregl.TransformStyleFunction = (_previous, next) =>
-  tuneBasemap(next, readTokens(basemapTokens))
+  tuneBasemap(next, readTokens(basemapTokens), { locale: getLocale(), fonts: scriptFonts })
 
 interface MapViewProps {
   theme: MapTheme
@@ -77,6 +89,20 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // A language change relabels the basemap in place; the style is not reloaded.
+  const locale = useLocale()
+  useEffect(() => {
+    if (!map) return
+    for (const { id, original } of labelFields(map.getStyle().layers)) {
+      map.setLayoutProperty(
+        id,
+        "text-field",
+        localisedLabel(original, locale) as maplibregl.ExpressionSpecification,
+      )
+    }
+  }, [map, locale])
+
+  const t = useT()
   const loadedTheme = useRef(theme)
   useEffect(() => {
     if (!map || loadedTheme.current === theme) return
@@ -95,7 +121,7 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
         <div
           ref={container}
           className="h-full w-full"
-          aria-label="Map of Sri Lanka"
+          aria-label={t("app.mapLabel")}
           role="region"
         />
       </div>
