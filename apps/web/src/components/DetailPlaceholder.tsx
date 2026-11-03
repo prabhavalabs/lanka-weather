@@ -1,6 +1,7 @@
 import type * as React from "react"
 import { XIcon } from "lucide-react"
 
+import { useT } from "@/lib/i18n"
 import { Panel } from "@/components/Panel"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -15,13 +16,14 @@ interface DetailPlaceholderProps {
 
 /** The detail panel while its data or code loads, or when its subject cannot be found. */
 export function DetailPlaceholder({ icon, title, message, onClose }: DetailPlaceholderProps) {
+  const t = useT()
   return (
     <Panel
       icon={icon}
       title={title}
       className="w-full"
       action={
-        <Button variant="outline" size="icon" onClick={onClose} aria-label="Close details">
+        <Button variant="outline" size="icon" onClick={onClose} aria-label={t("app.closeDetails")}>
           <XIcon />
         </Button>
       }
@@ -31,7 +33,7 @@ export function DetailPlaceholder({ icon, title, message, onClose }: DetailPlace
           {message}
         </p>
       ) : (
-        <div className="flex flex-col gap-3" role="status" aria-label="Loading">
+        <div className="flex flex-col gap-3" role="status" aria-label={t("common.loading")}>
           <Skeleton className="h-10 w-36" />
           <Skeleton className="h-4 w-52" />
           <Skeleton className="h-28 w-full rounded-2xl" />

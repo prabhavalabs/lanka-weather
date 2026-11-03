@@ -156,3 +156,23 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Sinhala and Tamil carry marks above and below the letters, so they need
+   more line height than Latin text. `lang` is set on <html> before first
+   paint (index.html, src/lib/i18n). Unlayered, so it outranks the tight
+   leading utilities, which would otherwise clip the marks. */
+:root:is(:lang(si), :lang(ta)) {
+  --text-xs--line-height: 1.55;
+  --text-sm--line-height: 1.6;
+  --text-base--line-height: 1.6;
+  --text-lg--line-height: 1.55;
+}
+:root:is(:lang(si), :lang(ta)) body {
+  line-height: 1.6;
+}
+:root:is(:lang(si), :lang(ta)) :is(.leading-none, .leading-4) {
+  line-height: 1.3;
+}
+:root:is(:lang(si), :lang(ta)) :is(.leading-tight, .leading-snug) {
+  line-height: 1.45;
+}
