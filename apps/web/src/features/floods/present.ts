@@ -3,6 +3,7 @@
  * river-level status colours, from calm to severe, so a map reader learns
  * one scale for both.
  */
+import { translate } from "@/lib/i18n"
 import { formatDay } from "@/lib/format"
 import type {
   FloodAreaKind,
@@ -12,6 +13,21 @@ import type {
   FloodTrend,
 } from "./types"
 
+/**
+ * A record whose values are read in the current language each time they are
+ * looked up, so callers can keep indexing it while a subscribed component renders.
+ */
+export function labelRecord<K extends string>(
+  keys: readonly K[],
+  label: (key: K) => string,
+): Readonly<Record<K, string>> {
+  const record = {} as Record<K, string>
+  for (const key of keys) {
+    Object.defineProperty(record, key, { enumerable: true, get: () => label(key) })
+  }
+  return record
+}
+
 export const floodSeverityOrder: FloodSeverity[] = [
   "extreme",
   "severe",
@@ -20,18 +36,22 @@ export const floodSeverityOrder: FloodSeverity[] = [
   "no_flooding",
 ]
 
-/**
- * Flood Hub's words for Google's severities. Its thresholds are named warning,
- * danger and extreme danger, and ABOVE_NORMAL, SEVERE and EXTREME are forecasts
- * against them. "Warning" here is a forecast, never an official warning.
- */
-export const floodSeverityLabels: Record<FloodSeverity, string> = {
-  extreme: "Extreme",
-  severe: "Danger",
-  above_normal: "Warning",
-  no_flooding: "Normal",
-  unknown: "No data",
+function isSeverity(value: string): value is FloodSeverity {
+  return (floodSeverityOrder as string[]).includes(value)
 }
+
+/**
+ * Flood Hub's words for Google's severities, in the current language. Its
+ * thresholds are named warning, danger and extreme danger, and ABOVE_NORMAL,
+ * SEVERE and EXTREME are forecasts against them. "Warning" here is a forecast,
+ * never an official warning.
+ */
+export function floodSeverityLabel(severity: FloodSeverity): string {
+  return translate(`floods.severity.${severity}`)
+}
+
+/** `floodSeverityLabel` as a record, read in the current language. */
+export const floodSeverityLabels = labelRecord(floodSeverityOrder, floodSeverityLabel)
 
 /** Theme tokens by severity (src/styles/theme.css). */
 export const floodSeverityTokens: Record<FloodSeverity, `--${string}`> = {
@@ -68,12 +88,23 @@ export const floodSeverityGlyphs: Record<FloodSeverity, string> = {
   unknown: "?",
 }
 
-export const floodTrendLabels: Record<FloodTrend, string> = {
-  rise: "Rising",
-  fall: "Falling",
-  no_change: "Steady",
-  unknown: "Trend unknown",
+const trendTerms = {
+  rise: "terms.trend.rising",
+  fall: "terms.trend.falling",
+  no_change: "terms.trend.steady",
+  unknown: "terms.trend.unknown",
+} as const satisfies Record<FloodTrend, string>
+
+/** A forecast's trend, in the shared official words. */
+export function floodTrendLabel(trend: FloodTrend): string {
+  return translate(trendTerms[trend] ?? trendTerms.unknown)
 }
+
+/** `floodTrendLabel` as a record, read in the current language. */
+export const floodTrendLabels = labelRecord(
+  Object.keys(trendTerms) as FloodTrend[],
+  floodTrendLabel,
+)
 
 export const floodTrendArrows: Record<FloodTrend, string> = {
   rise: "↑",
@@ -82,22 +113,39 @@ export const floodTrendArrows: Record<FloodTrend, string> = {
   unknown: "",
 }
 
-export const floodAreaLabels: Record<FloodAreaKind, string> = {
-  notification: "Riverine flood notification area",
-  inundation_high: "Inundation: very high probability",
-  inundation_medium: "Inundation: high probability",
-  inundation_low: "Inundation: moderate probability",
-  flash_likely: "Flash flood: likely",
-  flash_highly_likely: "Flash flood: highly likely",
-  significant_event: "Significant flood event",
+const floodAreaKinds: FloodAreaKind[] = [
+  "notification",
+  "inundation_high",
+  "inundation_medium",
+  "inundation_low",
+  "flash_likely",
+  "flash_highly_likely",
+  "significant_event",
+]
+
+/** A flood area's kind in full, e.g. "Flash flood: likely"; "Flood area" for one unknown. */
+export function floodAreaLabel(kind: string): string {
+  return (floodAreaKinds as string[]).includes(kind)
+    ? translate(`floods.area.${kind as FloodAreaKind}`)
+    : translate("floods.area.fallback")
 }
 
-/** Flood Hub's words for Google's three inundation levels, most probable first. */
+/** `floodAreaLabel` as a record, read in the current language. */
+export const floodAreaLabels = labelRecord(floodAreaKinds, floodAreaLabel)
+
+/** Google's own names for its three inundation levels, most probable first. */
 export const inundationWords = {
-  inundation_high: { label: "Very high", google: "high" },
-  inundation_medium: { label: "High", google: "medium" },
-  inundation_low: { label: "Moderate", google: "low" },
+  inundation_high: { google: "high" },
+  inundation_medium: { google: "medium" },
+  inundation_low: { google: "low" },
 } as const
+
+export type InundationKind = keyof typeof inundationWords
+
+/** Flood Hub's word for an inundation level: very high, high or moderate. */
+export function inundationLabel(kind: InundationKind): string {
+  return translate(`floods.inundation.${kind}`)
+}
 
 type AreaLike = {
   kind: FloodAreaKind
@@ -112,27 +160,32 @@ type AreaLike = {
 export function areaLikelihood(area: AreaLike): { label: string; note?: string } {
   switch (area.kind) {
     case "flash_highly_likely":
-      return { label: "Highly likely" }
+      return { label: translate("floods.likelihood.highlyLikely") }
     case "flash_likely":
-      return { label: "Likely" }
+      return { label: translate("floods.likelihood.likely") }
     case "significant_event":
-      return { label: "Event present" }
+      return { label: translate("floods.likelihood.eventPresent") }
     case "notification":
       return {
-        label: floodSeverityLabels[area.severity as FloodSeverity] ?? "Forecast",
-        note: "Google's notification polygon for this gauge's forecast.",
+        label: isSeverity(area.severity)
+          ? floodSeverityLabel(area.severity)
+          : translate("floods.likelihood.forecast"),
+        note: translate("floods.likelihood.notificationNote"),
       }
     default: {
-      const words = inundationWords[area.kind]
+      const kind = area.kind
+      if (!(kind in inundationWords)) return { label: translate("floods.likelihood.forecast") }
       if (area.details?.mapType === "depth") {
         return {
-          label: `${words.google[0]!.toUpperCase()}${words.google.slice(1)} depth`,
-          note: "Google gives this map by depth rather than probability.",
+          label: translate(`floods.likelihood.depth.${kind}`),
+          note: translate("floods.likelihood.depthNote"),
         }
       }
       return {
-        label: words.label,
-        note: `Flood Hub's word for Google's "${words.google}" probability level.`,
+        label: inundationLabel(kind),
+        note: translate("floods.likelihood.probabilityNote", {
+          google: inundationWords[kind].google,
+        }),
       }
     }
   }
@@ -155,9 +208,45 @@ export function areaBadge(area: AreaLike) {
 /** A gauge's name: its site or river, else its short id ("Gauge 4121155030"). */
 export function gaugeName(gauge: { siteName?: string; river?: string; gaugeId: string }): string {
   if (gauge.siteName) return gauge.siteName
-  if (gauge.river) return `${gauge.river} gauge`
+  if (gauge.river) return translate("floods.gaugeName.river", { river: gauge.river })
   const tail = gauge.gaugeId.replace(/^hybas_/i, "")
-  return `Gauge ${tail}`
+  return translate("floods.gaugeName.id", { id: tail })
+}
+
+const magnitudes = ["critical", "major", "minor"] as const
+type Magnitude = (typeof magnitudes)[number]
+
+function isMagnitude(value: string | null): value is Magnitude {
+  return value !== null && (magnitudes as readonly string[]).includes(value)
+}
+
+/** How a past flood was mapped (critical, major, minor), as a label; else as published. */
+export function pastFloodMagnitude(magnitude: string): string {
+  const value = magnitude.toLowerCase()
+  if (isMagnitude(value)) return translate(`floods.past.magnitudeLabel.${value}`)
+  return magnitude[0]!.toUpperCase() + magnitude.slice(1)
+}
+
+/**
+ * A past flood's name in the current language, "Kelani flood, 2016 (major)", from
+ * its river (a proper name, as published) and year. Falls back to the server's name.
+ */
+export function pastFloodName(event: {
+  name: string
+  river: string
+  year: number
+  magnitude: string | null
+}): string {
+  if (!event.river || !event.year) return event.name
+  const values = { river: event.river, year: String(event.year) }
+  const magnitude = event.magnitude?.toLowerCase() ?? null
+  if (isMagnitude(magnitude)) {
+    return translate("floods.past.nameWithMagnitude", {
+      ...values,
+      magnitude: translate(`floods.past.magnitude.${magnitude}`),
+    })
+  }
+  return translate("floods.past.name", values)
 }
 
 /** "Sat 7 Nov → Sun 8 Nov", or one day when the window is a day or less. */
@@ -190,7 +279,7 @@ export function countBySeverity(gauges: { properties: { severity: FloodSeverity 
 
 /**
  * "10 gauges · none raised" or "10 gauges · 2 raised · 1 area", of what the map
- * shows. Raised means at warning or above.
+ * shows, in the current language. Raised means at warning or above.
  */
 export function floodSummary(collection: FloodForecastCollection): string {
   const gauges = collection.features.filter(isGauge)
@@ -198,9 +287,11 @@ export function floodSummary(collection: FloodForecastCollection): string {
   const raised = counts.above_normal + counts.severe + counts.extreme
   const areas = collection.features.length - gauges.length
   const parts = [
-    `${gauges.length} ${gauges.length === 1 ? "gauge" : "gauges"}`,
-    raised === 0 ? "none raised" : `${raised} raised`,
+    translate("floods.summary.gauges", { count: gauges.length }),
+    raised === 0
+      ? translate("floods.summary.noneRaised")
+      : translate("floods.summary.raised", { count: raised }),
   ]
-  if (areas > 0) parts.push(`${areas} ${areas === 1 ? "area" : "areas"}`)
-  return parts.join(" · ")
+  if (areas > 0) parts.push(translate("floods.summary.areas", { count: areas }))
+  return parts.join(translate("common.separator"))
 }

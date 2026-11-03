@@ -2,21 +2,24 @@ import { useId, type ReactNode } from "react"
 import { Switch } from "@/components/ui/switch"
 import { MapLegend } from "@/components/weather/MapLegend"
 import { formatAge } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { BasinState } from "../river-risk/types"
 import {
   areaStyle,
   basinColors,
   basinFillOpacity,
-  basinStateLabels,
+  basinStateLabel,
   basinStateOrder,
 } from "./basins"
 import {
   floodSeverityColors,
   floodSeverityGlyphs,
-  floodSeverityLabels,
+  floodSeverityLabel,
   floodSeverityOrder,
+  inundationLabel,
   inundationWords,
+  type InundationKind,
 } from "./present"
 import type { FloodAreaKind, FloodSeverity } from "./types"
 import type { FloodView } from "./view"
@@ -133,31 +136,34 @@ export function FloodLegend({
   bare = false,
   className,
 }: FloodLegendProps) {
+  const t = useT()
   const set = (key: keyof FloodView) => (checked: boolean) =>
     onViewChange({ ...view, [key]: checked })
   const entries = (
     <div className="flex flex-col gap-3">
-      <Group title="Riverine floods" note="Expected severity">
+      <Group title={t("floods.legend.riverine")} note={t("floods.legend.expectedSeverity")}>
         <ul className="flex flex-col gap-1.5 text-xs">
           {floodSeverityOrder.map((severity) => (
             <li key={severity} className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
+              <span className="flex min-w-0 items-center gap-2">
                 <GaugeDot color={floodSeverityColors[severity]} />
-                <span className="text-muted-foreground">{floodSeverityLabels[severity]}</span>
+                <span className="min-w-0 break-words text-muted-foreground">
+                  {floodSeverityLabel(severity)}
+                </span>
                 {floodSeverityGlyphs[severity] && (
                   <span aria-hidden="true" className="numeric text-[0.6875rem] text-foreground">
                     {floodSeverityGlyphs[severity]}
                   </span>
                 )}
               </span>
-              <span className="flex items-center gap-2">
+              <span className="flex shrink-0 items-center gap-2">
                 {counts && <span className="numeric text-foreground">{counts[severity]}</span>}
                 {severity === "no_flooding" && (
                   <Switch
                     size="sm"
                     checked={view.normal}
                     onCheckedChange={set("normal")}
-                    aria-label="Show gauges forecast normal"
+                    aria-label={t("floods.legend.showNormal")}
                   />
                 )}
               </span>
@@ -167,35 +173,38 @@ export function FloodLegend({
             <span aria-hidden="true" className="numeric text-foreground">
               ↑↓
             </span>
-            Forecast trend
+            {t("floods.legend.trend")}
           </li>
         </ul>
       </Group>
 
       <Group
-        title="Flash floods"
-        note="Within 24 h"
+        title={t("floods.legend.flash")}
+        note={t("floods.legend.within24h")}
         checked={view.flash}
         onCheckedChange={set("flash")}
-        label="Show flash-flood areas"
+        label={t("floods.legend.showFlash")}
       >
         {view.flash && (
           <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
             <li className="flex items-center gap-2">
               <AreaSwatch kind="flash_highly_likely" />
-              Highly likely
+              {t("floods.likelihood.highlyLikely")}
             </li>
             <li className="flex items-center gap-2">
               <AreaSwatch kind="flash_likely" />
-              Likely
+              {t("floods.likelihood.likely")}
             </li>
           </ul>
         )}
         {flashAreas === 0 && (
           <p role="status" className="text-xs text-foreground">
-            No flash-flood areas for Sri Lanka right now
+            {t("floods.legend.noFlash")}
             {checkedAt && (
-              <span className="numeric text-muted-foreground"> · read {formatAge(checkedAt)}</span>
+              <span className="numeric text-muted-foreground">
+                {t("common.separator")}
+                {t("common.readAgo", { age: formatAge(checkedAt) })}
+              </span>
             )}
           </p>
         )}
@@ -205,13 +214,13 @@ export function FloodLegend({
         <Group
           title={
             lowerConfidenceGauges > 0
-              ? `Extended coverage (${lowerConfidenceGauges})`
-              : "Extended coverage"
+              ? t("floods.legend.extendedCount", { count: lowerConfidenceGauges })
+              : t("floods.legend.extended")
           }
-          note="Lower-confidence gauges only"
+          note={t("floods.legend.extendedNote")}
           checked={view.extended}
           onCheckedChange={set("extended")}
-          label="Show lower-confidence gauges"
+          label={t("floods.legend.showExtended")}
         >
           {view.extended && (
             <p className="flex items-start gap-2 text-xs text-muted-foreground">
@@ -220,67 +229,69 @@ export function FloodLegend({
                 className="mt-0.5 inline-block size-3 shrink-0 rounded-full border-2 bg-[var(--flood-ring)]"
                 style={{ borderColor: floodSeverityColors.no_flooding }}
               />
-              Hollow dots. Google has not verified these models. They do not raise river risk,
-              alerts or the overview.
+              {t("floods.legend.extendedHelp")}
             </p>
           )}
         </Group>
       </div>
 
-      <Group title="Significant flood events" checked={view.events} onCheckedChange={set("events")}>
+      <Group
+        title={t("floods.legend.events")}
+        checked={view.events}
+        onCheckedChange={set("events")}
+      >
         {view.events && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <AreaSwatch kind="significant_event" />
-            Event present
+            {t("floods.likelihood.eventPresent")}
           </p>
         )}
       </Group>
 
       <Group
-        title="Inundation probability"
+        title={t("floods.legend.inundation")}
         checked={view.inundation}
         onCheckedChange={set("inundation")}
       >
         {view.inundation && (
           <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-            {(Object.keys(inundationWords) as (keyof typeof inundationWords)[]).map((kind) => (
+            {(Object.keys(inundationWords) as InundationKind[]).map((kind) => (
               <li key={kind} className="flex items-center gap-2">
                 <AreaSwatch kind={kind} />
-                {inundationWords[kind].label}
+                {inundationLabel(kind)}
               </li>
             ))}
           </ul>
         )}
       </Group>
 
-      <Group title="River basins" note="Dashed: the worst forecast or gauge in each">
+      <Group title={t("floods.legend.basins")} note={t("floods.legend.basinsNote")}>
         <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
           {basinStateOrder.map((state) => (
-            <li key={state} className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
+            <li key={state} className="flex min-w-0 items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-2">
                 <BasinSwatch state={state} />
-                <span className="text-muted-foreground">{basinStateLabels[state]}</span>
+                <span className="min-w-0 break-words text-muted-foreground">
+                  {basinStateLabel(state)}
+                </span>
               </span>
               {basinCounts && <span className="numeric text-foreground">{basinCounts[state]}</span>}
             </li>
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">
-          A basin is not a flood area: solid shapes are the areas Google publishes. No forecast
-          means nothing is known there, not that it is calm.
-          {unverified && " Some rest only on lower-confidence gauges; each basin's panel says so."}
+          {t("floods.legend.basinsHelp")}
+          {unverified && ` ${t("floods.legend.basinsUnverified")}`}
         </p>
       </Group>
 
-      <p className="text-[0.6875rem] text-muted-foreground">
-        Google Flood Hub (Flood Forecasting API). Forecasts, not official warnings.
-      </p>
+      <p className="text-[0.6875rem] text-muted-foreground">{t("floods.legend.credit")}</p>
     </div>
   )
   if (bare) return <div className={cn(className)}>{entries}</div>
   return (
     <MapLegend
-      title="Flood forecast"
+      title={t("floods.legend.title")}
       unit="Google"
       className={cn("max-h-[50vh] w-72 overflow-y-auto", className)}
     >

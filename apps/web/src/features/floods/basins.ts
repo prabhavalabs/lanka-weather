@@ -2,7 +2,9 @@
  * How flood basins are named and tinted. Pure, so it is tested without a
  * browser. They share the flood status colours with gauges and rivers.
  */
+import { translate } from "@/lib/i18n"
 import type { BasinState, BasinStatus, SubbasinStatus } from "../river-risk/types"
+import { labelRecord } from "./present"
 import type { FloodAreaKind } from "./types"
 
 export const basinStateOrder: BasinState[] = [
@@ -13,13 +15,13 @@ export const basinStateOrder: BasinState[] = [
   "no_forecast",
 ]
 
-export const basinStateLabels: Record<BasinState, string> = {
-  extreme: "Extreme",
-  severe: "Danger",
-  above_normal: "Warning",
-  no_flooding: "Normal",
-  no_forecast: "No forecast",
+/** A basin's state in Flood Hub's words, in the current language. */
+export function basinStateLabel(state: BasinState): string {
+  return translate(`floods.basinState.${state}`)
 }
+
+/** `basinStateLabel` as a record, read in the current language. */
+export const basinStateLabels = labelRecord(basinStateOrder, basinStateLabel)
 
 /** Theme tokens by state (src/styles/theme.css). */
 export const basinTokens: Record<BasinState, `--${string}`> = {
