@@ -1,18 +1,18 @@
 /**
  * How the overview reads: pure, so it is tested without a browser. The words of
- * official warnings and the sentence at the top come from the API.
+ * official warnings and the sentence at the top come from the API (see
+ * `prose.ts` for how they read in Sinhala and Tamil).
  */
+import { getLocale, translateIn, type Locale } from "@/lib/i18n"
 import { inPointBounds, roundCoordinate, type Selection } from "../location/selection"
 import type { RegionVariable } from "../regions/present"
 import type { OverviewGroup, OverviewSection, OverviewTarget, OverviewTone } from "./types"
 
 export const groupOrder: OverviewGroup[] = ["official", "water", "hazards", "now"]
 
-export const groupLabels: Record<OverviewGroup, string> = {
-  official: "Official",
-  water: "Rivers and reservoirs",
-  hazards: "Cyclones and earthquakes",
-  now: "Right now",
+/** A group's heading in the language. */
+export function groupLabel(group: OverviewGroup, locale: Locale = getLocale()): string {
+  return translateIn(locale, `overview.group.${group}`)
 }
 
 /** Status badges for a line's tone; the badge's word is the API's. */
@@ -41,9 +41,9 @@ export function shownCounts(section: OverviewSection) {
 }
 
 /** The tag beside a section's title that says what kind of thing it is. */
-export function sectionTag(section: OverviewSection): string | null {
-  if (section.official) return "Official"
-  if (section.estimate) return "Estimate"
+export function sectionTag(section: OverviewSection, locale: Locale = getLocale()): string | null {
+  if (section.official) return translateIn(locale, "terms.official")
+  if (section.estimate) return translateIn(locale, "terms.estimate")
   return null
 }
 

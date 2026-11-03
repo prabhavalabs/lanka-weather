@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest"
-import { boundsWithSriLanka, cycloneSummary, evaluationNote, isCalm, positions } from "./present"
+import { translateIn } from "@/lib/i18n"
+import {
+  alertText,
+  alertWord,
+  boundsWithSriLanka,
+  cycloneStatusNote,
+  cycloneSummary,
+  evaluationNote,
+  isCalm,
+  positions,
+} from "./present"
 import type { CycloneCollection, CyclonePosition } from "./types"
 
 const system = {
@@ -88,6 +98,28 @@ describe("cyclones", () => {
   })
 
   it("keeps JTWC and IMD under evaluation in the words shown", () => {
-    expect(evaluationNote).toContain("under evaluation")
+    expect(evaluationNote()).toContain("under evaluation")
+  })
+})
+
+describe("cyclone words in the reader's language", () => {
+  it("rebuilds the server's note from the status", () => {
+    expect(cycloneStatusNote({ status: "active", stale: false })).toBe("")
+    expect(cycloneStatusNote({ status: "active", stale: true })).toContain("out of date")
+    expect(cycloneStatusNote({ status: "unknown", stale: true })).toContain("cannot say")
+    expect(cycloneStatusNote({ status: "none", stale: false }, "ta")).toBe(
+      "வட இந்து சமுத்திரத்தில் செயலில் உள்ள சூறாவளி இல்லை",
+    )
+  })
+
+  it("names GDACS's colours with the shared terms and keeps unknown words", () => {
+    expect(alertText("Red")).toBe("GDACS Red alert")
+    expect(alertWord("Orange", "si")).toBe(translateIn("si", "terms.colour.orange"))
+    expect(alertWord("Purple", "ta")).toBe("Purple")
+  })
+
+  it("names several systems with a count", () => {
+    const other = { ...position, properties: { ...system, eventId: "2", name: "B" } }
+    expect(cycloneSummary(collection([position, other]))).toEqual(["2 active: MURASU-26, B"])
   })
 })

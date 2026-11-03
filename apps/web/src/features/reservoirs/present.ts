@@ -3,7 +3,9 @@
  * unknown stays unknown: a missing figure is never shown as 0%. Pure, so it is
  * tested without a browser.
  */
-import { formatDay, sriLankaTimeZone } from "@/lib/format"
+import { formatDay, formatInteger, sriLankaTimeZone } from "@/lib/format"
+import { translate } from "@/lib/i18n"
+import { liveLabels } from "../rivers/present"
 import type {
   ReservoirCounts,
   ReservoirFeature,
@@ -26,20 +28,19 @@ export const reservoirColors: Record<ReservoirStatus, string> = {
   nodata: "var(--reservoir-nodata)",
 }
 
-export const reservoirStatusLabels: Record<ReservoirStatus, string> = {
-  spilling: "Spilling",
-  releasing: "Releasing",
-  holding: "Holding",
-  nodata: "No data",
-}
+const statuses: ReservoirStatus[] = ["spilling", "releasing", "holding", "nodata"]
 
-/** What the source's status means. */
-export const reservoirStatusMeanings: Record<ReservoirStatus, string> = {
-  spilling: "Over the spillway.",
-  releasing: "Through gates or outlets.",
-  holding: "The source lists this reservoir as holding its water.",
-  nodata: "The source has no spill or release status for this reservoir today.",
-}
+/** The source's status words, in the current language. */
+export const reservoirStatusLabels = liveLabels(
+  statuses,
+  (status) => `terms.reservoirStatus.${status}`,
+)
+
+/** What the source's status means, in the current language. */
+export const reservoirStatusMeanings = liveLabels(
+  statuses,
+  (status) => `reservoirs.meaning.${status}`,
+)
 
 /**
  * The shapes the map draws, so a status is told apart by shape as well as by
@@ -76,15 +77,19 @@ export const reservoirStatusOrder: ReservoirStatus[] = [
   "nodata",
 ]
 
-const typeWords: Record<string, string> = {
-  major: "Major reservoir",
-  medium: "Medium reservoir",
-  mahaweli: "Mahaweli reservoir",
+const types = ["major", "medium", "mahaweli"] as const
+
+function typeLabel(type: string): string {
+  return (types as readonly string[]).includes(type)
+    ? translate(`reservoirs.type.${type as (typeof types)[number]}`)
+    : translate("reservoirs.type.generic")
 }
 
 /** "Major reservoir · Kurunegala": short enough for one line on a phone. */
 export function reservoirSubtitle(reservoir: ReservoirProperties): string {
-  return [typeWords[reservoir.type] ?? "Reservoir", reservoir.district].filter(Boolean).join(" · ")
+  return [typeLabel(reservoir.type), reservoir.district]
+    .filter(Boolean)
+    .join(translate("common.separator"))
 }
 
 /** A YYYY-MM-DD day in Sri Lanka as a time at its noon, for date formatting. */
@@ -109,23 +114,26 @@ export function readingDayAge(day: string, now: Date = new Date()): string {
   const today = Date.parse(`${colomboDay.format(now)}T00:00:00Z`)
   const then = Date.parse(`${day}T00:00:00Z`)
   const days = Math.round((today - then) / 86_400_000)
-  if (days <= 0) return "today"
-  if (days === 1) return "yesterday"
-  return `${days} days ago`
+  if (days <= 0) return translate("format.today")
+  if (days === 1) return translate("format.yesterday")
+  return translate("format.daysAgo", { count: days })
 }
 
-const number = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 })
-
-const flowWords: Record<string, string> = {
-  spill: "Spill",
-  outlets: "Through outlets",
-  downstream: "Downstream flow",
+/** A figure to at most one decimal, "1,551" or "17.2". */
+function figure(value: number): string {
+  return formatInteger(value, 1)
 }
 
-/** "Spill: 1,551 cusecs", or "Spill" when the amount is not known. */
+const flowKinds = ["spill", "outlets", "downstream"] as const
+
+/** "Spill: 1,551 cusecs", or "Spill" when the amount is not known. The unit stays cusecs. */
 export function flowShort(flow: ReservoirFlow): string {
-  const kind = flowWords[flow.kind] ?? "Flow"
-  return flow.cusecs === null ? kind : `${kind}: ${number.format(flow.cusecs)} cusecs`
+  const kind = (flowKinds as readonly string[]).includes(flow.kind)
+    ? translate(`reservoirs.flow.${flow.kind as (typeof flowKinds)[number]}`)
+    : translate("reservoirs.flow.generic")
+  return flow.cusecs === null
+    ? kind
+    : translate("reservoirs.flow.amount", { kind, amount: figure(flow.cusecs) })
 }
 
 /**
@@ -136,9 +144,9 @@ export function flowShort(flow: ReservoirFlow): string {
 export function flowNote(flow: ReservoirFlow): string | null {
   switch (flow.kind) {
     case "downstream":
-      return "Can include power-station flow, so this is not necessarily a flood release."
+      return translate("reservoirs.flow.noteDownstream")
     case "outlets":
-      return "Flow through outlets, which the source does not count as spilling."
+      return translate("reservoirs.flow.noteOutlets")
     default:
       return null
   }
@@ -153,17 +161,22 @@ export function storageView(reservoir: ReservoirProperties): {
 } {
   const { storagePercent, storageFresh, readingDay } = reservoir
   if (storagePercent === null) {
-    return { value: "–", caption: "Storage is not reported.", current: false }
+    return { value: "–", caption: translate("reservoirs.storage.notReported"), current: false }
   }
   if (storageFresh === false || reservoir.stale) {
-    const when = readingDay ? ` from ${formatReadingDay(readingDay)}` : ""
     return {
-      value: number.format(storagePercent),
-      caption: `Last known figure${when}, not a current reading.`,
+      value: figure(storagePercent),
+      caption: readingDay
+        ? translate("reservoirs.storage.lastKnownOn", { day: formatReadingDay(readingDay) })
+        : translate("reservoirs.storage.lastKnown"),
       current: false,
     }
   }
-  return { value: number.format(storagePercent), caption: "Of capacity.", current: true }
+  return {
+    value: figure(storagePercent),
+    caption: translate("reservoirs.storage.ofCapacity"),
+    current: true,
+  }
 }
 
 /** Spilling or releasing on a reading that is not out of date. */
@@ -197,8 +210,8 @@ export function reservoirSummary(
   active: number,
   outOfDate: boolean,
 ): string {
-  if (counts.total === 0) return "Not collected yet"
-  if (outOfDate) return `${counts.total} reservoirs · figures out of date`
-  if (active === 0) return "None spilling or releasing"
-  return `${active} spilling or releasing`
+  if (counts.total === 0) return translate("reservoirs.summary.notCollected")
+  if (outOfDate) return translate("reservoirs.summary.outOfDate", { count: counts.total })
+  if (active === 0) return translate("reservoirs.summary.none")
+  return translate("reservoirs.summary.active", { count: active })
 }

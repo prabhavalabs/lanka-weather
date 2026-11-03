@@ -1,49 +1,54 @@
+import { translate, type MessageKey } from "@/lib/i18n"
 import type { WeatherCondition } from "./types"
 
-/** Words for each condition, for labels and screen readers. */
-export const conditionLabels: Record<WeatherCondition, string> = {
-  clear: "Clear",
-  "clear-night": "Clear night",
-  "partly-cloudy": "Partly cloudy",
-  cloudy: "Cloudy",
-  drizzle: "Drizzle",
-  rain: "Rain",
-  "heavy-rain": "Heavy rain",
-  thunderstorm: "Thunderstorm",
-  fog: "Fog",
-  windy: "Windy",
+const conditionKeys: Record<WeatherCondition, MessageKey> = {
+  clear: "weather.condition.clear",
+  "clear-night": "weather.condition.clearNight",
+  "partly-cloudy": "weather.condition.partlyCloudy",
+  cloudy: "weather.condition.cloudy",
+  drizzle: "weather.condition.drizzle",
+  rain: "weather.condition.rain",
+  "heavy-rain": "weather.condition.heavyRain",
+  thunderstorm: "weather.condition.thunderstorm",
+  fog: "weather.condition.fog",
+  windy: "weather.condition.windy",
+}
+
+/** Words for a condition in the current language, for labels and screen readers. */
+export function conditionLabel(condition: WeatherCondition): string {
+  return translate(conditionKeys[condition])
 }
 
 /** Words for WMO weather interpretation codes, as Open-Meteo reports them. */
-const wmoWords: Record<number, string> = {
-  0: "Clear",
-  1: "Mainly clear",
-  2: "Partly cloudy",
-  3: "Overcast",
-  45: "Fog",
-  48: "Freezing fog",
-  51: "Light drizzle",
-  53: "Drizzle",
-  55: "Dense drizzle",
-  56: "Freezing drizzle",
-  57: "Freezing drizzle",
-  61: "Light rain",
-  63: "Rain",
-  65: "Heavy rain",
-  66: "Freezing rain",
-  67: "Freezing rain",
-  71: "Light snow",
-  73: "Snow",
-  75: "Heavy snow",
-  77: "Snow grains",
-  80: "Light showers",
-  81: "Showers",
-  82: "Violent showers",
-  85: "Snow showers",
-  86: "Snow showers",
-  95: "Thunderstorm",
-  96: "Thunderstorm with hail",
-  99: "Thunderstorm with hail",
+const wmoKeys: Record<number, MessageKey> = {
+  0: "weather.wmo.clear",
+  1: "weather.wmo.mainlyClear",
+  2: "weather.wmo.partlyCloudy",
+  3: "weather.wmo.overcast",
+  45: "weather.wmo.fog",
+  48: "weather.wmo.freezingFog",
+  51: "weather.wmo.lightDrizzle",
+  53: "weather.wmo.drizzle",
+  55: "weather.wmo.denseDrizzle",
+  56: "weather.wmo.freezingDrizzle",
+  57: "weather.wmo.freezingDrizzle",
+  61: "weather.wmo.lightRain",
+  63: "weather.wmo.rain",
+  65: "weather.wmo.heavyRain",
+  66: "weather.wmo.freezingRain",
+  67: "weather.wmo.freezingRain",
+  71: "weather.wmo.lightSnow",
+  73: "weather.wmo.snow",
+  75: "weather.wmo.heavySnow",
+  77: "weather.wmo.snowGrains",
+  80: "weather.wmo.lightShowers",
+  81: "weather.wmo.showers",
+  82: "weather.wmo.violentShowers",
+  85: "weather.wmo.snowShowers",
+  86: "weather.wmo.snowShowers",
+  95: "weather.wmo.thunderstorm",
+  96: "weather.wmo.thunderstormHail",
+  99: "weather.wmo.thunderstormHail",
 }
 
 /** Sustained wind from which calm skies are called windy, in km/h. */
@@ -52,7 +57,8 @@ const windyKmh = 40
 /**
  * The condition for a WMO weather code (Open-Meteo's `weatherCode`), the
  * time of day and, optionally, the wind: clear skies at night are
- * "clear-night", and dry weather in a strong wind is "windy".
+ * "clear-night", and dry weather in a strong wind is "windy". The summary is
+ * in the current language, so callers that keep it must depend on the locale.
  */
 export function conditionFromWmo(
   code: number | null | undefined,
@@ -61,9 +67,12 @@ export function conditionFromWmo(
 ): { condition: WeatherCondition; summary: string } {
   const day = isDay === null || isDay === undefined ? true : Boolean(isDay)
   if (code === null || code === undefined || !Number.isFinite(code)) {
-    return { condition: day ? "partly-cloudy" : "clear-night", summary: "Unknown" }
+    return {
+      condition: day ? "partly-cloudy" : "clear-night",
+      summary: translate("weather.wmo.unknown"),
+    }
   }
-  const summary = wmoWords[code] ?? "Unknown"
+  const summary = translate(wmoKeys[code] ?? "weather.wmo.unknown")
   let condition: WeatherCondition
   if (code >= 95) condition = "thunderstorm"
   else if (code === 65 || code === 82 || code === 67) condition = "heavy-rain"
@@ -80,7 +89,7 @@ export function conditionFromWmo(
     windSpeedKmh !== null &&
     windSpeedKmh >= windyKmh
   ) {
-    return { condition: "windy", summary: `${summary}, windy` }
+    return { condition: "windy", summary: translate("weather.wmo.windy", { summary }) }
   }
   return { condition, summary }
 }

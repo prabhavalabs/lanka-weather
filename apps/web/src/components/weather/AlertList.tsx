@@ -2,9 +2,11 @@ import { CheckIcon, ExternalLinkIcon, InfoIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { formatDayTime } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-import { estimateLabels, severityBadge, severityColors, severityLabels } from "./severity"
+import { fillNodes } from "./fillNodes"
+import { estimateLabel, severityBadge, severityColors, severityLabel } from "./severity"
 import type { WeatherAlert } from "./types"
 
 interface AlertListProps {
@@ -28,11 +30,12 @@ const order = ["emergency", "warning", "watch", "advisory"]
  */
 export function AlertList({
   alerts,
-  emptyText = "No warnings in force for this area.",
-  label = "Warnings",
+  emptyText,
+  label,
   emptyIcon = "check",
   className,
 }: AlertListProps) {
+  const t = useT()
   if (alerts.length === 0) {
     return (
       <p
@@ -46,7 +49,7 @@ export function AlertList({
         ) : (
           <CheckIcon className="size-4 shrink-0" aria-hidden="true" />
         )}
-        {emptyText}
+        {emptyText ?? t("weather.alerts.none")}
       </p>
     )
   }
@@ -54,7 +57,10 @@ export function AlertList({
   const sorted = [...alerts].sort((a, b) => order.indexOf(a.severity) - order.indexOf(b.severity))
 
   return (
-    <ul className={cn("flex flex-col gap-2", className)} aria-label={label}>
+    <ul
+      className={cn("flex flex-col gap-2", className)}
+      aria-label={label ?? t("weather.alerts.label")}
+    >
       {sorted.map((alert) => (
         <li
           key={alert.id}
@@ -65,37 +71,49 @@ export function AlertList({
             className="absolute inset-y-2 left-1.5 w-1 rounded-full"
             style={{ backgroundColor: severityColors[alert.severity] }}
           />
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm leading-snug font-medium text-foreground">{alert.title}</p>
-            <div className="mt-px flex shrink-0 items-center gap-1.5">
+          {/* Badges wrap under the title when the words run long (Tamil, Sinhala). */}
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+            <p
+              className="min-w-0 flex-1 basis-40 text-sm leading-snug font-medium break-words text-foreground"
+              lang={alert.titleLang}
+            >
+              {alert.title}
+            </p>
+            <div className="mt-px flex max-w-full flex-wrap items-center gap-1.5">
               {alert.estimate && (
-                <Badge variant="outline" title="Derived by Lanka Weather, not an official warning">
-                  Estimate
+                <Badge variant="outline" title={t("weather.alerts.estimateTitle")}>
+                  {t("terms.estimate")}
                 </Badge>
               )}
               <Badge variant={severityBadge[alert.severity]}>
                 {alert.badgeLabel ??
-                  (alert.estimate
-                    ? estimateLabels[alert.severity]
-                    : severityLabels[alert.severity])}
+                  (alert.estimate ? estimateLabel(alert.severity) : severityLabel(alert.severity))}
               </Badge>
             </div>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {alert.issuer} · {alert.area}
+          <p className="mt-1 text-xs break-words text-muted-foreground">
+            {alert.issuer}
+            {alert.area && ` · ${alert.area}`}
           </p>
           {alert.summary && (
-            <p className="mt-2 line-clamp-6 text-sm whitespace-pre-line text-foreground/90">
+            <p
+              className="mt-2 line-clamp-6 text-sm break-words whitespace-pre-line text-foreground/90"
+              lang={alert.summaryLang}
+            >
               {alert.summary}
             </p>
           )}
           {alert.excerpt && (
             <p className="mt-1 text-[0.6875rem] text-muted-foreground">
-              Excerpt, copied unchanged from the bulletin&apos;s English text.
+              {t("weather.alerts.excerpt")}
             </p>
           )}
           {alert.basis && (
-            <p className="mt-1.5 text-xs text-muted-foreground">Derived from: {alert.basis}</p>
+            <p className="mt-1.5 text-xs break-words text-muted-foreground">
+              {fillNodes(t("weather.alerts.derivedFrom"), {
+                basis: <span lang={alert.basisLang}>{alert.basis}</span>,
+              })}
+            </p>
           )}
           <p className="numeric mt-2 text-[0.6875rem] text-muted-foreground">
             <time dateTime={alert.issuedAt}>{formatDayTime(alert.issuedAt)}</time>
@@ -115,7 +133,7 @@ export function AlertList({
             >
               {alert.link.label}
               <ExternalLinkIcon className="size-3" aria-hidden="true" />
-              <span className="sr-only">(opens in a new tab)</span>
+              <span className="sr-only">{t("weather.alerts.newTab")}</span>
             </a>
           )}
         </li>

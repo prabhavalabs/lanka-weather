@@ -1,11 +1,12 @@
 import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import type { FeatureCollection } from "geojson"
 import { useEffect, useRef } from "react"
+import { useLocale, type Locale } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
 import { polygonSdf, type Point } from "../map/sdf"
 import { slotBefore, styleReady } from "../map/slots"
-import { alertTokens } from "./present"
+import { alertTokens, alertWord } from "./present"
 import type { CycloneCollection } from "./types"
 
 const SOURCE = "cyclones"
@@ -52,7 +53,27 @@ function readPalette() {
   })
 }
 
-function addLayers(map: MapLibreMap, data: CycloneCollection) {
+/** "MURASU-26 · Red", with GDACS's alert colour in the reader's language. */
+function labelField(locale: Locale): ExpressionSpecification {
+  return [
+    "concat",
+    ["get", "name"],
+    " · ",
+    [
+      "match",
+      ["get", "alertLevel"],
+      "Green",
+      alertWord("Green", locale),
+      "Orange",
+      alertWord("Orange", locale),
+      "Red",
+      alertWord("Red", locale),
+      ["to-string", ["get", "alertLevel"]],
+    ],
+  ]
+}
+
+function addLayers(map: MapLibreMap, data: CycloneCollection, locale: Locale) {
   const palette = readPalette()
   const alertColor = [
     "match",
@@ -217,7 +238,7 @@ function addLayers(map: MapLibreMap, data: CycloneCollection) {
         source: SOURCE,
         filter: kind("position"),
         layout: {
-          "text-field": ["concat", ["get", "name"], " · ", ["get", "alertLevel"]],
+          "text-field": labelField(locale),
           "text-font": ["Noto Sans Regular"],
           "text-size": 12,
           "text-offset": [0, 1.7],
@@ -267,13 +288,15 @@ interface CyclonesLayerProps {
  */
 export function CyclonesLayer({ data, selectedId }: CyclonesLayerProps) {
   const map = useMap()
+  const locale = useLocale()
   const dataRef = useRef(data ?? empty)
   const selectedRef = useRef(selectedId)
+  const localeRef = useRef(locale)
 
   useEffect(() => {
     if (!map) return
     const add = () => {
-      addLayers(map, dataRef.current)
+      addLayers(map, dataRef.current, localeRef.current)
       if (selectedRef.current) {
         map.setFeatureState({ source: SOURCE, id: selectedRef.current }, { selected: true })
       }
@@ -285,6 +308,14 @@ export function CyclonesLayer({ data, selectedId }: CyclonesLayerProps) {
       removeLayers(map)
     }
   }, [map])
+
+  // The labels follow the language without rebuilding the layers.
+  useEffect(() => {
+    localeRef.current = locale
+    if (map?.getLayer(POSITION_LABELS)) {
+      map.setLayoutProperty(POSITION_LABELS, "text-field", labelField(locale))
+    }
+  }, [map, locale])
 
   useEffect(() => {
     dataRef.current = data ?? empty

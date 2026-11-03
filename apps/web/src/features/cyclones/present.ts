@@ -1,4 +1,5 @@
 /** Words and colours for cyclones. Pure, so it is tested without a browser. */
+import { getLocale, translate, translateIn, type Locale } from "@/lib/i18n"
 import type { CycloneCollection, CyclonePosition, CycloneStatus } from "./types"
 
 export function positions(data: CycloneCollection | undefined): CyclonePosition[] {
@@ -20,16 +21,56 @@ export const alertBadge: Record<string, "normal" | "minor_flood" | "major_flood"
   Red: "major_flood",
 }
 
+type AlertKey = "green" | "orange" | "red"
+
+/** GDACS's alert colour in the reader's language; an unknown word stays as GDACS gives it. */
+export function alertWord(level: string, locale: Locale = getLocale()): string {
+  const key = level.trim().toLowerCase()
+  return key === "green" || key === "orange" || key === "red"
+    ? translateIn(locale, `terms.colour.${key as AlertKey}`)
+    : level
+}
+
+/** "GDACS Red alert" */
+export function alertText(level: string, locale: Locale = getLocale()): string {
+  return translateIn(locale, "cyclones.alert", { level: alertWord(level, locale) })
+}
+
+/**
+ * The sentence about the feed, from its status: what the server says in
+ * `meta.note`, in the reader's language. Empty when systems are listed and the
+ * feed is fresh.
+ */
+export function cycloneStatusNote(
+  meta: Pick<CycloneCollection["meta"], "status" | "stale">,
+  locale: Locale = getLocale(),
+): string {
+  switch (meta.status) {
+    case "waiting":
+      return translateIn(locale, "cyclones.status.waiting")
+    case "active":
+      return meta.stale ? translateIn(locale, "cyclones.status.activeStale") : ""
+    case "unknown":
+      return translateIn(locale, "cyclones.status.unknown")
+    case "none":
+      return translateIn(locale, "cyclones.status.none")
+  }
+  return ""
+}
+
 export function cycloneSummary(data: CycloneCollection): string[] {
   const systems = positions(data)
   if (systems.length > 0) {
     return [
       systems.length === 1
-        ? `${systems[0]!.name} active`
-        : `${systems.length} active: ${systems.map((system) => system.name).join(", ")}`,
+        ? translate("cyclones.summary.one", { name: systems[0]!.name })
+        : translate("cyclones.summary.many", {
+            count: systems.length,
+            names: systems.map((system) => system.name).join(", "),
+          }),
     ]
   }
-  return [data.meta.note]
+  return [cycloneStatusNote(data.meta) || data.meta.note]
 }
 
 /** Only this state may read as calm. */
@@ -56,5 +97,7 @@ export function boundsWithSriLanka(
   ]
 }
 
-export const evaluationNote =
-  "JTWC and IMD RSMC New Delhi advisories remain under evaluation as direct sources. Track data here is GDACS's, which draws on JTWC."
+/** Which sources are still being weighed: JTWC and IMD are not used directly yet. */
+export function evaluationNote(): string {
+  return translate("cyclones.evaluation")
+}

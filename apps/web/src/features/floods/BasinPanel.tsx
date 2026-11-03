@@ -3,13 +3,13 @@ import { Panel } from "@/components/Panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { GaugeList, type GaugeListItem } from "@/components/weather/GaugeList"
-import { formatAge } from "@/lib/format"
+import { formatAge, formatInteger } from "@/lib/format"
+import { type Translate, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { formatLevel } from "../rivers/present"
 import type { BasinGauge, BasinsDocument, BasinStatus } from "../river-risk/types"
-import { basinBadge, basinStateLabels } from "./basins"
-import { floodAreaLabels, floodTrendArrows } from "./present"
-import type { FloodAreaKind } from "./types"
+import { basinBadge, basinStateLabel } from "./basins"
+import { floodAreaLabel, floodTrendArrows } from "./present"
 
 interface BasinPanelProps {
   basin: BasinStatus
@@ -26,24 +26,25 @@ interface BasinPanelProps {
 }
 
 function gaugeItem(
+  t: Translate,
   gauge: BasinGauge,
   onSelectStation: (id: string) => void,
   onSelectGauge: (id: string) => void,
 ): GaugeListItem {
-  const notes = [gauge.stale ? "Out of date" : formatAge(gauge.observedAt)]
+  const notes = [gauge.stale ? t("common.outOfDate") : formatAge(gauge.observedAt)]
   if (gauge.kind === "google") notes.push("Google")
-  if (!gauge.verified) notes.push("not verified by Google")
+  if (!gauge.verified) notes.push(t("floods.basin.notVerified"))
   return {
     id: `${gauge.kind}:${gauge.id}`,
     title: gauge.name,
-    subtitle: notes.join(" · "),
+    subtitle: notes.join(t("common.separator")),
     value:
       gauge.waterLevel !== undefined && gauge.unit
         ? formatLevel(gauge.waterLevel, gauge.unit as "m" | "ft")
         : floodTrendArrows[gauge.trend as keyof typeof floodTrendArrows] || undefined,
     badge: gauge.state
-      ? { variant: basinBadge[gauge.state], label: basinStateLabels[gauge.state] }
-      : { variant: "unknown", label: "Not used" },
+      ? { variant: basinBadge[gauge.state], label: basinStateLabel(gauge.state) }
+      : { variant: "unknown", label: t("floods.basin.notUsed") },
     onSelect: () => (gauge.kind === "google" ? onSelectGauge(gauge.id) : onSelectStation(gauge.id)),
   }
 }
@@ -61,11 +62,12 @@ export function BasinPanel({
   onWeatherAt,
   className,
 }: BasinPanelProps) {
-  const gauges = basin.gauges.map((gauge) => gaugeItem(gauge, onSelectStation, onSelectGauge))
+  const t = useT()
+  const gauges = basin.gauges.map((gauge) => gaugeItem(t, gauge, onSelectStation, onSelectGauge))
   const areas: GaugeListItem[] = basin.areas.map((area) => ({
     id: area.id,
-    title: floodAreaLabels[area.kind as FloodAreaKind] ?? area.kind,
-    badge: { variant: basinBadge[area.state], label: basinStateLabels[area.state] },
+    title: floodAreaLabel(area.kind),
+    badge: { variant: basinBadge[area.state], label: basinStateLabel(area.state) },
     onSelect: () => onSelectArea(area.id),
   }))
   return (
@@ -74,63 +76,64 @@ export function BasinPanel({
       title={basin.name}
       subtitle={
         <>
-          {basin.named ? "River basin" : "Coast outside any named basin"} ·{" "}
-          <span className="numeric">{Math.round(basin.areaKm2).toLocaleString("en-GB")} km²</span>
+          {basin.named ? t("floods.basin.river") : t("floods.basin.coast")}
+          {t("common.separator")}
+          <span className="numeric">{formatInteger(Math.round(basin.areaKm2))} km²</span>
         </>
       }
       className={cn("w-full", className)}
       action={
-        <Button variant="outline" size="icon" onClick={onClose} aria-label="Close basin details">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onClose}
+          aria-label={t("floods.basin.close")}
+        >
           <XIcon />
         </Button>
       }
-      footer={
-        <p>
-          Boundary: {meta.attribution}. Official flood warnings come from the Irrigation Department
-          and the DMC.
-        </p>
-      }
+      footer={<p>{t("floods.basin.footer", { attribution: meta.attribution })}</p>}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={basinBadge[basin.state]}>{basinStateLabels[basin.state]}</Badge>
+        <Badge variant={basinBadge[basin.state]}>{basinStateLabel(basin.state)}</Badge>
         {basin.onlyUnverified && (
           <Badge variant="chip" className="text-foreground">
-            Unverified gauges only
+            {t("floods.basin.unverifiedOnly")}
           </Badge>
         )}
         {meta.seeded && (
           <Badge variant="destructive" className="uppercase">
-            Test data
+            {t("floods.testData")}
           </Badge>
         )}
       </div>
 
       <p className="text-sm text-foreground">
         {basin.state === "no_forecast"
-          ? "No current gauge or forecast covers this basin, so nothing is known about flooding here. That does not mean it is safe."
+          ? t("floods.basin.noForecast")
           : basin.state === "no_flooding"
-            ? "No gauge or forecast in this basin is above normal."
-            : `The worst gauge or forecast in this basin reads ${basinStateLabels[basin.state].toLowerCase()}.`}
+            ? t("floods.basin.calm")
+            : t("floods.basin.worst", { state: basinStateLabel(basin.state).toLowerCase() })}
       </p>
       {basin.observedAt && (
         <p className="numeric text-xs text-muted-foreground">
-          Newest reading {formatAge(basin.observedAt)}
+          {t("floods.basin.newest", { age: formatAge(basin.observedAt) })}
         </p>
       )}
 
-      <GaugeList title="Gauges and forecasts here" items={gauges} />
-      <GaugeList title="Google flood areas touching this basin" items={areas} />
+      <GaugeList title={t("floods.basin.gauges")} items={gauges} />
+      <GaugeList title={t("floods.basin.areas")} items={areas} />
 
       <div className="flex flex-wrap gap-2">
         {basin.riverId && (
           <Button variant="secondary" size="sm" onClick={() => onSelectRiver(basin.riverId!)}>
-            Open the river
+            {t("floods.basin.openRiver")}
           </Button>
         )}
         {clickedAt && (
           <Button variant="secondary" size="sm" onClick={() => onWeatherAt(clickedAt)}>
             <MapPinIcon />
-            Weather at this place
+            {t("floods.basin.weatherHere")}
           </Button>
         )}
       </div>

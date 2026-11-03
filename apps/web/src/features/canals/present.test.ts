@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { changeText, groupCanals, shownState, stateLabel } from "./present"
+import { changeText, groupCanals, seaTrendText, shownState, stateLabel } from "./present"
 import type { CanalGauge } from "./types"
 
 const gauge = (name: string, group: string, state: string, stale = false): CanalGauge => ({
@@ -20,6 +20,20 @@ describe("stateLabel", () => {
     expect(stateLabel("offline")).toBe("Not reporting")
     expect(stateLabel("surging")).toBe("surging")
   })
+
+  it("reads in Sinhala and Tamil", () => {
+    expect(stateLabel("offline", "si")).not.toBe("Not reporting")
+    expect(stateLabel("rising", "ta")).not.toBe("Rising")
+    expect(stateLabel("surging", "ta")).toBe("surging")
+  })
+})
+
+describe("seaTrendText", () => {
+  it("translates the words the source uses and keeps others in English", () => {
+    expect(seaTrendText("rising slowly")).toEqual({ text: "rising slowly", english: false })
+    expect(seaTrendText("falling", "si").english).toBe(false)
+    expect(seaTrendText("ebbing", "si")).toEqual({ text: "ebbing", english: true })
+  })
 })
 
 describe("shownState", () => {
@@ -38,11 +52,7 @@ describe("groupCanals", () => {
       gauge("Silent", "Kelani River", "offline"),
       gauge("Calm", "Kelani River", "normal"),
     ])
-    expect(groups.map((group) => group.name)).toEqual([
-      "Kelani River",
-      "North Canal",
-      "Other gauges",
-    ])
+    expect(groups.map((group) => group.name)).toEqual(["Kelani River", "North Canal", ""])
     expect(groups[0]!.gauges.map((item) => item.name)).toEqual(["High", "Calm", "Silent"])
   })
 })

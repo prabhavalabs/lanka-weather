@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
 import {
   ageBand,
+  ageLabel,
+  distanceFromSriLanka,
+  reviewLabel,
   earthquakeParts,
   formatDistance,
   magnitudeRadius,
@@ -81,7 +85,25 @@ describe("earthquakes", () => {
   })
 
   it("says the flag is not a warning and points to the DMC", () => {
-    expect(tsunamiNote).toContain("not a warning for Sri Lanka")
-    expect(tsunamiNote).toContain("Disaster Management Centre")
+    expect(tsunamiNote()).toContain("not a warning for Sri Lanka")
+    expect(tsunamiNote()).toContain("Disaster Management Centre")
+  })
+})
+
+describe("earthquake words in the reader's language", () => {
+  it("keeps units and groups thousands in every language", () => {
+    setLocale("si")
+    try {
+      expect(distanceFromSriLanka(1605)).toBe("ශ්‍රී ලංකාවේ සිට 1,605 km")
+      expect(ageLabel("day")).toBe("පසුගිය පැය 24")
+      expect(earthquakeParts(collection([6.24]))).toEqual(["දින 30 තුළ 1", "ප්‍රබලතම M6.2"])
+    } finally {
+      setLocale("en")
+    }
+  })
+
+  it("translates USGS's review status and keeps an unknown one", () => {
+    expect(reviewLabel("reviewed")).toBe("Reviewed")
+    expect(reviewLabel("pending")).toBe("pending")
   })
 })

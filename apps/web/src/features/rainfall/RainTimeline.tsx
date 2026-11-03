@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { formatAge } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import type { ResolvedTheme } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { liftedColour, rainImageLift, stepLabel } from "./present"
@@ -22,12 +23,17 @@ interface RainTimelineProps {
 
 /** NASA's colours at round rates, drawn as the map draws them. */
 export function RainImageScale({ data, theme }: { data: RainSteps; theme: ResolvedTheme }) {
+  const t = useT()
   const lift = rainImageLift(theme)
   const stops = data.legend.stops
   return (
     <div
       className="flex items-center gap-2"
-      aria-label={`Satellite image colours, from ${stops[0]?.rateMmH} to ${stops.at(-1)?.rateMmH} ${data.legend.unit} and above`}
+      aria-label={t("rain.timeline.scale", {
+        from: stops[0]?.rateMmH ?? 0,
+        to: stops.at(-1)?.rateMmH ?? 0,
+        unit: data.legend.unit,
+      })}
       role="img"
     >
       <ol
@@ -67,12 +73,13 @@ export function RainTimeline({
   theme,
   className,
 }: RainTimelineProps) {
+  const t = useT()
   const count = data.steps.length
   const label = step ? stepLabel(step) : ""
   const age = step ? formatAge(step.endsAt) : ""
   return (
     <section
-      aria-label="Satellite rain image time"
+      aria-label={t("rain.timeline.section")}
       className={cn(
         "pointer-events-auto flex w-full max-w-[23rem] flex-col gap-2 rounded-2xl md:w-[23rem] border border-border bg-card/95 px-3 py-2.5 text-card-foreground shadow-panel backdrop-blur-md",
         className,
@@ -85,7 +92,7 @@ export function RainTimeline({
             size="icon"
             className="size-8 shrink-0"
             onClick={() => onPlayingChange(!playing)}
-            aria-label={playing ? "Pause the rain images" : "Play the rain images"}
+            aria-label={playing ? t("rain.timeline.pause") : t("rain.timeline.play")}
           >
             {playing ? <PauseIcon /> : <PlayIcon />}
           </Button>
@@ -100,20 +107,20 @@ export function RainTimeline({
             if (value !== undefined) onIndexChange(value)
           }}
           disabled={count < 2}
-          thumbLabel="Time of the satellite rain image"
-          thumbValueText={`${label}, ${age}`}
+          thumbLabel={t("rain.timeline.thumb")}
+          thumbValueText={t("rain.timeline.thumbValue", { time: label, age })}
         />
-        <p className="w-[9.25rem] shrink-0 text-right leading-tight">
+        <p className="max-w-[45%] min-w-[9.25rem] shrink-0 text-right leading-tight">
           <span className="numeric block text-sm text-foreground">{age}</span>
           <span className="numeric block text-[0.6875rem] text-muted-foreground">{label}</span>
         </p>
       </div>
       <RainImageScale data={data} theme={theme} />
-      <p className="flex items-center justify-between gap-3 text-[0.6875rem] text-muted-foreground">
-        <span>Estimate · NASA IMERG · lags by hours</span>
+      <p className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[0.6875rem] text-muted-foreground">
+        <span>{t("rain.timeline.note")}</span>
         {data.stale && (
           <Badge variant="chip" className="h-5 px-1.5 text-[0.6875rem] text-foreground">
-            Out of date
+            {t("rain.timeline.outOfDate")}
           </Badge>
         )}
       </p>

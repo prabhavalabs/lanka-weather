@@ -7,6 +7,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { SearchCommand } from "@/components/weather/SearchCommand"
 import { apiGet } from "@/lib/api"
+import { useLocale } from "@/lib/i18n"
 import { useDebouncedValue } from "@/lib/useDebouncedValue"
 import { useLocalStorage } from "@/lib/useLocalStorage"
 import type { RiverRisk } from "../river-risk/types"
@@ -14,6 +15,7 @@ import type { ReservoirsCollection } from "../reservoirs/types"
 import type { RiverLevelsCollection } from "../rivers/types"
 import {
   addRecent,
+  relabel,
   reservoirEntries,
   riverEntries,
   searchEntry,
@@ -45,9 +47,14 @@ export default function SearchPalette({
   riverNetwork,
   reservoirs,
 }: SearchPaletteProps) {
+  const locale = useLocale()
   const [query, setQuery] = useState("")
   const [storedRecent, setRecent] = useLocalStorage<unknown>(recentKey, [])
-  const recent = useMemo(() => validRecent(storedRecent), [storedRecent])
+  // Recent searches are stored with the words of their day; they read in today's language.
+  const recent = useMemo(
+    () => validRecent(storedRecent).map((entry) => relabel(entry, locale)),
+    [storedRecent, locale],
+  )
   const term = useDebouncedValue(query.trim(), 160)
 
   const search = useQuery({
@@ -61,17 +68,17 @@ export default function SearchPalette({
     // The API caches results for an hour.
     staleTime: 60 * 60 * 1000,
     placeholderData: keepPreviousData,
-    meta: { label: "search results" },
+    meta: { label: "app.data.search" },
   })
 
   const entries = useMemo<SearchEntry[]>(() => {
     if (!term) return []
-    const places = (search.data?.results ?? []).map(searchEntry)
-    const stations = rivers ? stationEntries(rivers.features, term) : []
-    const named = riverNetwork ? riverEntries(riverNetwork, term) : []
-    const dams = reservoirs ? reservoirEntries(reservoirs.features, term) : []
+    const places = (search.data?.results ?? []).map((result) => searchEntry(result, locale))
+    const stations = rivers ? stationEntries(rivers.features, term, undefined, locale) : []
+    const named = riverNetwork ? riverEntries(riverNetwork, term, undefined, locale) : []
+    const dams = reservoirs ? reservoirEntries(reservoirs.features, term, undefined, locale) : []
     return [...named, ...places, ...stations, ...dams]
-  }, [search.data, rivers, riverNetwork, reservoirs, term])
+  }, [search.data, rivers, riverNetwork, reservoirs, term, locale])
 
   const byId = useMemo(() => {
     const map = new Map<string, SearchEntry>()
@@ -104,10 +111,11 @@ export default function SearchPalette({
         onChoose(entry.choice)
       }}
       footer={
-        <>
+        // Data credits, as the sources publish them.
+        <span lang="en">
           Places © OpenStreetMap contributors (ODbL). Regions: Survey Department and Department of
           Census and Statistics. Reservoirs: Sri Lanka Water Levels (waterlevels.lk).
-        </>
+        </span>
       }
     />
   )

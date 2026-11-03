@@ -1,5 +1,6 @@
 import { BellIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 interface WarningsButtonProps {
@@ -21,18 +22,18 @@ export function WarningsButton({
   onClick,
   className,
 }: WarningsButtonProps) {
-  const state = stale ? ", out of date" : ""
+  const t = useT()
   return (
     <Button
       type="button"
       variant="secondary"
       size="sm"
       onClick={onClick}
-      aria-label={`Official warnings, ${count} in force${state}`}
+      aria-label={t(stale ? "warnings.button.labelStale" : "warnings.button.label", { count })}
       className={cn(!compact && "rounded-full bg-card/95 shadow-panel backdrop-blur-md", className)}
     >
       <BellIcon />
-      {!compact && "Warnings"}
+      {!compact && t("warnings.button.text")}
       {count > 0 && (
         <span className="numeric rounded-full bg-brand px-1.5 text-[0.6875rem] leading-4 text-brand-foreground">
           {count}

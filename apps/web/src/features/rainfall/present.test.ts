@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { liftedColour, rainImageLift, stepLabel, tilesInBounds, tileUrl } from "./present"
+import {
+  liftedColour,
+  methodLabel,
+  rainImageLift,
+  stepLabel,
+  tilesInBounds,
+  tileUrl,
+} from "./present"
 
 describe("tilesInBounds", () => {
   it("finds the nine collected tiles from their bounds", () => {
@@ -38,5 +45,15 @@ describe("stepLabel", () => {
     expect(stepLabel({ validAt: "2026-11-02T13:30:00Z", endsAt: "2026-11-02T14:00:00Z" })).toBe(
       "Mon 2 Nov 19:00–19:30",
     )
+    expect(
+      stepLabel({ validAt: "2026-11-02T13:30:00Z", endsAt: "2026-11-02T14:00:00Z" }, "ta"),
+    ).toContain("19:00–19:30")
+  })
+})
+
+describe("methodLabel", () => {
+  it("says how a total was reached, in the language", () => {
+    expect(methodLabel("sum_gauge")).toBe("Sum of hourly river gauge readings")
+    expect(methodLabel("sum_3h", "si")).toContain("කාලගුණ විද්‍යා දෙපාර්තමේන්තුවේ")
   })
 })

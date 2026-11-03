@@ -1,6 +1,7 @@
 import { MapLegend } from "@/components/weather/MapLegend"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import { bandLabels, bandOrder, bandRanges, bandTokens } from "./present"
+import { bandLabel, bandOrder, bandRange, bandTokens } from "./present"
 import type { RainBand } from "./types"
 
 function Drop({ band }: { band: RainBand }) {
@@ -31,14 +32,17 @@ export function RainGaugeLegend({
   bare?: boolean
   className?: string
 }) {
+  const t = useT()
   const entries = (
     <ul className="flex flex-col gap-1.5 text-xs">
       {bandOrder.map((band) => (
         <li key={band} className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-2">
             <Drop band={band} />
-            <span className="text-foreground">{bandLabels[band]}</span>
-            <span className="truncate text-muted-foreground">{bandRanges[band]}</span>
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+              <span className="text-foreground">{bandLabel(band)}</span>
+              <span className="text-muted-foreground">{bandRange(band)}</span>
+            </span>
           </span>
           {counts && <span className="numeric text-foreground">{counts[band]}</span>}
         </li>
@@ -47,7 +51,11 @@ export function RainGaugeLegend({
   )
   if (bare) return <div className={cn(className)}>{entries}</div>
   return (
-    <MapLegend title="Rain gauges" unit="last 24 h" className={cn("w-72", className)}>
+    <MapLegend
+      title={t("rain.gauges.legendTitle")}
+      unit={t("rain.gauges.legendUnit")}
+      className={cn("w-72", className)}
+    >
       {entries}
     </MapLegend>
   )

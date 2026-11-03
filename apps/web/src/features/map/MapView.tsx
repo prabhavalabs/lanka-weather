@@ -1,9 +1,12 @@
 import * as maplibregl from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
+import sinhalaFontUrl from "@fontsource-variable/noto-sans-sinhala/files/noto-sans-sinhala-sinhala-wght-normal.woff2?url"
+import tamilFontUrl from "@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2?url"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { getLocale, translateIn, useLocale, useT, type Locale } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
-import { basemapTokens, tuneBasemap } from "./basemap"
+import { basemapTokens, labelFields, localisedLabel, tuneBasemap } from "./basemap"
 import { mapStyles, minimumZoom, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
 
@@ -13,12 +16,44 @@ import { MapContext } from "./MapContext"
 maplibregl.setWorkerUrl(workerUrl)
 
 /**
- * Tunes each fetched basemap to the theme in effect. The `dark` class is set
- * before a theme change reaches React, so the tokens read here already
- * belong to the new theme.
+ * The app's own Sinhala and Tamil fonts, for map text in those scripts
+ * (basemap.ts). Absolute, because MapLibre loads them outside the page.
+ */
+const scriptFonts = {
+  sinhala: new URL(sinhalaFontUrl, window.location.href).href,
+  tamil: new URL(tamilFontUrl, window.location.href).href,
+}
+
+/**
+ * Tunes each fetched basemap to the theme and language in effect. The `dark`
+ * class is set before a theme change reaches React, so the tokens read here
+ * already belong to the new theme.
  */
 const transformStyle: maplibregl.TransformStyleFunction = (_previous, next) =>
-  tuneBasemap(next, readTokens(basemapTokens))
+  tuneBasemap(next, readTokens(basemapTokens), { locale: getLocale(), fonts: scriptFonts })
+
+/** MapLibre's own button labels, in a language. */
+function controlStrings(locale: Locale): Record<string, string> {
+  const t = (key: Parameters<typeof translateIn>[1]) => translateIn(locale, key)
+  return {
+    "NavigationControl.ZoomIn": t("map.controls.zoomIn"),
+    "NavigationControl.ZoomOut": t("map.controls.zoomOut"),
+    "NavigationControl.ResetBearing": t("map.controls.resetBearing"),
+    "GeolocateControl.FindMyLocation": t("map.controls.findMyLocation"),
+    "GeolocateControl.LocationNotAvailable": t("map.controls.locationNotAvailable"),
+    "AttributionControl.ToggleAttribution": t("map.controls.toggleAttribution"),
+    "AttributionControl.MapFeedback": t("map.controls.mapFeedback"),
+  }
+}
+
+/** The control buttons MapLibre has already drawn, by the string that labels them. */
+const controlButtons: Record<string, string> = {
+  "NavigationControl.ZoomIn": ".maplibregl-ctrl-zoom-in",
+  "NavigationControl.ZoomOut": ".maplibregl-ctrl-zoom-out",
+  "NavigationControl.ResetBearing": ".maplibregl-ctrl-compass",
+  "GeolocateControl.FindMyLocation": ".maplibregl-ctrl-geolocate",
+  "AttributionControl.ToggleAttribution": ".maplibregl-ctrl-attrib-button",
+}
 
 interface MapViewProps {
   theme: MapTheme
@@ -54,6 +89,7 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
       minZoom: minimumZoom,
       maxZoom: 16,
       attributionControl: { compact: true },
+      locale: controlStrings(getLocale()),
     })
     instance.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right")
     instance.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right")
@@ -77,6 +113,29 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // A language change relabels the basemap in place; the style is not reloaded.
+  const locale = useLocale()
+  useEffect(() => {
+    if (!map) return
+    for (const { id, original } of labelFields(map.getStyle().layers)) {
+      map.setLayoutProperty(
+        id,
+        "text-field",
+        localisedLabel(original, locale) as maplibregl.ExpressionSpecification,
+      )
+    }
+    // MapLibre labels its buttons once, when it draws them: relabel them in place.
+    const strings = controlStrings(locale)
+    for (const [key, selector] of Object.entries(controlButtons)) {
+      for (const button of map.getContainer().querySelectorAll<HTMLElement>(selector)) {
+        if (key === "GeolocateControl.FindMyLocation" && button.hasAttribute("disabled")) continue
+        button.title = strings[key]!
+        button.setAttribute("aria-label", strings[key]!)
+      }
+    }
+  }, [map, locale])
+
+  const t = useT()
   const loadedTheme = useRef(theme)
   useEffect(() => {
     if (!map || loadedTheme.current === theme) return
@@ -95,7 +154,7 @@ export function MapView({ theme, onReady, children }: MapViewProps) {
         <div
           ref={container}
           className="h-full w-full"
-          aria-label="Map of Sri Lanka"
+          aria-label={t("app.mapLabel")}
           role="region"
         />
       </div>

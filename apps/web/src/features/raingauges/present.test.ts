@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest"
 import type { ObservedRainCollection } from "../rainfall/types"
-import { bandMinZoom, countBands, seriesPath, shownAt, withoutLiveDuplicates } from "./present"
+import {
+  bandLabel,
+  bandMinZoom,
+  bandRange,
+  countBands,
+  gaugesSummary,
+  seriesPath,
+  shownAt,
+  withoutLiveDuplicates,
+} from "./present"
 import type { RainGaugeCollection } from "./types"
 
 describe("what shows at which zoom", () => {
@@ -18,6 +27,20 @@ describe("what shows at which zoom", () => {
 
   it("never brings an out-of-date gauge in earlier than a dry one", () => {
     expect(bandMinZoom.unknown).toBeGreaterThanOrEqual(bandMinZoom.none)
+  })
+})
+
+describe("words", () => {
+  it("names each band and its range in the language", () => {
+    expect(bandLabel("very_heavy")).toBe("Very heavy")
+    expect(bandRange("heavy")).toBe("50 to 100 mm")
+    expect(bandLabel("heavy", "si")).toBe("තද වැසි")
+    expect(bandLabel("none", "ta")).toBe("மழை இல்லை")
+  })
+
+  it("sums up the gauges", () => {
+    const meta = { fresh: 258, total: 275, wet: 31 } as RainGaugeCollection["meta"]
+    expect(gaugesSummary(meta)).toBe("258 of 275 current · 31 with 10 mm or more")
   })
 })
 

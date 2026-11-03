@@ -16,9 +16,15 @@ export type WeatherCondition =
   | "windy"
 
 export interface Place {
+  /** The name in the reader's language, else in English. */
   name: string
-  /** The name in Sinhala (or Tamil), shown under the English name. */
+  /**
+   * The name in another script, shown beside the area: the Sinhala name when
+   * reading English, the English name when reading Sinhala or Tamil.
+   */
   localName?: string
+  /** The language of `localName` (BCP 47); Sinhala when not given. */
+  localNameLang?: string
   /** Administrative context, smallest first, e.g. "Mahanuwara › Gangawata Korale › Kandy › Central". */
   area: string
   latitude: number
@@ -97,6 +103,13 @@ export interface WeatherAlert {
   estimate?: boolean
   /** For estimates, the data it was derived from. */
   basis?: string
+  /**
+   * The language of `title`, `summary` or `basis` when it is not the
+   * reader's, e.g. "en" for English text from the server or a bulletin.
+   */
+  titleLang?: string
+  summaryLang?: string
+  basisLang?: string
   /** Who issued it, e.g. "Department of Meteorology". */
   issuer: string
   /** Where it applies, e.g. "Ratnapura, Kegalle and Kalutara districts". */
@@ -131,6 +144,8 @@ export interface SearchResult {
   title: string
   /** The name in Sinhala or Tamil, shown after the title. */
   localName?: string
+  /** The language of `localName` (BCP 47); Sinhala when not given. */
+  localNameLang?: string
   /** Second line, e.g. "Kalu Ganga · river gauge". */
   subtitle?: string
   /** Short value on the right, e.g. a level or a temperature. */

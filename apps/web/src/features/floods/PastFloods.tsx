@@ -8,12 +8,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Layer } from "@/lib/layers"
-import { formatDay } from "@/lib/format"
+import { formatDay, formatInteger } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { useMap } from "../map/MapContext"
 import { slotBefore, styleReady } from "../map/slots"
 import type { PastFlood, PastFloodsDocument } from "../river-risk/types"
+import { pastFloodMagnitude, pastFloodName } from "./present"
 
 const SOURCE = "past-floods"
 /** The extents: what clicks and hovers hit. */
@@ -158,6 +160,7 @@ interface PastFloodsListProps {
 
 /** The mapped events, newest first, under the layer's switch. */
 export function PastFloodsList({ data, selectedId, onSelect }: PastFloodsListProps) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-2">
       <p className="flex items-start gap-2 text-xs text-muted-foreground">
@@ -165,7 +168,9 @@ export function PastFloodsList({ data, selectedId, onSelect }: PastFloodsListPro
           aria-hidden="true"
           className="mt-0.5 inline-block h-2.5 w-3.5 shrink-0 rounded-[2px] border border-past-flood bg-[repeating-linear-gradient(135deg,var(--past-flood)_0,var(--past-flood)_1px,transparent_1px,transparent_3px)]"
         />
-        Past events, not a current forecast. {data?.meta.attribution ?? "Irrigation Department"}.
+        {t("floods.past.legend", {
+          attribution: data?.meta.attribution ?? t("terms.agency.irrigation"),
+        })}
       </p>
       {data ? (
         <ScrollArea
@@ -185,9 +190,11 @@ export function PastFloodsList({ data, selectedId, onSelect }: PastFloodsListPro
                     selectedId === event.id && "bg-accent",
                   )}
                 >
-                  <span className="min-w-0 truncate text-foreground">{event.name}</span>
+                  <span className="min-w-0 truncate text-foreground" title={pastFloodName(event)}>
+                    {pastFloodName(event)}
+                  </span>
                   <span className="numeric shrink-0 text-muted-foreground">
-                    {Math.round(event.areaKm2).toLocaleString("en-GB")} km²
+                    {formatInteger(Math.round(event.areaKm2))} km²
                   </span>
                 </button>
               </li>
@@ -198,17 +205,35 @@ export function PastFloodsList({ data, selectedId, onSelect }: PastFloodsListPro
         <Skeleton
           className="h-24 w-full rounded-xl"
           role="status"
-          aria-label="Loading past floods"
+          aria-label={t("floods.past.loadingList")}
         />
       )}
     </div>
   )
 }
 
+/** "As published: {name}", the source's own title set in italics, in English as published. */
+function AsPublished({ template, name }: { template: string; name: string }) {
+  const [before = "", after = ""] = template.split("{name}")
+  return (
+    <>
+      {before}
+      <span className="italic" lang="en">
+        {name}
+      </span>
+      {after}
+    </>
+  )
+}
+
 interface PastFloodPanelProps {
   event: PastFlood | undefined
   loading: boolean
-  note: string | undefined
+  /**
+   * The server's English note. The panel shows its own words for it, in the
+   * current language, so this is kept only for callers that pass it.
+   */
+  note?: string | undefined
   attribution: string | undefined
   onClose: () => void
   className?: string
@@ -218,13 +243,13 @@ interface PastFloodPanelProps {
 export function PastFloodPanel({
   event,
   loading,
-  note,
   attribution,
   onClose,
   className,
 }: PastFloodPanelProps) {
+  const t = useT()
   const close = (
-    <Button variant="outline" size="icon" onClick={onClose} aria-label="Close past flood details">
+    <Button variant="outline" size="icon" onClick={onClose} aria-label={t("floods.past.close")}>
       <XIcon />
     </Button>
   )
@@ -232,14 +257,18 @@ export function PastFloodPanel({
     return (
       <Panel
         icon={<HistoryIcon />}
-        title="Past flood"
+        title={t("floods.past.title")}
         className={cn("w-full", className)}
         action={close}
       >
         {loading ? (
-          <Skeleton className="h-24 w-full rounded-2xl" role="status" aria-label="Loading" />
+          <Skeleton
+            className="h-24 w-full rounded-2xl"
+            role="status"
+            aria-label={t("common.loading")}
+          />
         ) : (
-          <p className="text-sm text-muted-foreground">This event is not in the mapped floods.</p>
+          <p className="text-sm text-muted-foreground">{t("floods.past.missing")}</p>
         )}
       </Panel>
     )
@@ -247,38 +276,53 @@ export function PastFloodPanel({
   return (
     <Panel
       icon={<HistoryIcon />}
-      title={event.name}
-      subtitle="Past flood"
+      title={pastFloodName(event)}
+      subtitle={t("floods.past.title")}
       className={cn("w-full", className)}
       action={close}
-      footer={<p>Source: {attribution ?? "Irrigation Department of Sri Lanka"}.</p>}
+      footer={
+        <p>
+          {t("floods.past.source", {
+            attribution: attribution ?? t("terms.agency.irrigation"),
+          })}
+        </p>
+      }
     >
       <div className="flex flex-wrap items-center gap-2">
-        <Badge className="border-past-flood bg-transparent text-foreground">Past event</Badge>
+        <Badge className="border-past-flood bg-transparent text-foreground">
+          {t("floods.past.pastEvent")}
+        </Badge>
         <Badge variant="chip" className="text-foreground">
-          Not a forecast
+          {t("floods.past.notForecast")}
         </Badge>
       </div>
-      <p className="text-sm text-foreground">{note}</p>
+      <p className="text-sm text-foreground">{t("floods.past.note")}</p>
       <LabeledRows>
-        <LabeledRow label="When" value={event.date ? formatDay(event.date) : String(event.year)} />
+        <LabeledRow
+          label={t("floods.past.when")}
+          value={event.date ? formatDay(event.date) : String(event.year)}
+        />
         {event.magnitude && (
           <LabeledRow
-            label="Mapped as"
-            value={event.magnitude[0]!.toUpperCase() + event.magnitude.slice(1)}
+            label={t("floods.past.mappedAs")}
+            value={pastFloodMagnitude(event.magnitude)}
             numeric={false}
           />
         )}
         <LabeledRow
-          label="Mapped extent"
-          value={`${Math.round(event.areaKm2).toLocaleString("en-GB")} km²`}
+          label={t("floods.past.extent")}
+          value={`${formatInteger(Math.round(event.areaKm2))} km²`}
         />
         {event.districts.length > 0 && (
-          <LabeledRow label="Districts" value={event.districts.join(", ")} numeric={false} />
+          <LabeledRow
+            label={t("floods.past.districts")}
+            value={<span lang="en">{event.districts.join(", ")}</span>}
+            numeric={false}
+          />
         )}
       </LabeledRows>
-      <p className="text-xs text-muted-foreground">
-        As published: <span className="italic">{event.sourceName}</span>
+      <p className="break-words text-xs text-muted-foreground">
+        <AsPublished template={t("floods.past.asPublished")} name={event.sourceName} />
       </p>
     </Panel>
   )

@@ -11,18 +11,20 @@ import {
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command"
+import { useT, scriptLang } from "@/lib/i18n"
 
 import type { SearchResult, SearchResultKind } from "./types"
 
 // The trigger lives apart so the page can show it without loading the palette.
 export { SearchTrigger } from "./SearchTrigger"
 
-const groups: { kind: SearchResultKind; heading: string; Icon: typeof MapPinIcon }[] = [
-  { kind: "river", heading: "Rivers", Icon: WavesIcon },
-  { kind: "place", heading: "Places", Icon: MapPinIcon },
-  { kind: "station", heading: "River gauges", Icon: RadioTowerIcon },
-  { kind: "reservoir", heading: "Reservoirs", Icon: ContainerIcon },
-  { kind: "area", heading: "Administrative areas", Icon: ShapesIcon },
+/** Result groups in order; headings are `weather.search.groups.*` and `weather.search.recent.*`. */
+const groups: { kind: SearchResultKind; Icon: typeof MapPinIcon }[] = [
+  { kind: "river", Icon: WavesIcon },
+  { kind: "place", Icon: MapPinIcon },
+  { kind: "station", Icon: RadioTowerIcon },
+  { kind: "reservoir", Icon: ContainerIcon },
+  { kind: "area", Icon: ShapesIcon },
 ]
 
 interface SearchCommandProps {
@@ -60,6 +62,7 @@ export function SearchCommand({
   shortcut = true,
   footer,
 }: SearchCommandProps) {
+  const t = useT()
   React.useEffect(() => {
     if (!shortcut) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -78,8 +81,8 @@ export function SearchCommand({
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Search"
-      description="Find a place, a river gauge or an administrative area"
+      title={t("weather.search.title")}
+      description={t("weather.search.description")}
       className="sm:max-w-lg"
     >
       {/* Filtering is done by the parent, so cmdk's own filter is off. */}
@@ -87,23 +90,31 @@ export function SearchCommand({
         <CommandInput
           value={query}
           onValueChange={onQueryChange}
-          placeholder="Search places, rivers, areas…"
+          placeholder={t("weather.search.placeholder")}
         />
         <CommandList className="max-h-[min(60dvh,24rem)] px-1.5 pb-1.5">
-          {!loading && <CommandEmpty>{query ? "Nothing found." : "Type to search."}</CommandEmpty>}
+          {!loading && (
+            <CommandEmpty>
+              {query ? t("weather.search.nothingFound") : t("weather.search.typeToSearch")}
+            </CommandEmpty>
+          )}
           {loading && (
             <p className="py-6 text-center text-sm text-muted-foreground" role="status">
-              Searching…
+              {t("weather.search.searching")}
             </p>
           )}
           {!loading &&
-            groups.map(({ kind, heading, Icon }) => {
+            groups.map(({ kind, Icon }) => {
               const items = shown.filter((result) => result.kind === kind)
               if (items.length === 0) return null
               return (
                 <CommandGroup
                   key={kind}
-                  heading={query.trim() === "" ? `Recent ${heading.toLowerCase()}` : heading}
+                  heading={
+                    query.trim() === ""
+                      ? t(`weather.search.recent.${kind}`)
+                      : t(`weather.search.groups.${kind}`)
+                  }
                 >
                   {items.map((result) => (
                     <CommandItem
@@ -118,7 +129,10 @@ export function SearchCommand({
                         <span className="block truncate">
                           {result.title}
                           {result.localName && (
-                            <span className="ml-2 text-muted-foreground" lang="si">
+                            <span
+                              className="ml-2 text-muted-foreground"
+                              lang={result.localNameLang ?? scriptLang(result.localName)}
+                            >
                               {result.localName}
                             </span>
                           )}

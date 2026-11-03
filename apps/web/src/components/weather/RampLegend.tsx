@@ -1,3 +1,4 @@
+import { useT } from "@/lib/i18n"
 import type { ScaleStep } from "@/lib/tokens"
 
 import { MapLegend } from "./MapLegend"
@@ -25,18 +26,22 @@ export function RampLegend({
   bare,
   className,
 }: RampLegendProps) {
+  const t = useT()
   const stops = scale.map(
     (step, index) => `var(${step.token}) ${((index / (scale.length - 1)) * 100).toFixed(1)}%`,
   )
   const labels = scale.map((step, index) =>
     step.from === null ? `≤${(scale[index + 1]?.from ?? 0) - openSpan}` : String(step.from),
   )
-  const describe = ends ? ` (${ends[0]} to ${ends[1]})` : ""
+  const range = { from: labels[0] ?? "", to: labels.at(-1) ?? "", unit }
+  const description = ends
+    ? t("weather.legend.rampEnds", { ...range, start: ends[0], end: ends[1] })
+    : t("weather.legend.ramp", range)
   return (
     <MapLegend title={title} unit={unit} bare={bare} className={className}>
       <div
         role="img"
-        aria-label={`Colour ramp from ${labels[0]} to ${labels.at(-1)} ${unit} and above${describe}`}
+        aria-label={description}
         className="h-2.5 rounded-full ring-1 ring-black/10 ring-inset dark:ring-white/10"
         style={{ backgroundImage: `linear-gradient(to right, ${stops.join(", ")})` }}
       />

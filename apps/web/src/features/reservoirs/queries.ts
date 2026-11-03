@@ -17,7 +17,7 @@ export function useReservoirs(layer: Layer | undefined, enabled: boolean) {
     },
     enabled: enabled && Boolean(layer?.dataPath),
     ...(layer ? queryTimings(layer) : {}),
-    meta: { label: "reservoirs" },
+    meta: { label: "app.data.reservoirs" },
   })
 }
 
@@ -35,7 +35,7 @@ export function useReservoirAreas(layer: Layer | undefined, enabled: boolean) {
     },
     enabled: enabled && Boolean(layer),
     ...(layer ? queryTimings(layer) : {}),
-    meta: { label: "reservoir areas" },
+    meta: { label: "app.data.reservoirAreas" },
   })
 }
 

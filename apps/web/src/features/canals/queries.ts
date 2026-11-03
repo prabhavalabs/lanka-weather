@@ -10,6 +10,6 @@ export function useCanals(enabled: boolean) {
     queryFn: ({ signal }) => apiGet<CanalsDocument>("/v1/rivers/canals", signal),
     enabled,
     ...layerQueryOptions({ refreshSeconds: 1800 }),
-    meta: { label: "the Colombo canal levels" },
+    meta: { label: "app.data.canals" },
   })
 }

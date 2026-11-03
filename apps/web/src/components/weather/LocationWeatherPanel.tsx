@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { compassPoint, formatClock, formatDayTime, formatNumber } from "@/lib/format"
+import { intlTag, useT, type MessageKey, type Translate } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 import { AlertList } from "./AlertList"
 import { ConditionIcon } from "./ConditionIcon"
 import { DailyForecast } from "./DailyForecast"
 import { ForecastStrip } from "./ForecastStrip"
-import { estimateLabels } from "./severity"
+import { estimateLabel } from "./severity"
 import type {
   CurrentConditions,
   ForecastDay,
@@ -63,11 +64,11 @@ interface LocationWeatherPanelProps {
   className?: string
 }
 
-const tabLabels: Record<Tab, string> = {
-  hourly: "72 hours",
-  daily: "7 days",
-  wind: "Wind",
-  alerts: "Warnings",
+const tabs: Record<Tab, MessageKey> = {
+  hourly: "weather.panel.tabs.hourly",
+  daily: "weather.panel.tabs.daily",
+  wind: "weather.panel.tabs.wind",
+  alerts: "weather.panel.tabs.alerts",
 }
 
 /**
@@ -87,13 +88,14 @@ export function LocationWeatherPanel({
   officialNote,
   officialBulletins = [],
   status = current ? "ready" : "loading",
-  unavailableText = "Weather is not available here yet.",
+  unavailableText,
   highlight,
   children,
   sources,
   onClose,
   className,
 }: LocationWeatherPanelProps) {
+  const t = useT()
   const [hour, setHour] = React.useState(0)
   const [tab, setTab] = React.useState<Tab>("hourly")
   const selected = forecast[hour]
@@ -115,7 +117,7 @@ export function LocationWeatherPanel({
       subtitle={
         place.localName ? (
           <>
-            <span lang="si">{place.localName}</span>
+            <span lang={place.localNameLang ?? "si"}>{place.localName}</span>
             {place.area && ` · ${place.area}`}
           </>
         ) : (
@@ -129,7 +131,7 @@ export function LocationWeatherPanel({
             variant="outline"
             size="icon"
             onClick={onClose}
-            aria-label={`Close weather for ${place.name}`}
+            aria-label={t("weather.panel.closeFor", { name: place.name })}
           >
             <XIcon />
           </Button>
@@ -137,7 +139,7 @@ export function LocationWeatherPanel({
       }
     >
       {status === "loading" && (
-        <div className="flex flex-col gap-3" role="status" aria-label="Loading weather">
+        <div className="flex flex-col gap-3" role="status" aria-label={t("weather.panel.loading")}>
           <Skeleton className="h-10 w-36" />
           <Skeleton className="h-4 w-52" />
           <Skeleton className="h-28 w-full rounded-2xl" />
@@ -147,7 +149,9 @@ export function LocationWeatherPanel({
       {status === "unavailable" && (
         <DottedGrid className="flex flex-col items-center gap-2 px-4 py-8 text-center">
           <CloudOffIcon className="size-5 text-muted-foreground" aria-hidden="true" />
-          <p className="text-sm text-foreground">{unavailableText}</p>
+          <p className="text-sm text-foreground">
+            {unavailableText ?? t("weather.panel.unavailable")}
+          </p>
         </DottedGrid>
       )}
 
@@ -156,13 +160,16 @@ export function LocationWeatherPanel({
           <div className="flex items-start gap-4">
             <StatValue
               className="flex-1"
-              label="Modelled now"
+              label={t("weather.panel.modelledNow")}
               value={formatNumber(current.temperatureC, 1)}
               unit="°C"
               caption={
                 current.feelsLikeC === null
                   ? current.summary
-                  : `${current.summary} · feels like ${formatNumber(current.feelsLikeC)}°`
+                  : t("weather.panel.feelsLike", {
+                      summary: current.summary,
+                      value: formatNumber(current.feelsLikeC),
+                    })
               }
             />
             <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border bg-inset">
@@ -188,15 +195,14 @@ export function LocationWeatherPanel({
         >
           <TriangleAlertIcon className="size-4 shrink-0 text-brand-text" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-foreground">
+            <span className="block truncate font-medium text-foreground" lang={top.titleLang}>
               {top.title}
               {top.badgeLabel && ` · ${top.badgeLabel}`}
             </span>
             <span className="block truncate text-xs text-muted-foreground">
-              {top.estimate
-                ? `Estimate · ${estimateLabels[top.severity].toLowerCase()}`
-                : top.issuer}
-              {warningCount > 1 && ` · ${warningCount - 1} more`}
+              {warningCount > 1
+                ? t("weather.panel.andMore", { text: topLine(top, t), count: warningCount - 1 })
+                : topLine(top, t)}
             </span>
           </span>
           <ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden="true" />
@@ -205,10 +211,11 @@ export function LocationWeatherPanel({
 
       {status !== "unavailable" && (
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="gap-3">
-          <TabsList className="w-full">
-            {(Object.keys(tabLabels) as Tab[]).map((key) => (
-              <TabsTrigger key={key} value={key}>
-                {tabLabels[key]}
+          {/* Tabs size to their words and the row scrolls sideways if they run past the panel (Tamil). */}
+          <TabsList className="w-full justify-start overflow-x-auto [scrollbar-width:none]">
+            {(Object.keys(tabs) as Tab[]).map((key) => (
+              <TabsTrigger key={key} value={key} className="flex-auto shrink-0 px-2">
+                {t(tabs[key])}
                 {key === "alerts" && warningCount > 0 && (
                   <span className="numeric ml-0.5 rounded-full bg-brand px-1.5 text-[0.6875rem] leading-4 text-brand-foreground">
                     {warningCount}
@@ -227,35 +234,29 @@ export function LocationWeatherPanel({
                 {selected && (
                   <LabeledRows>
                     <LabeledRow
-                      label="Time"
+                      label={t("weather.panel.time")}
                       value={
                         hour === 0
-                          ? `Now · ${formatClock(selected.time)}`
+                          ? t("weather.panel.nowAt", { time: formatClock(selected.time) })
                           : formatDayTime(selected.time)
                       }
                     />
                     <LabeledRow
-                      label="Temperature"
+                      label={t("weather.panel.temperature")}
                       value={`${formatNumber(selected.temperatureC, 1)} °C`}
                     />
                     <LabeledRow
-                      label="Rain"
-                      value={`${formatNumber(selected.rainfallMm, 1)} mm · ${selected.rainChancePercent}%`}
+                      label={t("weather.panel.rain")}
+                      value={t("weather.panel.rainValue", {
+                        amount: formatNumber(selected.rainfallMm, 1),
+                        chance: selected.rainChancePercent,
+                      })}
                       tone={selected.rainfallMm >= 10 ? "signal" : "default"}
                     />
                     {selected.windSpeedKmh !== undefined && selected.windSpeedKmh !== null && (
                       <LabeledRow
-                        label="Wind"
-                        value={
-                          `${formatNumber(selected.windSpeedKmh)} km/h` +
-                          (selected.windFromDegrees !== null &&
-                          selected.windFromDegrees !== undefined
-                            ? ` ${compassPoint(selected.windFromDegrees)}`
-                            : "") +
-                          (selected.gustKmh !== null && selected.gustKmh !== undefined
-                            ? ` · gusts ${formatNumber(selected.gustKmh)}`
-                            : "")
-                        }
+                        label={t("weather.panel.wind")}
+                        value={hourWind(selected, selected.windSpeedKmh, t)}
                       />
                     )}
                   </LabeledRows>
@@ -283,13 +284,19 @@ export function LocationWeatherPanel({
                 />
                 <LabeledRows className="flex-1">
                   <LabeledRow
-                    label="From"
-                    value={`${compassPoint(wind.fromDegrees)} · ${Math.round(wind.fromDegrees)}°`}
+                    label={t("weather.panel.from")}
+                    value={t("weather.panel.fromValue", {
+                      direction: compassPoint(wind.fromDegrees),
+                      degrees: Math.round(wind.fromDegrees),
+                    })}
                   />
-                  <LabeledRow label="Speed" value={`${formatNumber(wind.speedKmh)} km/h`} />
                   <LabeledRow
-                    label="Gusts"
-                    value={`${formatNumber(wind.gustKmh)} km/h`}
+                    label={t("weather.panel.speed")}
+                    value={t("weather.panel.speedValue", { speed: formatNumber(wind.speedKmh) })}
+                  />
+                  <LabeledRow
+                    label={t("weather.panel.gusts")}
+                    value={t("weather.panel.speedValue", { speed: formatNumber(wind.gustKmh) })}
                     tone={wind.gustKmh >= 50 ? "signal" : "default"}
                   />
                 </LabeledRows>
@@ -301,11 +308,13 @@ export function LocationWeatherPanel({
 
           <TabsContent value="alerts" className="flex flex-col gap-4">
             <section className="flex flex-col gap-2">
-              <h3 className="text-xs font-medium text-muted-foreground">Official warnings</h3>
+              <h3 className="text-xs font-medium text-muted-foreground">
+                {t("weather.panel.officialWarnings")}
+              </h3>
               <AlertList
                 alerts={officialAlerts}
-                label="Official warnings"
-                emptyText={officialNote ?? "No official warnings in force for this area."}
+                label={t("weather.panel.officialWarnings")}
+                emptyText={officialNote ?? t("weather.panel.officialNone")}
                 emptyIcon={officialNote ? "info" : "check"}
               />
               {officialAlerts.length > 0 && officialNote && (
@@ -314,23 +323,28 @@ export function LocationWeatherPanel({
               {officialBulletins.length > 0 && (
                 <>
                   <h3 className="mt-2 text-xs font-medium text-muted-foreground">
-                    Latest bulletins
+                    {t("weather.panel.latestBulletins")}
                   </h3>
-                  <AlertList alerts={officialBulletins} label="Latest official bulletins" />
+                  <AlertList
+                    alerts={officialBulletins}
+                    label={t("weather.panel.latestBulletinsLabel")}
+                  />
                 </>
               )}
             </section>
             <section className="flex flex-col gap-2">
               <div>
-                <h3 className="text-xs font-medium text-muted-foreground">Estimates</h3>
+                <h3 className="text-xs font-medium text-muted-foreground">
+                  {t("weather.panel.estimates")}
+                </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Derived by Lanka Weather from forecasts and gauges. Not official warnings.
+                  {t("weather.panel.estimatesNote")}
                 </p>
               </div>
               <AlertList
                 alerts={alerts}
-                label="Estimates"
-                emptyText="No hazards estimated from the forecast."
+                label={t("weather.panel.estimates")}
+                emptyText={t("weather.panel.estimatesNone")}
               />
             </section>
           </TabsContent>
@@ -344,73 +358,98 @@ export function LocationWeatherPanel({
   )
 }
 
+/** The top alert's second line: an estimate's level, or the issuer of an official warning. */
+function topLine(alert: WeatherAlert, t: Translate): string {
+  if (!alert.estimate) return alert.issuer
+  const level = estimateLabel(alert.severity).toLocaleLowerCase(intlTag())
+  return t("weather.panel.estimateLevel", { level })
+}
+
+/** An hour's wind: "12 km/h SW · gusts 25". */
+function hourWind(hour: ForecastHour, speedKmh: number, t: Translate): string {
+  const speed = formatNumber(speedKmh)
+  const wind =
+    hour.windFromDegrees !== null && hour.windFromDegrees !== undefined
+      ? t("weather.panel.speedFrom", { speed, direction: compassPoint(hour.windFromDegrees) })
+      : t("weather.panel.speedValue", { speed })
+  return hour.gustKmh !== null && hour.gustKmh !== undefined
+    ? t("weather.panel.withGusts", { wind, gust: formatNumber(hour.gustKmh) })
+    : wind
+}
+
 /** Small label-over-value cells in a hairline grid. */
 function CurrentGrid({ current, wind }: { current: CurrentConditions; wind: WindReading | null }) {
+  const t = useT()
   const cells: { label: string; value: string; note?: string }[] = [
     {
-      label: "Humidity",
+      label: t("weather.current.humidity"),
       value: current.humidityPercent === null ? "–" : `${Math.round(current.humidityPercent)}%`,
       note:
         current.dewPointC === null || current.dewPointC === undefined
           ? ""
-          : `dew ${formatNumber(current.dewPointC)}°`,
+          : t("weather.current.dew", { value: formatNumber(current.dewPointC) }),
     },
     {
-      label: "Rain now",
+      label: t("weather.current.rainNow"),
       value: current.rainfallMm === null ? "–" : `${formatNumber(current.rainfallMm, 1)} mm`,
-      note: "this hour",
+      note: t("weather.current.thisHour"),
     },
     {
-      label: "Chance",
+      label: t("weather.current.chance"),
       value:
         current.rainChancePercent === null || current.rainChancePercent === undefined
           ? "–"
           : `${Math.round(current.rainChancePercent)}%`,
-      note: "this hour",
+      note: t("weather.current.thisHour"),
     },
     {
-      label: "Rain, 24 h",
+      label: t("weather.current.rain24h"),
       value:
         current.rainNext24hMm === null || current.rainNext24hMm === undefined
           ? "–"
           : `${formatNumber(current.rainNext24hMm, 1)} mm`,
-      note: "ahead",
+      note: t("weather.current.ahead"),
     },
     {
-      label: "Wind",
+      label: t("weather.current.wind"),
       value: wind ? `${formatNumber(wind.speedKmh)} km/h` : "–",
       note: wind ? compassPoint(wind.fromDegrees) : "",
     },
     {
-      label: "Cloud",
+      label: t("weather.current.cloud"),
       value:
         current.cloudCoverPercent === null || current.cloudCoverPercent === undefined
           ? "–"
           : `${Math.round(current.cloudCoverPercent)}%`,
-      note: "cover",
+      note: t("weather.current.cover"),
     },
     {
-      label: "Pressure",
+      label: t("weather.current.pressure"),
       value: current.pressureHpa === null ? "–" : `${formatNumber(current.pressureHpa)}`,
       note: "hPa",
     },
     {
-      label: "UV index",
+      label: t("weather.current.uvIndex"),
       value:
         current.uvIndex === null || current.uvIndex === undefined
           ? "–"
           : formatNumber(current.uvIndex),
-      note: uvWords(current.uvIndex),
+      note: uvWords(current.uvIndex, t),
     },
   ]
   return (
     <dl className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border">
       {cells.map((cell) => (
         <div key={cell.label} className="flex min-w-0 flex-col gap-0.5 bg-card px-2.5 py-2">
-          <dt className="truncate text-[0.6875rem] text-muted-foreground">{cell.label}</dt>
+          <dt className="truncate text-[0.6875rem] text-muted-foreground" title={cell.label}>
+            {cell.label}
+          </dt>
           <dd className="numeric truncate text-sm text-foreground">{cell.value}</dd>
           {cell.note !== undefined && (
-            <dd className="numeric truncate text-[0.6875rem] text-muted-foreground">
+            <dd
+              className="numeric truncate text-[0.6875rem] text-muted-foreground"
+              title={cell.note || undefined}
+            >
               {cell.note || " "}
             </dd>
           )}
@@ -421,11 +460,11 @@ function CurrentGrid({ current, wind }: { current: CurrentConditions; wind: Wind
 }
 
 /** WHO UV index categories. */
-function uvWords(uv: number | null | undefined) {
+function uvWords(uv: number | null | undefined, t: Translate) {
   if (uv === null || uv === undefined) return undefined
-  if (uv < 3) return "low"
-  if (uv < 6) return "moderate"
-  if (uv < 8) return "high"
-  if (uv < 11) return "very high"
-  return "extreme"
+  if (uv < 3) return t("weather.uv.low")
+  if (uv < 6) return t("weather.uv.moderate")
+  if (uv < 8) return t("weather.uv.high")
+  if (uv < 11) return t("weather.uv.veryHigh")
+  return t("weather.uv.extreme")
 }

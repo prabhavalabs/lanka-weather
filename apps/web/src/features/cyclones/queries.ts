@@ -11,6 +11,6 @@ export function useCyclones(layer: Layer | undefined, enabled: boolean) {
       apiGetBare<CycloneCollection>(layer!.dataPath!, signal, "application/geo+json"),
     enabled: enabled && Boolean(layer?.dataPath),
     ...(layer ? layerQueryOptions(layer) : {}),
-    meta: { label: "cyclones" },
+    meta: { label: "app.data.cyclones" },
   })
 }

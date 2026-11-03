@@ -10,6 +10,6 @@ export function useOverview(enabled: boolean) {
     enabled,
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
-    meta: { label: "the overview" },
+    meta: { label: "app.data.overview" },
   })
 }

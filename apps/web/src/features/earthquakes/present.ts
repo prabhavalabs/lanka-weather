@@ -1,4 +1,6 @@
 /** Words and shades for earthquakes. Pure, so it is tested without a browser. */
+import { formatInteger, formatNumber } from "@/lib/format"
+import { translate } from "@/lib/i18n"
 import type { EarthquakeCollection } from "./types"
 
 export type AgeBand = "day" | "week" | "month"
@@ -13,10 +15,9 @@ export function ageBand(time: string, now: Date = new Date()): AgeBand {
 }
 
 export const ageOpacity: Record<AgeBand, number> = { day: 0.95, week: 0.65, month: 0.35 }
-export const ageLabels: Record<AgeBand, string> = {
-  day: "Last 24 hours",
-  week: "Last 7 days",
-  month: "Last 30 days",
+/** "Last 24 hours", "Last 7 days", "Last 30 days" */
+export function ageLabel(band: AgeBand): string {
+  return translate(`earthquakes.age.${band}`)
 }
 
 /** Circle radius in pixels at the map's middle zooms. */
@@ -47,17 +48,40 @@ export function strongest(data: EarthquakeCollection | undefined) {
 
 export function earthquakeParts(data: EarthquakeCollection): string[] {
   const peak = strongest(data)
-  if (!peak) return [`None of M4.5+ in ${data.meta.windowDays} days`]
+  const days = data.meta.windowDays
+  if (!peak) return [translate("earthquakes.summary.none", { days })]
   return [
-    `${data.features.length} in ${data.meta.windowDays} days`,
-    `strongest M${peak.properties.magnitude.toFixed(1)}`,
+    translate("earthquakes.summary.count", { count: data.features.length, days }),
+    translate("earthquakes.summary.strongest", { magnitude: magnitude(peak.properties.magnitude) }),
   ]
+}
+
+/** "6.2": a magnitude as USGS gives it, to one decimal. */
+export function magnitude(value: number): string {
+  return formatNumber(value, 1)
 }
 
 /** "4,512 km" */
 export function formatDistance(km: number): string {
-  return `${Math.round(km).toLocaleString("en-GB")} km`
+  return `${formatInteger(Math.round(km))} km`
 }
 
-export const tsunamiNote =
-  "USGS has set its tsunami flag on this event. The flag is an indicator that the event is in an oceanic region and large enough to look at; it is not a warning for Sri Lanka. For tsunami warnings, follow the Disaster Management Centre and the Department of Meteorology."
+/** "4,512 km from Sri Lanka" */
+export function distanceFromSriLanka(km: number): string {
+  return translate("earthquakes.fromSriLanka", { distance: formatDistance(km) })
+}
+
+/** What USGS's tsunami flag means, and whom to follow for warnings. */
+export function tsunamiNote(): string {
+  return translate("earthquakes.tsunami")
+}
+
+const reviewStatus = ["reviewed", "automatic", "deleted"] as const
+
+/** USGS's review status in the reader's language; an unknown word stays as USGS gives it. */
+export function reviewLabel(status: string): string {
+  const key = status.trim().toLowerCase()
+  return (reviewStatus as readonly string[]).includes(key)
+    ? translate(`earthquakes.status.${key as (typeof reviewStatus)[number]}`)
+    : status
+}

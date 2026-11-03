@@ -2,6 +2,7 @@ import type * as React from "react"
 
 import { DetailSheet } from "@/components/DetailSheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useT } from "@/lib/i18n"
 import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
 import { cn } from "@/lib/utils"
 
@@ -54,7 +55,7 @@ export function AppShell({
   toolbar,
   detail,
   onDetailClose,
-  detailLabel = "Details",
+  detailLabel,
   detailFull = false,
   detailSmall = false,
   legends,
@@ -63,6 +64,7 @@ export function AppShell({
   className,
 }: AppShellProps) {
   const desktop = useMediaQuery(desktopQuery, true)
+  const t = useT()
   return (
     <main
       className={cn(
@@ -125,7 +127,7 @@ export function AppShell({
         <DetailSheet
           open={Boolean(detail)}
           onClose={() => onDetailClose?.()}
-          label={detailLabel}
+          label={detailLabel ?? t("common.details")}
           openFull={detailFull}
           openSmall={detailSmall}
         >

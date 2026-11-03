@@ -1,5 +1,6 @@
 import { DottedGrid } from "@/components/DottedGrid"
-import { formatClock, formatDay } from "@/lib/format"
+import { formatDayTime } from "@/lib/format"
+import { useT } from "@/lib/i18n"
 import { chartGeometry, type ChartReading, type ChartThreshold } from "./chart"
 
 interface LevelChartProps {
@@ -14,11 +15,12 @@ const height = 120
 
 /** Water level over time with the station's flood thresholds as reference lines. */
 export function LevelChart({ readings, thresholds, unit, hours }: LevelChartProps) {
+  const t = useT()
   const geometry = chartGeometry(readings, thresholds, width, height)
   if (readings.length === 0) {
     return (
       <DottedGrid className="px-4 py-8 text-center text-xs text-muted-foreground">
-        No readings in the last {hours} hours.
+        {t("rivers.chart.empty", { hours })}
       </DottedGrid>
     )
   }
@@ -36,7 +38,7 @@ export function LevelChart({ readings, thresholds, unit, hours }: LevelChartProp
           viewBox={`0 0 ${width} ${height}`}
           className="h-32 w-full overflow-visible text-foreground"
           role="img"
-          aria-label={`Water level over the last ${hours} hours, in ${unit}`}
+          aria-label={t("rivers.chart.label", { hours, unit })}
           preserveAspectRatio="none"
         >
           {area && <path d={area} fill="currentColor" opacity={0.06} />}
@@ -75,16 +77,12 @@ export function LevelChart({ readings, thresholds, unit, hours }: LevelChartProp
           />
         )}
       </DottedGrid>
-      <figcaption className="numeric flex justify-between text-[0.6875rem] text-muted-foreground">
-        <time dateTime={first.observedAt}>
-          {formatDay(first.observedAt)} {formatClock(first.observedAt)}
-        </time>
+      <figcaption className="numeric flex flex-wrap justify-between gap-x-2 text-[0.6875rem] text-muted-foreground">
+        <time dateTime={first.observedAt}>{formatDayTime(first.observedAt)}</time>
         <span>
           {geometry.yMin.toFixed(1)}–{geometry.yMax.toFixed(1)} {unit}
         </span>
-        <time dateTime={last.observedAt}>
-          {formatDay(last.observedAt)} {formatClock(last.observedAt)}
-        </time>
+        <time dateTime={last.observedAt}>{formatDayTime(last.observedAt)}</time>
       </figcaption>
     </figure>
   )

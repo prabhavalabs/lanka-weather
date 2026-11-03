@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale, translateIn } from "@/lib/i18n"
 import {
   atRisk,
   coverageText,
   reachIdsByLevel,
+  reasonBasis,
+  reasonText,
+  rebuildReason,
+  riskLabels,
+  riverName,
   riskHeadline,
   riversAtRisk,
   riverSearchNames,
@@ -136,5 +142,91 @@ describe("riverSearchNames", () => {
     expect(
       riverSearchNames({ name: "Malwathu Oya", nameSi: "මල්වතු ඔය", aliases: ["Aruvi Aru"] }),
     ).toEqual(["Malwathu Oya", "මල්වතු ඔය", "Aruvi Aru"])
+  })
+})
+
+describe("riverName", () => {
+  it("uses the Sinhala name where the data has one, else English", () => {
+    const named = { name: "Malwathu Oya", nameSi: "මල්වතු ඔය" }
+    expect(riverName(named, "en")).toBe("Malwathu Oya")
+    expect(riverName(named, "si")).toBe("මල්වතු ඔය")
+    expect(riverName(named, "ta")).toBe("Malwathu Oya")
+    expect(riverName({ name: "Kelani Ganga", nameSi: null }, "si")).toBe("Kelani Ganga")
+  })
+})
+
+describe("in Sinhala and Tamil", () => {
+  afterEach(() => setLocale("en"))
+
+  it("words the headline, coverage and levels", () => {
+    setLocale("si")
+    const headline = riskHeadline(document([river("a", "high")]), new Date("2026-11-02T12:00:00Z"))
+    expect(headline.title).toBe("අවදානමේ ඇති ගංගා 1")
+    expect(headline.detail).toContain("මිනුම් ස්ථාන 40න් 38ක්")
+    expect(coverageText({ gaugedReaches: 0, reaches: [] })).toBe("මෙම ගඟේ මිනුම් ස්ථානයක් නැත")
+    setLocale("ta")
+    expect(riskLabels.severe).toBe("கடும் அபாயம்")
+  })
+
+  it("never names our estimate with the Irrigation Department's status words", () => {
+    for (const locale of ["en", "si", "ta"] as const) {
+      expect(translateIn(locale, "rivers.risk.level.watch")).not.toBe(
+        translateIn(locale, "terms.riverStatus.alert"),
+      )
+    }
+  })
+})
+
+describe("reasonText", () => {
+  const reason = (kind: string, text: string) => ({ kind, text })
+
+  it("keeps the server's sentence in English", () => {
+    const text = "Kalu Ganga at Ratnapura is at 5.20 m, above its alert level of 5.00 m."
+    expect(reasonText(reason("gauge", text), "en")).toEqual({ text, english: false })
+  })
+
+  it("rebuilds the sentences it knows, which read the same in English", () => {
+    const sentences: [string, string][] = [
+      ["coverage", "No gauge on this stretch, so its level is not known."],
+      [
+        "coverage",
+        "No gauge on this stretch, so its level is not known. The next gauge downstream is Hanwella.",
+      ],
+      ["rain", "The rain forecast is out of date, so it is not used."],
+      [
+        "rain",
+        "Heavy rain is forecast over the catchment: 120 mm in the next 24 hours and 210 mm in 72 hours on average.",
+      ],
+      ["gauge", "Hanwella publishes no alert level to compare with."],
+      ["gauge", "Hanwella is at 6.10 m, above its minor flood level of 6.00 m."],
+      [
+        "gauge",
+        "Hanwella is at 4.80 m, below its alert level of 5.00 m. It is within 0.20 m of that level.",
+      ],
+      [
+        "gauge",
+        "Hanwella is at 5.50 m, above its alert level of 5.00 m. Rising 0.20 m an hour, it would reach minor flood level in about 3 hours.",
+      ],
+    ]
+    for (const [kind, text] of sentences) {
+      // Rebuilt in English, each matches the server's sentence exactly.
+      expect(rebuildReason(reason(kind, text), "en")).toBe(text)
+      const parts = reasonText(reason(kind, text), "si")
+      expect(parts.english, text).toBe(false)
+      expect(parts.text, text).not.toBe(text)
+    }
+    expect(reasonText(reason("gauge", sentences[5]![1]), "si").text).toBe(
+      "Hanwella හි ජල මට්ටම 6.10 m කි; එය 6.00 m වන සුළු ගංවතුර මට්ටමට ඉහළින් ය.",
+    )
+    expect(reasonText(reason("gauge", sentences[7]![1]), "ta").text).toContain(
+      "ஏறத்தாழ 3 மணித்தியாலத்தில்",
+    )
+  })
+
+  it("keeps an unknown sentence in English, marked as such", () => {
+    const text = "Victoria is spilling 1,200 cusecs directly upstream."
+    expect(reasonText(reason("reservoir", text), "ta")).toEqual({ text, english: true })
+    expect(reasonBasis("reservoir", "ta")).toBe("மேல்நோக்கிய நீர்த்தேக்கம் ஒன்றின்படி")
+    expect(reasonBasis("surprise", "en")).toBe("Estimate")
   })
 })

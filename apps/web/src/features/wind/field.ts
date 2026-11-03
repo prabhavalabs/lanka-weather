@@ -4,6 +4,8 @@
  * it, and how to read it at any point. Ported from TerraGuard, whose
  * format the API keeps. Pure, so it is tested without a browser.
  */
+import { compassPoint as formatCompassPoint } from "@/lib/format"
+import { getLocale, translateIn, type Locale } from "@/lib/i18n"
 
 /** The API's answer, as far as the map needs it. */
 export type WindResponse = {
@@ -114,34 +116,15 @@ export function sampleWind(field: WindField, lon: number, lat: number): [number,
   return sampleInto(field, lon, lat, out) ? out : null
 }
 
-const POINTS = [
-  "N",
-  "NNE",
-  "NE",
-  "ENE",
-  "E",
-  "ESE",
-  "SE",
-  "SSE",
-  "S",
-  "SSW",
-  "SW",
-  "WSW",
-  "W",
-  "WNW",
-  "NW",
-  "NNW",
-]
-
 /** Where the wind blows from, in degrees clockwise from north, as forecasters give it. */
 export function windFrom(u: number, v: number): number {
   const degrees = (Math.atan2(-u, -v) * 180) / Math.PI
   return (degrees + 360) % 360
 }
 
-/** One of the 16 compass points. */
-export function compassPoint(degrees: number): string {
-  return POINTS[Math.round((((degrees % 360) + 360) % 360) / 22.5) % 16]!
+/** One of the 16 compass points, in the current language ("NE" in English). */
+export function compassPoint(degrees: number, locale: Locale = getLocale()): string {
+  return formatCompassPoint(degrees, 16, locale)
 }
 
 export const KMH_PER_MS = 3.6
@@ -150,11 +133,13 @@ export const KNOTS_PER_MS = 3600 / 1852
 /** Below this the wind has no meaningful direction. */
 const CALM_MS = 0.5
 
-/** "35 km/h (19 kt) from the NE", or "Calm". */
-export function windText(u: number, v: number): string {
+/** "35 km/h (19 kt) from the NE", or "Calm", in the current language. */
+export function windText(u: number, v: number, locale: Locale = getLocale()): string {
   const speed = Math.hypot(u, v)
-  if (speed < CALM_MS) return "Calm"
-  const kmh = Math.round(speed * KMH_PER_MS)
-  const knots = Math.round(speed * KNOTS_PER_MS)
-  return `${kmh} km/h (${knots} kt) from the ${compassPoint(windFrom(u, v))}`
+  if (speed < CALM_MS) return translateIn(locale, "grid.wind.calm")
+  return translateIn(locale, "grid.wind.text", {
+    kmh: Math.round(speed * KMH_PER_MS),
+    knots: Math.round(speed * KNOTS_PER_MS),
+    direction: compassPoint(windFrom(u, v), locale),
+  })
 }

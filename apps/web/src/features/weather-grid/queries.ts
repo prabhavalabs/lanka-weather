@@ -11,6 +11,6 @@ export function useCurrentGrid(layer: Layer | undefined, enabled: boolean) {
       apiGetBare<CurrentGrid>(layer?.dataPath ?? "/v1/weather/current", signal),
     enabled: enabled && Boolean(layer),
     ...layerQueryOptions(layer ?? { refreshSeconds: 3600 }),
-    meta: { label: "the weather grid" },
+    meta: { label: "app.data.grid" },
   })
 }

@@ -1,5 +1,6 @@
 import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl"
 import { useEffect, useRef } from "react"
+import { useLocale, type Locale } from "@/lib/i18n"
 import type { Layer } from "@/lib/layers"
 import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
@@ -120,6 +121,23 @@ interface LayerState {
   version: string
   ids: Record<RiskLevel, number[]>
   selected: string | null
+  /** The label text: the river's name in the reader's language. */
+  label: ExpressionSpecification
+}
+
+/**
+ * River labels in the reader's language. The tiles carry the English name and
+ * the river's id; the Sinhala names come with the risk document, so they are
+ * matched by id. Rivers have no Tamil names in the data, so Tamil shows English.
+ */
+function labelField(locale: Locale, rivers: RiverRisk[]): ExpressionSpecification {
+  const english: ExpressionSpecification = ["to-string", ["coalesce", ["get", "name"], ""]]
+  if (locale !== "si") return english
+  const pairs = rivers.flatMap((river) =>
+    river.nameSi && river.nameSi.trim() !== "" ? [river.id, river.nameSi] : [],
+  )
+  if (pairs.length === 0) return english
+  return ["match", ["to-string", ["get", "river"]], ...pairs, english] as ExpressionSpecification
 }
 
 function colours() {
@@ -309,7 +327,7 @@ function addLayers(map: MapLibreMap, layer: Layer, state: LayerState) {
         layout: {
           "symbol-placement": "line",
           "symbol-spacing": 280,
-          "text-field": ["get", "name"],
+          "text-field": state.label,
           "text-font": ["Noto Sans Italic"],
           "text-size": ["interpolate", ["linear"], ["zoom"], 7, 11, 11, 14],
           "text-letter-spacing": 0.04,
@@ -403,10 +421,12 @@ interface RiverNetworkLayerProps {
  */
 export function RiverNetworkLayer({ layer, rivers, version, selectedId }: RiverNetworkLayerProps) {
   const map = useMap()
+  const locale = useLocale()
   const state = useRef<LayerState>({
     version: version ?? "",
     ids: reachIdsByLevel(rivers ?? []),
     selected: selectedId,
+    label: labelField(locale, rivers ?? []),
   })
   const layerRef = useRef(layer)
 
@@ -433,6 +453,14 @@ export function RiverNetworkLayer({ layer, rivers, version, selectedId }: RiverN
     state.current = { ...state.current, ids: reachIdsByLevel(rivers ?? []) }
     if (map && styleReady(map)) applyRisk(map, state.current)
   }, [map, rivers])
+
+  // Labels follow the language without reloading tiles.
+  useEffect(() => {
+    state.current = { ...state.current, label: labelField(locale, rivers ?? []) }
+    if (map && styleReady(map) && map.getLayer(LABELS)) {
+      map.setLayoutProperty(LABELS, "text-field", state.current.label)
+    }
+  }, [map, locale, rivers])
 
   useEffect(() => {
     state.current = { ...state.current, selected: selectedId }

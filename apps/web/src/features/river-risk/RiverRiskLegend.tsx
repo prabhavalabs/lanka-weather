@@ -1,5 +1,8 @@
 import { MapLegend } from "@/components/weather/MapLegend"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { riskLabels } from "./present"
+import type { RiskLevel } from "./types"
 
 /** A short piece of river as drawn on the map: the line and its non-colour cue. */
 function Line({
@@ -39,26 +42,22 @@ function Line({
   )
 }
 
-const entries = [
+const entries: { level: RiskLevel; line: Parameters<typeof Line>[0] }[] = [
   {
-    label: "Severe",
-    note: "likely overflowing",
-    line: { color: "var(--status-major-flood)", width: 6, mark: "chevron" as const },
+    level: "severe",
+    line: { color: "var(--status-major-flood)", width: 6, mark: "chevron" },
   },
   {
-    label: "High",
-    note: "overflow risk",
-    line: { color: "var(--status-minor-flood)", width: 5, mark: "triangle" as const },
+    level: "high",
+    line: { color: "var(--status-minor-flood)", width: 5, mark: "triangle" },
   },
   {
-    label: "Watch",
-    note: "at or nearing alert",
-    line: { color: "var(--status-alert)", width: 4, mark: "dot" as const },
+    level: "watch",
+    line: { color: "var(--status-alert)", width: 4, mark: "dot" },
   },
-  { label: "Normal", note: "gauge below alert", line: { color: "var(--status-normal)", width: 3 } },
+  { level: "normal", line: { color: "var(--status-normal)", width: 3 } },
   {
-    label: "Not known",
-    note: "no current gauge",
+    level: "unknown",
     line: { color: "var(--river-unassessed)", width: 3, dashed: true },
   },
 ]
@@ -71,20 +70,30 @@ interface RiverRiskLegendProps {
 
 /** Key to the river lines. A dashed line is not a safe one: nothing measures it. */
 export function RiverRiskLegend({ card = false, className }: RiverRiskLegendProps) {
+  const t = useT()
   const list = (
     <ul className="flex flex-col gap-1 text-xs">
-      {entries.map((entry) => (
-        <li key={entry.label} className="flex items-center gap-2">
-          <Line {...entry.line} />
-          <span className="font-medium text-foreground">{entry.label}</span>
-          <span className="truncate text-muted-foreground">{entry.note}</span>
-        </li>
-      ))}
+      {entries.map((entry) => {
+        const note = t(`rivers.risk.legend.${entry.level}`)
+        return (
+          <li key={entry.level} className="flex min-w-0 items-center gap-2">
+            <Line {...entry.line} />
+            <span className="shrink-0 font-medium text-foreground">{riskLabels[entry.level]}</span>
+            <span className="min-w-0 truncate text-muted-foreground" title={note}>
+              {note}
+            </span>
+          </li>
+        )
+      })}
     </ul>
   )
   if (!card) return <div className={className}>{list}</div>
   return (
-    <MapLegend title="River risk" unit="Estimate" className={cn("w-72", className)}>
+    <MapLegend
+      title={t("rivers.risk.legend.title")}
+      unit={t("terms.estimate")}
+      className={cn("w-72", className)}
+    >
       {list}
     </MapLegend>
   )

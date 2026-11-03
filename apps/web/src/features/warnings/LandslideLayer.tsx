@@ -1,6 +1,7 @@
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import type { FeatureCollection, Point } from "geojson"
 import { useEffect, useMemo, useRef } from "react"
+import { localName, translateIn, useLocale, type Locale } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
 import { slotBefore, styleReady } from "../map/slots"
@@ -206,12 +207,18 @@ const emptyData = {
   meta: {},
 } as unknown as LandslideLayerData
 
-function labelCollection(data: LandslideLayerData): FeatureCollection<Point> {
+/** "L2 Yatinuwara", in the reader's language and with the division's name in it where known. */
+function labelCollection(data: LandslideLayerData, locale: Locale): FeatureCollection<Point> {
   return {
     type: "FeatureCollection",
     features: data.features.map((feature) => ({
       type: "Feature",
-      properties: { text: `L${feature.properties.level} ${feature.properties.name}` },
+      properties: {
+        text: translateIn(locale, "warnings.landslide.mapLabel", {
+          level: feature.properties.level,
+          name: localName(feature.properties, locale),
+        }),
+      },
       geometry: {
         type: "Point",
         coordinates: [feature.properties.labelLon, feature.properties.labelLat],
@@ -232,8 +239,9 @@ interface LandslideLayerProps {
  */
 export function LandslideLayer({ data, selectedId }: LandslideLayerProps) {
   const map = useMap()
+  const locale = useLocale()
   const shown = data ?? emptyData
-  const labels = useMemo(() => labelCollection(shown), [shown])
+  const labels = useMemo(() => labelCollection(shown, locale), [shown, locale])
   const current = useRef({ shown, labels, selectedId })
 
   useEffect(() => {

@@ -1,12 +1,7 @@
 import { MapLegend } from "@/components/weather/MapLegend"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import {
-  landslideLevels,
-  levelActions,
-  levelColors,
-  levelLabels,
-  type LandslideLevel,
-} from "./present"
+import { landslideLevels, levelColors, levelWords, type LandslideLevel } from "./present"
 
 /** The hatches on the map, in CSS: dots, lines, cross-hatch. */
 const hatches: Record<LandslideLevel, string> = {
@@ -37,15 +32,14 @@ interface LandslideLegendProps {
 
 /** Key to landslide levels: NBRO's words, with colour and hatch. */
 export function LandslideLegend({ counts, bare = false, className }: LandslideLegendProps) {
+  const t = useT()
   const entries = (
     <ul className="flex flex-col gap-1.5 text-xs">
       {landslideLevels.map((level) => (
         <li key={level} className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             <LevelSwatch level={level} />
-            <span className="text-muted-foreground">
-              {levelLabels[level]} · {levelActions[level]}
-            </span>
+            <span className="min-w-0 text-muted-foreground">{levelWords(level)}</span>
           </span>
           {counts && <span className="numeric text-foreground">{counts[level]}</span>}
         </li>
@@ -54,7 +48,11 @@ export function LandslideLegend({ counts, bare = false, className }: LandslideLe
   )
   if (bare) return <div className={cn(className)}>{entries}</div>
   return (
-    <MapLegend title="Landslide warnings" unit="NBRO" className={cn("w-64", className)}>
+    <MapLegend
+      title={t("warnings.landslide.layerTitle")}
+      unit="NBRO"
+      className={cn("w-64", className)}
+    >
       {entries}
     </MapLegend>
   )
@@ -62,18 +60,19 @@ export function LandslideLegend({ counts, bare = false, className }: LandslideLe
 
 /** Key to the district outlines. */
 export function OfficialDistrictsLegend({ className }: { className?: string }) {
+  const t = useT()
   return (
     <ul className={cn("flex flex-col gap-1.5 text-xs text-muted-foreground", className)}>
       <li className="flex items-center gap-2">
         <span aria-hidden="true" className="inline-block h-0 w-5 border-t-2 border-brand" />
-        Landslide warning in force
+        {t("warnings.legend.landslide")}
       </li>
       <li className="flex items-center gap-2">
         <span
           aria-hidden="true"
           className="inline-block h-0 w-5 border-t-2 border-dashed border-brand"
         />
-        Mentioned in bulletin
+        {t("warnings.area.mentioned")}
       </li>
     </ul>
   )

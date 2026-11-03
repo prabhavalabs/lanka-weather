@@ -2,7 +2,8 @@ import { PauseIcon, PlayIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { formatClock, formatDay } from "@/lib/format"
+import { formatDayTime } from "@/lib/format"
+import { useLocale, useT } from "@/lib/i18n"
 import { windScale } from "@/lib/tokens"
 import { cn } from "@/lib/utils"
 import { leadLabel } from "./forecast"
@@ -38,12 +39,16 @@ export function WindTimeline({
   now,
   className,
 }: WindTimelineProps) {
+  const t = useT()
+  const locale = useLocale()
   const time = steps[Math.min(index, steps.length - 1)] ?? now
   const iso = new Date(time).toISOString()
   const single = steps.length <= 1
+  const lead = leadLabel(time, now, locale)
+  const when = formatDayTime(iso, locale)
   return (
     <section
-      aria-label="Wind forecast time"
+      aria-label={t("grid.timeline.section")}
       className={cn(
         "pointer-events-auto flex w-full max-w-[23rem] flex-col gap-2 rounded-2xl border border-border bg-card/95 px-3 py-2.5 text-card-foreground shadow-panel backdrop-blur-md",
         className,
@@ -56,7 +61,7 @@ export function WindTimeline({
           className="size-8 shrink-0"
           onClick={() => onPlayingChange(!playing)}
           disabled={single}
-          aria-label={playing ? "Pause the wind forecast" : "Play the wind forecast"}
+          aria-label={playing ? t("grid.timeline.pause") : t("grid.timeline.play")}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </Button>
@@ -71,17 +76,15 @@ export function WindTimeline({
             if (value !== undefined) onIndexChange(value)
           }}
           disabled={single}
-          thumbLabel="Forecast time"
-          thumbValueText={`${formatDay(iso)} ${formatClock(iso)}, ${leadLabel(time, now)}`}
+          thumbLabel={t("grid.timeline.thumb")}
+          thumbValueText={t("grid.timeline.thumbValue", { time: when, lead })}
         />
-        <p className="w-[6.5rem] shrink-0 text-right leading-tight">
-          <span className="numeric block text-sm text-foreground">{leadLabel(time, now)}</span>
-          <span className="numeric block text-[0.6875rem] text-muted-foreground">
-            {formatDay(iso)} {formatClock(iso)}
-          </span>
+        <p className="max-w-[9rem] min-w-[6.5rem] shrink-0 text-right leading-tight">
+          <span className="numeric block text-sm text-foreground">{lead}</span>
+          <span className="numeric block text-[0.6875rem] text-muted-foreground">{when}</span>
         </p>
       </div>
-      <div className="flex items-center gap-2" aria-label="Particle colours by wind speed in km/h">
+      <div className="flex items-center gap-2" aria-label={t("grid.timeline.scale")}>
         <ol className="grid flex-1 grid-cols-7 gap-0.5">
           {windScale.map((step, position) => (
             <li key={step.token} className="flex flex-col gap-0.5">
@@ -98,11 +101,11 @@ export function WindTimeline({
         </ol>
         <span className="numeric text-[0.625rem] text-muted-foreground">km/h</span>
       </div>
-      <p className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
-        <span>Wind 10 m · NOAA GFS{loading ? " · loading…" : ""}</span>
+      <p className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[0.6875rem] text-muted-foreground">
+        <span>{loading ? t("grid.timeline.sourceLoading") : t("grid.timeline.source")}</span>
         {runAt && (
           <span className="numeric">
-            run {formatDay(runAt)} {formatClock(runAt)}
+            {t("grid.timeline.run", { time: formatDayTime(runAt, locale) })}
           </span>
         )}
       </p>

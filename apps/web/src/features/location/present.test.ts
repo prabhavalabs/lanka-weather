@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
 import type { RegionDetail } from "../regions/types"
 import {
   currentFrom,
@@ -9,6 +10,7 @@ import {
   hoursFrom,
   localDate,
   placeFor,
+  regionLabel,
   sumNext,
   windFrom,
 } from "./present"
@@ -248,5 +250,103 @@ describe("localDate and formatCoordinates", () => {
 
   it("writes hemispheres", () => {
     expect(formatCoordinates(-1.5, 80)).toBe("1.5000° S, 80.0000° E")
+  })
+})
+
+describe("in Sinhala and Tamil", () => {
+  afterEach(() => setLocale("en"))
+  const location = { lat: 7.29, lon: 80.63 }
+
+  it("heads the panel with the local name and gives the English one beside it", () => {
+    setLocale("si")
+    expect(placeFor({ kind: "point", ...location }, location, summary)).toMatchObject({
+      name: "කටුකැලේ",
+      localName: "Katukele",
+      localNameLang: "en",
+      area: "Gangawata Korale › Kandy දිස්ත්‍රික්කය › මධ්‍යම පළාත",
+    })
+  })
+
+  it("names regions without repeating the level word", () => {
+    setLocale("ta")
+    expect(regionLabel({ level: "district", name: "Kandy", nameTa: "கண்டி" })).toBe(
+      "கண்டி மாவட்டம்",
+    )
+    setLocale("si")
+    expect(regionLabel({ level: "province", name: "Central", nameSi: "මධ්‍යම පළාත" })).toBe(
+      "මධ්‍යම පළාත",
+    )
+  })
+
+  it("rebuilds a derived alert from its numbers, and marks what stays in English", () => {
+    setLocale("ta")
+    const alert = estimateAlert(
+      {
+        type: "heavy_rain",
+        level: "red",
+        title: "Very heavy rain likely",
+        detail: "About 160 mm of rain is forecast tomorrow (threshold 150 mm).",
+        value: 160,
+        threshold: 150,
+        unit: "mm",
+        validFrom: "2026-11-02T18:30:00Z",
+        validUntil: "2026-11-03T18:30:00Z",
+        estimate: true,
+        basis: "Something new from the server",
+      },
+      0,
+      "கண்டி",
+      "2026-11-02T14:51:02Z",
+    )
+    expect(alert).toMatchObject({
+      title: "மிகப் பலத்த மழை பெய்ய அதிக வாய்ப்புள்ளது",
+      issuer: "Lanka Weather மதிப்பீடு",
+      summary: "நாளை சுமார் 160 mm மழை முன்னறிவிக்கப்பட்டுள்ளது (வரம்பு 150 mm).",
+      basis: "Something new from the server",
+      basisLang: "en",
+    })
+    expect(alert.summaryLang).toBeUndefined()
+  })
+
+  it("keeps the river gauge's name in a river alert", () => {
+    setLocale("si")
+    const alert = estimateAlert(
+      {
+        type: "river_level",
+        level: "orange",
+        title: "River at minor flood level",
+        detail: "The Peradeniya gauge, 4 km away, is at minor flood level.",
+        value: 4.2,
+        unit: "km",
+        estimate: true,
+        basis: "Irrigation Department river gauge reading and the station's own thresholds",
+      },
+      0,
+      "",
+      "2026-11-02T14:51:02Z",
+    )
+    expect(alert.summary).toBe("4 km දුරින් ඇති Peradeniya ජල මිනුම් ස්ථානය සුළු ගංවතුර මට්ටමේ ඇත.")
+    expect(alert.basisLang).toBeUndefined()
+  })
+
+  it("writes hemispheres in the language", () => {
+    setLocale("si")
+    expect(formatCoordinates(7.5, 80)).toBe("7.5000° උ, 80.0000° නැ")
+  })
+})
+
+describe("region names in Sinhala and Tamil", () => {
+  it("mends the cut-short level word the boundary data carries", () => {
+    setLocale("si")
+    try {
+      expect(regionLabel({ level: "district", name: "Kandy", nameSi: "මහනුවර දිස්ත්‍රික" })).toBe(
+        "මහනුවර දිස්ත්‍රික්කය",
+      )
+    } finally {
+      setLocale("en")
+    }
+    expect(regionLabel({ level: "district", name: "Kandy", nameSi: "මහනුවර දිස්ත්‍රික" })).toBe(
+      "Kandy District",
+    )
   })
 })

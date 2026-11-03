@@ -4,8 +4,9 @@ import { Panel } from "@/components/Panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatAge, formatDayTime } from "@/lib/format"
+import { type MessageKey, useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import { areaBadge, areaLikelihood, floodAreaLabels } from "./present"
+import { areaBadge, areaLikelihood, floodAreaLabel } from "./present"
 import type { FloodAreaFeature } from "./types"
 
 interface FloodAreaPanelProps {
@@ -16,14 +17,14 @@ interface FloodAreaPanelProps {
   className?: string
 }
 
-const kindNames: Record<FloodAreaFeature["properties"]["kind"], string> = {
-  notification: "Riverine flood notification",
-  inundation_high: "Inundation",
-  inundation_medium: "Inundation",
-  inundation_low: "Inundation",
-  flash_likely: "Flash flood",
-  flash_highly_likely: "Flash flood",
-  significant_event: "Significant flood event",
+const kindNames: Record<FloodAreaFeature["properties"]["kind"], MessageKey> = {
+  notification: "floods.areaKind.notification",
+  inundation_high: "floods.areaKind.inundation",
+  inundation_medium: "floods.areaKind.inundation",
+  inundation_low: "floods.areaKind.inundation",
+  flash_likely: "floods.areaKind.flash",
+  flash_highly_likely: "floods.areaKind.flash",
+  significant_event: "floods.areaKind.significant_event",
 }
 
 /** One of Google's flood polygons: what kind it is, how likely, and when it applies. */
@@ -34,63 +35,69 @@ export function FloodAreaPanel({
   onSelectGauge,
   className,
 }: FloodAreaPanelProps) {
+  const t = useT()
   const { kind, validFrom, validUntil, issuedAt, gaugeId, fetchedAt, lowerConfidence } =
     area.properties
   const likelihood = areaLikelihood(area.properties)
   return (
     <Panel
       icon={<WavesIcon />}
-      title={floodAreaLabels[kind] ?? "Flood area"}
-      subtitle="Google flood forecast"
+      title={floodAreaLabel(kind)}
+      subtitle={t("floods.areaPanel.subtitle")}
       className={cn("w-full", className)}
       action={
         <Button
           variant="outline"
           size="icon"
           onClick={onClose}
-          aria-label="Close flood area details"
+          aria-label={t("floods.areaPanel.close")}
         >
           <XIcon />
         </Button>
       }
-      footer={
-        <p>
-          Google Flood Hub (Flood Forecasting API). A forecast, not an official warning. Official
-          flood warnings come from the Irrigation Department and the DMC.
-        </p>
-      }
+      footer={<p>{t("floods.forecastFooter")}</p>}
     >
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={areaBadge(area.properties)}>{likelihood.label}</Badge>
         {lowerConfidence && (
           <Badge variant="chip" className="text-foreground">
-            Lower confidence
+            {t("floods.lowerConfidence")}
           </Badge>
         )}
         {seeded && (
           <Badge variant="destructive" className="uppercase">
-            Test data
+            {t("floods.testData")}
           </Badge>
         )}
       </div>
       <LabeledRows>
-        <LabeledRow label="Kind" value={kindNames[kind] ?? "Flood area"} numeric={false} />
-        <LabeledRow label="Likelihood" value={likelihood.label} numeric={false} />
         <LabeledRow
-          label="Forecast from"
-          value={validFrom ? formatDayTime(validFrom) : "Not given"}
+          label={t("floods.areaPanel.kind")}
+          value={t(kindNames[kind] ?? "floods.area.fallback")}
+          numeric={false}
         />
         <LabeledRow
-          label="Forecast until"
-          value={validUntil ? formatDayTime(validUntil) : "Not given"}
+          label={t("floods.areaPanel.likelihood")}
+          value={likelihood.label}
+          numeric={false}
+        />
+        <LabeledRow
+          label={t("floods.areaPanel.from")}
+          value={validFrom ? formatDayTime(validFrom) : t("common.notGiven")}
+        />
+        <LabeledRow
+          label={t("floods.areaPanel.until")}
+          value={validUntil ? formatDayTime(validUntil) : t("common.notGiven")}
         />
         {issuedAt && (
           <LabeledRow
-            label="Issued"
-            value={`${formatDayTime(issuedAt)} · ${formatAge(issuedAt)}`}
+            label={t("common.issued")}
+            value={`${formatDayTime(issuedAt)}${t("common.separator")}${formatAge(issuedAt)}`}
           />
         )}
-        {fetchedAt && <LabeledRow label="Read" value={formatAge(fetchedAt)} />}
+        {fetchedAt && (
+          <LabeledRow label={t("floods.areaPanel.read")} value={formatAge(fetchedAt)} />
+        )}
       </LabeledRows>
       {likelihood.note && <p className="text-xs text-muted-foreground">{likelihood.note}</p>}
       {gaugeId && (
@@ -100,7 +107,7 @@ export function FloodAreaPanel({
           className="w-fit"
           onClick={() => onSelectGauge(gaugeId)}
         >
-          Open its forecast gauge
+          {t("floods.areaPanel.openGauge")}
         </Button>
       )}
     </Panel>

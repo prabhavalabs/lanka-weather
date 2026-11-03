@@ -26,6 +26,7 @@ import { SearchTrigger } from "@/components/weather/SearchTrigger"
 import { isNotReady } from "@/lib/api"
 import type { Layer } from "@/lib/layers"
 import { desktopQuery, useMediaQuery } from "@/lib/useMediaQuery"
+import { useT } from "@/lib/i18n"
 import { useTheme } from "@/lib/theme"
 import { useLocalStorage } from "@/lib/useLocalStorage"
 import { anyUnverified, countBasins, topArea } from "./features/floods/basins"
@@ -52,7 +53,7 @@ import {
 } from "./features/floods/view"
 import { hazardDefaults, useHazards } from "./features/hazards/useHazards"
 import { LayerPanel } from "./features/layers/LayerPanel"
-import { count, layerStatus, type LayerStatus } from "./features/layers/status"
+import { layerStatus, type LayerStatus } from "./features/layers/status"
 import { useLayers } from "./features/layers/useLayers"
 import { LocationMarker } from "./features/location/LocationMarker"
 import { useSelectionLocation } from "./features/location/queries"
@@ -177,13 +178,6 @@ const newDefaultLayers = [RIVERS, RESERVOIRS, RAIN_GAUGES, ...hazardDefaults]
 
 type RegionFill = RegionVariable | "none"
 
-const levelPlural: Record<RegionLevel, string> = {
-  province: "province",
-  district: "district",
-  ds: "DS division",
-  gn: "GN division",
-}
-
 /** Gauges are small: clicks and hovers count within a few pixels. */
 const pointSlack = 6
 
@@ -219,6 +213,8 @@ export function App() {
   const zoom = useMapZoom(map)
   const desktop = useMediaQuery(desktopQuery, true)
   const { resolved: theme } = useTheme()
+  // Subscribes the page to the language: statuses, legends and panels re-render on a switch.
+  const t = useT()
 
   // The catalogue says which layers exist and how often their data changes.
   const catalogue = useLayers()
@@ -697,7 +693,7 @@ export function App() {
 
     const { lat, lng } = event.lngLat
     if (!inPointBounds(lat, lng)) {
-      toast("Weather is available over Sri Lanka and its coastal waters only.", {
+      toast(t("app.outside"), {
         id: "outside",
       })
       return
@@ -820,8 +816,10 @@ export function App() {
       layer: riverLayer,
       parts: rivers.data
         ? [
-            count(rivers.data.features.length, "station"),
-            raised === 0 ? "none above alert" : `${raised} above alert`,
+            t("app.rivers.stations", { count: rivers.data.features.length }),
+            raised === 0
+              ? t("app.rivers.noneAboveAlert")
+              : t("app.rivers.aboveAlert", { count: raised }),
           ]
         : [],
       observedAt: rivers.data?.meta.fetchedAt,
@@ -833,7 +831,7 @@ export function App() {
     details[RIVER_LEVELS] = (
       <div className="flex flex-col gap-3">
         <SegmentedBar
-          label="Stations by flood status"
+          label={t("app.rivers.byStatus")}
           segments={statusOrder.map((status) => ({
             label: statusLabels[status],
             value: riverCounts[status],
@@ -843,7 +841,7 @@ export function App() {
         <RiverLegend bare counts={riverCounts} />
         <Button size="sm" variant="secondary" onClick={openCanals} className="w-full">
           <ListIcon />
-          Colombo canals
+          {t("app.rivers.canals")}
         </Button>
       </div>
     )
@@ -862,7 +860,7 @@ export function App() {
       parts: shownFloods
         ? shownFloods.meta.configured
           ? [floodSummary(shownFloods)]
-          : ["Not configured on this server"]
+          : [t("app.floods.notConfigured")]
         : [],
       observedAt: issued ?? floods.data?.meta.fetchedAt,
       error: floods.error,
@@ -871,7 +869,7 @@ export function App() {
     if (floods.data && floodGauges.length === 0 && floods.data.meta.configured) {
       statuses[FLOOD_FORECAST] = {
         state: "waiting",
-        summary: "No forecasts yet · collected hourly",
+        summary: t("app.floods.noneYet"),
         stale: false,
       }
     }
@@ -896,8 +894,12 @@ export function App() {
       layer: riversNetworkLayer,
       parts: riverRisk.data
         ? [
-            count(riverRisk.data.rivers.filter((river) => river.named).length, "river"),
-            atRiskCount === 0 ? "none at risk" : `${atRiskCount} at risk`,
+            t("app.riverRisk.rivers", {
+              count: riverRisk.data.rivers.filter((river) => river.named).length,
+            }),
+            atRiskCount === 0
+              ? t("app.riverRisk.noneAtRisk")
+              : t("app.riverRisk.atRisk", { count: atRiskCount }),
           ]
         : [],
       observedAt: riverRisk.data?.meta.gaugesObservedAt,
@@ -912,8 +914,8 @@ export function App() {
     statuses[PAST_FLOODS] = {
       state: "ready",
       summary: pastFloods.data
-        ? `${count(pastFloods.data.events.length, "mapped event")} · past, not a forecast`
-        : "Loading…",
+        ? t("floods.past.listSummary", { count: pastFloods.data.events.length })
+        : t("common.loading"),
       stale: false,
     }
   }
@@ -944,7 +946,10 @@ export function App() {
       ? {
           ...status,
           stale: outOfDate,
-          summary: `${reservoirSummary(reservoirCounts, activeCountOfReservoirs, outOfDate)} · ${status.summary}`,
+          summary: [
+            reservoirSummary(reservoirCounts, activeCountOfReservoirs, outOfDate),
+            status.summary,
+          ].join(t("common.separator")),
         }
       : status
   }
@@ -952,7 +957,7 @@ export function App() {
     details[RESERVOIRS] = (
       <div className="flex flex-col gap-3">
         <SegmentedBar
-          label="Reservoirs by status"
+          label={t("app.reservoirs.byStatus")}
           segments={reservoirStatusOrder.map((status) => ({
             label: reservoirStatusLabels[status],
             value: reservoirCounts[status],
@@ -962,13 +967,18 @@ export function App() {
         <ReservoirLegend bare counts={reservoirCounts} />
         <Button size="sm" variant="secondary" onClick={openReservoirList} className="w-full">
           <ListIcon />
-          {activeCountOfReservoirs === 0
-            ? "Reservoir list"
-            : `Spilling or releasing (${activeCountOfReservoirs})`}
+          <span className="min-w-0 truncate">
+            {activeCountOfReservoirs === 0
+              ? t("app.reservoirs.list")
+              : t("app.reservoirs.active", { count: activeCountOfReservoirs })}
+          </span>
         </Button>
         <p className="text-xs text-muted-foreground">
-          {reservoirCounts.mapped} of {reservoirCounts.total} are on the map. Not an official
-          warning. In an emergency call 117.
+          {t("app.reservoirs.mapped", {
+            mapped: reservoirCounts.mapped,
+            total: reservoirCounts.total,
+          })}{" "}
+          {t("terms.notOfficial")} {t("terms.emergency")}
         </p>
       </div>
     )
@@ -979,7 +989,7 @@ export function App() {
     statuses[TEMPERATURE] = layerStatus({
       layer: gridLayer,
       parts: grid.data
-        ? [count(countValues(values), "grid point"), gridVariables[gridVariable].label]
+        ? [t("app.grid.points", { count: countValues(values) }), gridVariables[gridVariable].label]
         : [],
       observedAt: grid.data?.validAt,
       error: grid.error,
@@ -995,7 +1005,7 @@ export function App() {
         onValueChange={(value) => {
           if (value) setGridVariable(value as GridVariable)
         }}
-        aria-label="Weather field shows"
+        aria-label={t("app.grid.shows")}
         className="w-full"
       >
         {gridVariableOrder.map((variable) => (
@@ -1004,16 +1014,15 @@ export function App() {
             value={variable}
             aria-label={gridVariables[variable].label}
             title={gridVariables[variable].label}
-            className="flex-1"
+            className="min-w-0 flex-1"
           >
-            {gridVariables[variable].short}
+            <span className="truncate">{gridVariables[variable].short}</span>
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
       <GridLegend variable={gridVariable} bare className="md:hidden" />
       <p className="text-xs text-muted-foreground">
-        Model values on a 0.2° grid (about 22 km), smoothed between grid points. Weather data by
-        Open-Meteo.com (CC BY 4.0).
+        {t("app.grid.note")} <span lang="en">Weather data by Open-Meteo.com (CC BY 4.0).</span>
       </p>
     </div>
   )
@@ -1022,7 +1031,7 @@ export function App() {
     const field = wind.field
     statuses[WIND] = layerStatus({
       layer: windLayer,
-      parts: field ? ["NOAA GFS, 10 m", `${wind.steps.length} forecast times`] : [],
+      parts: field ? ["NOAA GFS, 10 m", t("app.wind.times", { count: wind.steps.length })] : [],
       observedAt: field?.runAt,
       ageLabel: "run",
       error: wind.query.error,
@@ -1041,12 +1050,7 @@ export function App() {
       now={wind.now}
     />
   )
-  details[WIND] = (
-    <p className="text-xs text-muted-foreground">
-      Particles follow the forecast wind 10 m above ground; choose the time below the map. Speeds
-      can differ a little from the weather panel, which uses Open-Meteo.
-    </p>
-  )
+  details[WIND] = <p className="text-xs text-muted-foreground">{t("app.wind.note")}</p>
 
   if (regionsLayer) {
     const levelCount = regionList.length
@@ -1055,10 +1059,14 @@ export function App() {
       parts:
         levelCount > 0
           ? [
-              count(levelCount, levelPlural[level]),
-              fillVariable ? regionVariables[fillVariable].label.toLowerCase() : "boundaries",
+              t(`terms.adminCount.${level}`, { count: levelCount }),
+              fillVariable ? regionVariables[fillVariable].label : t("app.regions.boundaries"),
             ]
-          : [level === "gn" && zoom < levelMinZoom.gn ? "Zoom in for GN divisions" : "Boundaries"],
+          : [
+              level === "gn" && zoom < levelMinZoom.gn
+                ? t("app.regions.zoomForGn")
+                : t("app.regions.boundaries"),
+            ],
       observedAt: regionValidAt,
       error: level === "gn" ? gnWeather.error : levelWeather.error,
       pending: false,
@@ -1068,7 +1076,7 @@ export function App() {
     <div className="flex flex-col gap-3">
       <AdminLevelSelector level={level} onLevelChange={setLevel} />
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-muted-foreground">Colour regions by</span>
+        <span className="text-xs text-muted-foreground">{t("app.regions.colourBy")}</span>
         <ToggleGroup
           type="single"
           size="sm"
@@ -1076,29 +1084,26 @@ export function App() {
           onValueChange={(value) => {
             if (value) setRegionFill(value as RegionFill)
           }}
-          aria-label="Colour regions by"
+          aria-label={t("app.regions.colourBy")}
           className="w-full"
           disabled={gridOn}
         >
-          <ToggleGroupItem value="none" className="flex-1">
-            None
+          <ToggleGroupItem value="none" className="min-w-0 flex-1" title={t("common.none")}>
+            <span className="truncate">{t("common.none")}</span>
           </ToggleGroupItem>
           {(Object.keys(regionVariables) as RegionVariable[]).map((variable) => (
             <ToggleGroupItem
               key={variable}
               value={variable}
               aria-label={regionVariables[variable].label}
-              className="flex-1"
+              title={regionVariables[variable].label}
+              className="min-w-0 flex-1"
             >
-              {regionVariables[variable].short}
+              <span className="truncate">{regionVariables[variable].short}</span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        {gridOn && (
-          <p className="text-xs text-muted-foreground">
-            Region colours are hidden while the weather field is on.
-          </p>
-        )}
+        {gridOn && <p className="text-xs text-muted-foreground">{t("app.regions.hiddenByGrid")}</p>}
       </div>
       {fillVariable && (
         <RegionLegend variable={fillVariable} level={level} bare className="md:hidden" />
@@ -1125,10 +1130,7 @@ export function App() {
   )
   const smallPrint = (
     <div className="flex flex-col gap-1">
-      <span>
-        Official warnings come from the Department of Meteorology and the DMC. Region and point
-        alerts here are estimates.
-      </span>
+      <span>{t("app.smallPrint")}</span>
     </div>
   )
 
@@ -1147,23 +1149,20 @@ export function App() {
         role="alert"
         className="pointer-events-auto rounded-full border border-destructive bg-card px-3.5 py-1.5 text-sm font-medium text-destructive shadow-panel"
       >
-        TEST DATA: this flood is not real. Local seed in use.
+        {t("app.testData")}
       </p>
     )
   } else if (regionsOn && zoom < levelMinZoom[level] && map && !hazards.farAway && zoom >= 4.5) {
     notice = (
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-card/95 py-1 pr-1 pl-3.5 text-sm shadow-panel backdrop-blur-md">
-        <span>
-          Zoom in to see {level === "gn" ? "GN" : level === "ds" ? "DS" : levelPlural[level]}{" "}
-          divisions
-        </span>
+        <span className="min-w-0">{t(`app.regions.zoomToSee.${level}`)}</span>
         <Button
           size="sm"
           variant="secondary"
           onClick={() => map.easeTo({ zoom: levelMinZoom[level] + 0.3, duration: 800 })}
         >
           <ZoomInIcon />
-          Zoom in
+          {t("app.regions.zoomIn")}
         </Button>
       </div>
     )
@@ -1173,19 +1172,25 @@ export function App() {
         role="status"
         className="pointer-events-auto rounded-full border border-border bg-card/95 px-3.5 py-1.5 text-sm text-muted-foreground shadow-panel backdrop-blur-md"
       >
-        Weather data is still loading. Layers fill in as the collectors run.
+        {t("app.stillLoading")}
       </p>
     )
   }
 
   // The detail panel for the selection.
   let detail: ReactNode = hazards.detail
-  let detailLabel = hazards.detailLabel ?? "Details"
+  let detailLabel = hazards.detailLabel ?? t("common.details")
   if (selection?.kind === "point" || selection?.kind === "region") {
-    detailLabel = "Weather here"
+    detailLabel = t("app.detail.weatherHere")
     detail = (
       <Suspense
-        fallback={<DetailPlaceholder icon={<MapPinIcon />} title="Weather" onClose={close} />}
+        fallback={
+          <DetailPlaceholder
+            icon={<MapPinIcon />}
+            title={t("app.detail.weather")}
+            onClose={close}
+          />
+        }
       >
         <LocationPanel
           selection={selection}
@@ -1201,9 +1206,13 @@ export function App() {
       </Suspense>
     )
   } else if (selection?.kind === "river") {
-    detailLabel = "River"
+    detailLabel = t("app.detail.river")
     detail = (
-      <Suspense fallback={<DetailPlaceholder icon={<WavesIcon />} title="River" onClose={close} />}>
+      <Suspense
+        fallback={
+          <DetailPlaceholder icon={<WavesIcon />} title={t("app.detail.river")} onClose={close} />
+        }
+      >
         <RiverPanel
           id={selection.id}
           reachFid={selection.reach}
@@ -1215,7 +1224,7 @@ export function App() {
       </Suspense>
     )
   } else if (selection?.kind === "basin") {
-    detailLabel = "River basin"
+    detailLabel = t("app.detail.basin")
     detail =
       selectedBasin && basins.data ? (
         <BasinPanel
@@ -1232,13 +1241,13 @@ export function App() {
       ) : (
         <DetailPlaceholder
           icon={<WavesIcon />}
-          title="River basin"
-          message={basins.isPending ? undefined : "This basin is not in the flood forecast."}
+          title={t("app.detail.basin")}
+          message={basins.isPending ? undefined : t("app.detail.basinMissing")}
           onClose={close}
         />
       )
   } else if (selection?.kind === "area") {
-    detailLabel = "Flood area"
+    detailLabel = t("app.detail.floodArea")
     detail = selectedArea ? (
       <FloodAreaPanel
         area={selectedArea}
@@ -1249,13 +1258,13 @@ export function App() {
     ) : (
       <DetailPlaceholder
         icon={<WavesIcon />}
-        title="Flood area"
-        message={floods.isPending ? undefined : "This flood area is no longer in the forecast."}
+        title={t("app.detail.floodArea")}
+        message={floods.isPending ? undefined : t("app.detail.floodAreaMissing")}
         onClose={close}
       />
     )
   } else if (selection?.kind === "past") {
-    detailLabel = "Past flood"
+    detailLabel = t("app.detail.pastFlood")
     detail = (
       <PastFloodPanel
         event={selectedPast}
@@ -1266,30 +1275,28 @@ export function App() {
       />
     )
   } else if (selection?.kind === "station") {
-    detailLabel = "River gauge"
+    detailLabel = t("app.detail.riverGauge")
     detail = station ? (
       <StationPanel station={station.properties} onClose={close} />
     ) : (
       <DetailPlaceholder
         icon={<WavesIcon />}
-        title="River gauge"
-        message={
-          rivers.isPending ? undefined : "This gauge is not in the latest river level readings."
-        }
+        title={t("app.detail.riverGauge")}
+        message={rivers.isPending ? undefined : t("app.detail.riverGaugeMissing")}
         onClose={close}
       />
     )
   } else if (selection?.kind === "met") {
-    detailLabel = "Weather station"
+    detailLabel = t("app.detail.weatherStation")
     detail = <MetStationPanel id={selection.id} onClose={close} />
   } else if (selection?.kind === "raingauge") {
-    detailLabel = "Rain gauge"
+    detailLabel = t("app.detail.rainGauge")
     detail = <RainGaugePanel id={selection.id} onClose={close} />
   } else if (selection?.kind === "canals") {
-    detailLabel = "Colombo canals"
+    detailLabel = t("app.rivers.canals")
     detail = <CanalsPanel onClose={close} />
   } else if (selection?.kind === "gauge") {
-    detailLabel = "Flood forecast gauge"
+    detailLabel = t("app.detail.floodGauge")
     const areas = (floods.data?.features ?? []).filter(
       (feature): feature is FloodAreaFeature =>
         !isGauge(feature) && feature.properties.gaugeId === selection.id,
@@ -1299,29 +1306,27 @@ export function App() {
     ) : (
       <DetailPlaceholder
         icon={<WavesIcon />}
-        title="Flood forecast gauge"
-        message={floods.isPending ? undefined : "This gauge is not in the latest flood forecast."}
+        title={t("app.detail.floodGauge")}
+        message={floods.isPending ? undefined : t("app.detail.floodGaugeMissing")}
         onClose={close}
       />
     )
   }
 
   if (selection?.kind === "reservoir") {
-    detailLabel = "Reservoir"
+    detailLabel = t("app.detail.reservoir")
     detail = reservoir ? (
       <ReservoirPanel reservoir={reservoir.properties} onClose={close} />
     ) : (
       <DetailPlaceholder
         icon={<ContainerIcon />}
-        title="Reservoir"
-        message={
-          reservoirs.isPending ? undefined : "This reservoir is not in the latest reservoir data."
-        }
+        title={t("app.detail.reservoir")}
+        message={reservoirs.isPending ? undefined : t("app.detail.reservoirMissing")}
         onClose={close}
       />
     )
   } else if (selection?.kind === "reservoirs") {
-    detailLabel = "Reservoirs spilling or releasing"
+    detailLabel = t("app.detail.reservoirsActive")
     detail = (
       <ReservoirListPanel
         data={reservoirs.data}
@@ -1334,7 +1339,7 @@ export function App() {
   }
 
   if (!selection && overviewOpen) {
-    detailLabel = "Sri Lanka now"
+    detailLabel = t("app.detail.overview")
     detail = (
       <OverviewPanel
         overview={overview.data}
@@ -1351,13 +1356,20 @@ export function App() {
   const legendClass = "w-60"
   const keySections: MapKeySection[] = [
     ...(riverNetworkOn
-      ? [{ id: "river-risk", title: "River risk", unit: "Estimate", content: <RiverRiskLegend /> }]
+      ? [
+          {
+            id: "river-risk",
+            title: t("app.key.riverRisk"),
+            unit: t("terms.estimate"),
+            content: <RiverRiskLegend />,
+          },
+        ]
       : []),
     ...(floodsOn && floodGauges.length > 0
       ? [
           {
             id: "flood-forecast",
-            title: "Flood forecast",
+            title: t("layers.title.flood-forecast"),
             unit: "Google",
             content: <FloodLegend bare {...floodLegendProps} />,
           },
@@ -1367,8 +1379,8 @@ export function App() {
       ? [
           {
             id: "river-levels",
-            title: "River levels",
-            unit: "status",
+            title: t("layers.title.river-levels"),
+            unit: t("app.key.status"),
             content: <RiverLegend bare counts={riverCounts} />,
           },
         ]
@@ -1377,8 +1389,8 @@ export function App() {
       ? [
           {
             id: "reservoirs",
-            title: "Reservoirs",
-            unit: "status",
+            title: t("app.key.reservoirs"),
+            unit: t("app.key.status"),
             content: <ReservoirLegend bare counts={reservoirCounts} />,
           },
         ]

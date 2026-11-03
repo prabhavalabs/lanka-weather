@@ -13,7 +13,17 @@ import type {
   WeatherAlert,
   WindReading,
 } from "@/components/weather/types"
-import { sriLankaTimeZone } from "@/lib/format"
+import { formatNumber, sriLankaTimeZone } from "@/lib/format"
+import {
+  getLocale,
+  localName,
+  translate,
+  translateIn,
+  type LocalNames,
+  type Locale,
+  type MessageKey,
+} from "@/lib/i18n"
+import { regionBareName } from "../regions/present"
 import type { RegionDetail } from "../regions/types"
 import type { Selection } from "./selection"
 import type {
@@ -25,18 +35,40 @@ import type {
   Summary,
 } from "./types"
 
-export const levelWords: Record<RegionLevel, string> = {
-  province: "Province",
-  district: "District",
-  ds: "DS division",
-  gn: "GN division",
+/** The level's name in the current language: "District", "DS division". */
+export function levelWord(level: RegionLevel): string {
+  return translate(`terms.adminLevel.${level}`)
 }
 
-/** A region's name as people say it: "Kandy District", "Central Province". */
-export function regionLabel(region: Pick<RegionRef, "level" | "name">): string {
-  if (region.level === "district") return `${region.name} District`
-  if (region.level === "province") return `${region.name} Province`
-  return region.name
+/**
+ * The level names in the current language, read when used. Prefer
+ * `levelWord(level)`; this keeps `levelWords[level]` working.
+ */
+export const levelWords: Readonly<Record<RegionLevel, string>> = {
+  get province() {
+    return levelWord("province")
+  },
+  get district() {
+    return levelWord("district")
+  },
+  get ds() {
+    return levelWord("ds")
+  },
+  get gn() {
+    return levelWord("gn")
+  },
+}
+
+/**
+ * A region's name as people say it, in the current language when the data
+ * has it: "Kandy District", "මහනුවර දිස්ත්‍රික්කය", "Central Province". A
+ * local name that already ends in the level word is kept as it is.
+ */
+export function regionLabel(
+  region: Pick<RegionRef, "level" | "name"> & Partial<Pick<LocalNames, "nameSi" | "nameTa">>,
+): string {
+  if (region.level !== "district" && region.level !== "province") return localName(region)
+  return translate(`location.region.${region.level}`, { name: regionBareName(region) })
 }
 
 /** The regions containing a place, smallest first: "Katukele › Gangawata Korale › Kandy District › Central Province". */
@@ -50,7 +82,38 @@ export function hierarchyText(regions: Summary["regions"], skip: RegionLevel[] =
 
 /** "7.2931° N, 80.6350° E" */
 export function formatCoordinates(lat: number, lon: number): string {
-  return `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? "E" : "W"}`
+  return translate("location.coordinates", {
+    lat: Math.abs(lat).toFixed(4),
+    latHemisphere: translate(lat >= 0 ? "location.hemisphere.north" : "location.hemisphere.south"),
+    lon: Math.abs(lon).toFixed(4),
+    lonHemisphere: translate(lon >= 0 ? "location.hemisphere.east" : "location.hemisphere.west"),
+  })
+}
+
+/**
+ * The name in another script, for under the heading: the Sinhala name when
+ * reading English, the English name when reading Sinhala or Tamil (when the
+ * heading is a local name).
+ */
+function otherName(
+  names: LocalNames,
+  locale: Locale = getLocale(),
+  level?: RegionLevel,
+): Pick<Place, "localName" | "localNameLang"> {
+  if (locale === "en") {
+    if (!names.nameSi) return {}
+    // A province's or district's Sinhala name, mended and with its whole level word.
+    const localName =
+      level === "district" || level === "province"
+        ? translateIn("si", `location.region.${level}`, {
+            name: regionBareName({ level, ...names }, "si"),
+          })
+        : names.nameSi
+    return { localName, localNameLang: "si" }
+  }
+  return localName(names, locale) !== names.name
+    ? { localName: names.name, localNameLang: "en" }
+    : {}
 }
 
 /**
@@ -66,16 +129,21 @@ export function placeFor(
 ): Place {
   const base = { latitude: location.lat, longitude: location.lon }
   if (selection.kind === "region") {
-    if (!region) return { ...base, name: "Loading…", area: "" }
+    if (!region) return { ...base, name: translate("common.loading"), area: "" }
+    const names: LocalNames = {
+      name: region.name,
+      nameSi: region.names.si,
+      nameTa: region.names.ta,
+    }
     const parents = [...region.hierarchy]
       .reverse()
       .map((parent) => regionLabel(parent))
       .join(" › ")
     return {
       ...base,
-      name: regionLabel(region),
-      localName: region.names.si ?? undefined,
-      area: [levelWords[region.level], parents].filter(Boolean).join(" · "),
+      name: regionLabel({ level: region.level, ...names }),
+      ...otherName(names, getLocale(), region.level),
+      area: [levelWord(region.level), parents].filter(Boolean).join(" · "),
     }
   }
   const regions = summary?.regions ?? null
@@ -86,14 +154,14 @@ export function placeFor(
   if (gn) {
     return {
       ...base,
-      name: gn.name,
-      localName: gn.nameSi ?? undefined,
+      name: localName(gn),
+      ...otherName(gn),
       area: hierarchyText(regions, ["gn"]),
     }
   }
   return {
     ...base,
-    name: summary ? "Off the coast" : "Loading…",
+    name: summary ? translate("location.offCoast") : translate("common.loading"),
     area: formatCoordinates(location.lat, location.lon),
   }
 }
@@ -203,9 +271,115 @@ const levelSeverity: Record<AlertLevel, AlertSeverity> = {
   red: "emergency",
 }
 
+const levelKey = { yellow: "Yellow", orange: "Orange", red: "Red" } as const
+
+/** Days from one Sri Lanka date to another (YYYY-MM-DD). */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
+}
+
+/**
+ * When a forecast alert's window falls, in words, as the server words it:
+ * a window starting today is the next 24 hours, else tomorrow or the day after.
+ */
+function alertWhen(validFrom: string | null | undefined, generatedAt: string): string | null {
+  if (!validFrom || Number.isNaN(Date.parse(validFrom)) || Number.isNaN(Date.parse(generatedAt))) {
+    return null
+  }
+  const days = daysBetween(localDate(new Date(generatedAt)), localDate(new Date(validFrom)))
+  if (days <= 0) return translate("location.alert.when.next24h")
+  if (days === 1) return translate("location.alert.when.tomorrow")
+  if (days === 2) return translate("location.alert.when.dayAfter")
+  return null
+}
+
+/**
+ * A derived alert's title and detail in the current language, rebuilt from
+ * its type, level and numbers. Null parts keep the server's English words.
+ */
+function alertText(
+  alert: DerivedAlert,
+  generatedAt: string,
+): { title: string | null; detail: string | null } {
+  const level = levelKey[alert.level]
+  if (!level) return { title: null, detail: null }
+  const value = typeof alert.value === "number" ? formatNumber(alert.value) : null
+  const threshold = typeof alert.threshold === "number" ? formatNumber(alert.threshold) : null
+  const when = alertWhen(alert.validFrom, generatedAt)
+  const forecast = (key: MessageKey) =>
+    value !== null && threshold !== null && when !== null
+      ? translate(key, { value, threshold, when })
+      : null
+  switch (alert.type) {
+    case "heavy_rain":
+      return {
+        title: translate(`location.alert.title.rain${level}`),
+        detail: forecast("location.alert.rain"),
+      }
+    case "strong_wind": {
+      const kind = alert.detail.startsWith("Gusts")
+        ? "location.alert.gusts"
+        : alert.detail.startsWith("Winds")
+          ? "location.alert.winds"
+          : null
+      return {
+        title: translate(`location.alert.title.wind${level}`),
+        detail: kind ? forecast(kind) : null,
+      }
+    }
+    case "heat":
+      return {
+        title: translate(`location.alert.title.heat${level}`),
+        detail:
+          value !== null && threshold !== null
+            ? translate("location.alert.heat", { value, threshold })
+            : null,
+      }
+    case "river_level": {
+      const name = /^The (.+) gauge, /.exec(alert.detail)?.[1]
+      return {
+        title: translate(`location.alert.title.river${level}`),
+        detail:
+          name && value !== null
+            ? translate(`location.alert.river${level}`, { name, distance: value })
+            : null,
+      }
+    }
+    case "flood_forecast":
+      return value !== null
+        ? {
+            title: translate("location.alert.title.floodGauge"),
+            detail: translate(`location.alert.floodGauge${level}`, { distance: value }),
+          }
+        : {
+            title: translate("location.alert.title.floodArea"),
+            detail: translate("location.alert.floodArea"),
+          }
+  }
+  return { title: null, detail: null }
+}
+
+const forecastBasis = "Open-Meteo forecast, interpolated from the weather grid"
+
+/** The server's words for what an alert was derived from, in the current language. */
+function basisText(basis: string): string | null {
+  if (basis === forecastBasis) return translate("location.alert.basis.forecast")
+  if (basis === `${forecastBasis}; heat index from temperature and humidity`) {
+    return translate("location.alert.basis.heat")
+  }
+  if (basis === "Irrigation Department river gauge reading and the station's own thresholds") {
+    return translate("location.alert.basis.rivers")
+  }
+  if (basis === "Google Flood Forecasting") return translate("location.alert.basis.floods")
+  const source = /^(.+) gauge reading and the station's published thresholds$/.exec(basis)?.[1]
+  return source ? translate("location.alert.basis.riversOther", { source }) : null
+}
+
 /**
  * A derived alert as the alert list shows it: always an estimate, issued
- * by lanka-weather, with the data it came from.
+ * by lanka-weather, with the data it came from. Its words are rebuilt in the
+ * current language from the alert's type and numbers; what cannot be rebuilt
+ * keeps the server's English, marked as English.
  */
 export function estimateAlert(
   alert: DerivedAlert,
@@ -213,17 +387,22 @@ export function estimateAlert(
   area: string,
   generatedAt: string,
 ): WeatherAlert {
+  const text = alertText(alert, generatedAt)
+  const basis = alert.basis ? basisText(alert.basis) : null
   return {
     id: `${alert.type}-${index}`,
-    title: alert.title,
+    title: text.title ?? alert.title,
+    ...(text.title === null ? { titleLang: "en" } : {}),
     severity: levelSeverity[alert.level] ?? "watch",
     estimate: true,
-    issuer: "Lanka Weather estimate",
+    issuer: translate("location.alert.issuer"),
     area,
     issuedAt: alert.validFrom ?? generatedAt,
     validUntil: alert.validUntil ?? undefined,
-    summary: alert.detail,
-    basis: alert.basis,
+    summary: text.detail ?? alert.detail,
+    ...(text.detail === null && alert.detail ? { summaryLang: "en" } : {}),
+    basis: basis ?? alert.basis,
+    ...(basis === null && alert.basis ? { basisLang: "en" } : {}),
   }
 }
 

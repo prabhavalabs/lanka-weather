@@ -1,4 +1,7 @@
+import { useT } from "@/lib/i18n"
 import type { ScaleStep } from "@/lib/tokens"
+
+import { cn } from "@/lib/utils"
 
 import { MapLegend } from "./MapLegend"
 
@@ -15,6 +18,7 @@ interface StepLegendProps {
 
 /** Discrete colour steps with their lower bounds, as small squares. */
 export function StepLegend({ title, unit, scale, names = {}, bare, className }: StepLegendProps) {
+  const t = useT()
   return (
     <MapLegend title={title} unit={unit} bare={bare} className={className}>
       <ol className="grid gap-1" style={{ gridTemplateColumns: `repeat(${scale.length}, 1fr)` }}>
@@ -22,15 +26,16 @@ export function StepLegend({ title, unit, scale, names = {}, bare, className }: 
           const next = scale[index + 1]?.from
           const range =
             step.from === null
-              ? `under ${next}`
+              ? t("weather.legend.under", { to: next ?? "", unit })
               : next === undefined
-                ? `${step.from} and above`
-                : `${step.from} to ${next}`
+                ? t("weather.legend.above", { from: step.from, unit })
+                : t("weather.legend.between", { from: step.from, to: next ?? "", unit })
+          const name = names[index]
           return (
             <li
               key={step.token}
               className="flex flex-col gap-1"
-              aria-label={`${range} ${unit}${names[index] ? `, ${names[index]}` : ""}`}
+              aria-label={name ? t("weather.legend.named", { range, name }) : range}
             >
               <span
                 aria-hidden="true"
@@ -56,7 +61,9 @@ export function StepLegend({ title, unit, scale, names = {}, bare, className }: 
             return (
               <span
                 key={index}
-                className={last ? "text-right whitespace-nowrap" : "whitespace-nowrap"}
+                title={name}
+                // Truncates rather than runs into the next name in longer languages.
+                className={cn("min-w-0 truncate", last && "text-right")}
                 style={{
                   gridColumn: last ? `${column} / span 2` : `${column + 1} / span 2`,
                   gridRow: 1,

@@ -24,7 +24,7 @@ function regionWeatherQuery(
       apiGet<RegionWeatherResponse>(regionWeatherPath(level, parent), signal),
     ...layerQueryOptions(timings),
     // GN divisions are many: kept in memory only.
-    meta: { persist: level !== "gn", label: "weather by region" },
+    meta: { persist: level !== "gn", label: "app.data.regionWeather" as const },
   }
 }
 
@@ -101,6 +101,6 @@ export function useRegionDetail(id: string | null) {
     enabled: id !== null,
     // Boundaries change a few times a year.
     staleTime: 24 * 60 * 60 * 1000,
-    meta: { label: "the region" },
+    meta: { label: "app.data.region" },
   })
 }

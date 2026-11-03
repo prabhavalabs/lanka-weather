@@ -4,10 +4,47 @@
  * province, two for a district, four for a DS division and seven for a GN
  * division, each starting with its parent's digits.
  */
+import { foldName, getLocale, translate, type Locale } from "@/lib/i18n"
 import { rainfallScale, temperatureScale, windScale, type ScaleStep } from "@/lib/tokens"
 import type { RegionLevel, RegionWeather } from "./types"
 
 export const regionLevels: RegionLevel[] = ["province", "district", "ds", "gn"]
+
+/** The level words that Sinhala and Tamil names of provinces and districts end with. */
+const localLevelWords: Partial<Record<Locale, Partial<Record<RegionLevel, string>>>> = {
+  si: { province: "පළාත", district: "දිස්ත්‍රික්කය" },
+  ta: { province: "மாகாணம்", district: "மாவட்டம்" },
+}
+
+/**
+ * A Sinhala or Tamil province or district name without its level word. The
+ * boundary data writes the word in, often cut short ("මහනුවර දිස්ත්‍රික",
+ * "அம்பாந்தோட்டை மாவ"), so any start of the word of three letters or more is
+ * taken off, and callers add the whole word.
+ */
+export function withoutLevelWord(name: string, level: RegionLevel, locale: Locale): string {
+  const word = localLevelWords[locale]?.[level]
+  const words = name.trim().split(/\s+/)
+  if (!word || words.length < 2) return name.trim()
+  const last = foldName(words.at(-1)!)
+  return last.length >= 3 && foldName(word).startsWith(last)
+    ? words.slice(0, -1).join(" ")
+    : name.trim()
+}
+
+/**
+ * A region's own name in a language, without a level word, else the English
+ * name: "මහනුවර" for Kandy in Sinhala.
+ */
+export function regionBareName(
+  region: { level: RegionLevel; name: string; nameSi?: string | null; nameTa?: string | null },
+  locale: Locale = getLocale(),
+): string {
+  const local = locale === "si" ? region.nameSi : locale === "ta" ? region.nameTa : null
+  return typeof local === "string" && local.trim() !== ""
+    ? withoutLevelWord(local, region.level, locale)
+    : region.name
+}
 
 const digitsByLevel: Record<RegionLevel, number> = { province: 1, district: 2, ds: 4, gn: 7 }
 
@@ -41,9 +78,10 @@ export function ancestorId(id: string, level: RegionLevel): string | null {
 export type RegionVariable = "temperature" | "rain" | "wind"
 
 export interface RegionVariableSpec {
-  label: string
-  /** Short label for a segmented control. */
-  short: string
+  /** In the current language: read it while a subscribed component renders. */
+  readonly label: string
+  /** Short label for a segmented control, in the current language. */
+  readonly short: string
   unit: string
   scale: ScaleStep[]
   value: (region: RegionWeather) => number | null
@@ -51,26 +89,39 @@ export interface RegionVariableSpec {
   decimals: number
 }
 
+/** Labels are getters, so they read the current language each time. */
 export const regionVariables: Record<RegionVariable, RegionVariableSpec> = {
   temperature: {
-    label: "Temperature now",
-    short: "Temp",
+    get label() {
+      return translate("regions.variable.temperature.label")
+    },
+    get short() {
+      return translate("regions.variable.temperature.short")
+    },
     unit: "°C",
     scale: temperatureScale,
     value: (region) => region.temperatureC,
     decimals: 1,
   },
   rain: {
-    label: "Rain today",
-    short: "Rain",
+    get label() {
+      return translate("regions.variable.rain.label")
+    },
+    get short() {
+      return translate("regions.variable.rain.short")
+    },
     unit: "mm",
     scale: rainfallScale,
     value: (region) => region.precipitationTodayMm,
     decimals: 1,
   },
   wind: {
-    label: "Strongest wind now",
-    short: "Wind",
+    get label() {
+      return translate("regions.variable.wind.label")
+    },
+    get short() {
+      return translate("regions.variable.wind.short")
+    },
     unit: "km/h",
     scale: windScale,
     value: (region) => region.windSpeedMaxKmh,

@@ -4,19 +4,28 @@
  * so it is tested without a browser.
  */
 import { parseHex, type RampStop } from "@/lib/colour"
+import { getLocale, translateIn, type Locale, type MessageKey } from "@/lib/i18n"
 import type { ScaleStep } from "@/lib/tokens"
 import { gridBounds, mercatorY } from "../weather-grid/field"
 import type { GridSpec } from "../location/types"
 import type { AqiCategory } from "../location/types"
 
-/** The EPA's words for each AQI band, in order. */
-export const aqiBands: { category: AqiCategory; label: string; token: `--${string}` }[] = [
-  { category: "good", label: "Good", token: "--aqi-1" },
-  { category: "moderate", label: "Moderate", token: "--aqi-2" },
-  { category: "unhealthy_sensitive", label: "Unhealthy for sensitive groups", token: "--aqi-3" },
-  { category: "unhealthy", label: "Unhealthy", token: "--aqi-4" },
-  { category: "very_unhealthy", label: "Very unhealthy", token: "--aqi-5" },
-  { category: "hazardous", label: "Hazardous", token: "--aqi-6" },
+/** The EPA's AQI bands, in order, with the message key of each one's words. */
+export const aqiBands: {
+  category: AqiCategory
+  key: Extract<MessageKey, `environment.aqi.${string}`>
+  token: `--${string}`
+}[] = [
+  { category: "good", key: "environment.aqi.good", token: "--aqi-1" },
+  { category: "moderate", key: "environment.aqi.moderate", token: "--aqi-2" },
+  {
+    category: "unhealthy_sensitive",
+    key: "environment.aqi.unhealthySensitive",
+    token: "--aqi-3",
+  },
+  { category: "unhealthy", key: "environment.aqi.unhealthy", token: "--aqi-4" },
+  { category: "very_unhealthy", key: "environment.aqi.veryUnhealthy", token: "--aqi-5" },
+  { category: "hazardous", key: "environment.aqi.hazardous", token: "--aqi-6" },
 ]
 
 const aqiLimits = [50, 100, 150, 200, 300]
@@ -32,16 +41,50 @@ export function aqiBand(category: AqiCategory) {
   return aqiBands.find((band) => band.category === category) ?? aqiBands[0]!
 }
 
-/** The WMO sea-state word for a wave height in metres. */
-export function seaStateOf(heightM: number): string {
-  if (heightM < 0.1) return "Calm"
-  if (heightM < 0.5) return "Smooth"
-  if (heightM < 1.25) return "Slight"
-  if (heightM < 2.5) return "Moderate"
-  if (heightM < 4) return "Rough"
-  if (heightM < 6) return "Very rough"
-  if (heightM < 9) return "High"
-  return "Very high"
+/** The EPA's words for an AQI band, in the current language: "Good". */
+export function aqiLabel(category: AqiCategory, locale: Locale = getLocale()): string {
+  return translateIn(locale, aqiBand(category).key)
+}
+
+/** The WMO sea states, calmest first, as the API names them. */
+export type SeaState =
+  "calm" | "smooth" | "slight" | "moderate" | "rough" | "very rough" | "high" | "very high"
+
+const seaStateKeys: Record<SeaState, Extract<MessageKey, `environment.seaState.${string}`>> = {
+  calm: "environment.seaState.calm",
+  smooth: "environment.seaState.smooth",
+  slight: "environment.seaState.slight",
+  moderate: "environment.seaState.moderate",
+  rough: "environment.seaState.rough",
+  "very rough": "environment.seaState.veryRough",
+  high: "environment.seaState.high",
+  "very high": "environment.seaState.veryHigh",
+}
+
+/** The WMO sea state for a wave height in metres. */
+export function seaStateCode(heightM: number): SeaState {
+  if (heightM < 0.1) return "calm"
+  if (heightM < 0.5) return "smooth"
+  if (heightM < 1.25) return "slight"
+  if (heightM < 2.5) return "moderate"
+  if (heightM < 4) return "rough"
+  if (heightM < 6) return "very rough"
+  if (heightM < 9) return "high"
+  return "very high"
+}
+
+/** The WMO sea-state word for a wave height in metres, in the current language. */
+export function seaStateOf(heightM: number, locale: Locale = getLocale()): string {
+  return translateIn(locale, seaStateKeys[seaStateCode(heightM)])
+}
+
+/**
+ * The API's sea-state word in the current language. A word we do not know
+ * falls back to the state of the wave height, so it is never left in English.
+ */
+export function seaStateLabel(state: string, heightM: number, locale: Locale = getLocale()) {
+  const key = seaStateKeys[state.trim().toLowerCase() as SeaState]
+  return key ? translateIn(locale, key) : seaStateOf(heightM, locale)
 }
 
 /**

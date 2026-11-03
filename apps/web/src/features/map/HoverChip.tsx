@@ -1,12 +1,13 @@
 import type { MapGeoJSONFeature, MapMouseEvent } from "maplibre-gl"
 import { useEffect, useRef, useState } from "react"
 import { formatNumber } from "@/lib/format"
+import { localName, translate, useLocale, type Locale } from "@/lib/i18n"
 import { useMediaQuery } from "@/lib/useMediaQuery"
-import { basinStateLabels, topArea } from "../floods/basins"
+import { basinStateLabel, topArea } from "../floods/basins"
 import { SUBBASIN_FILL } from "../floods/FloodBasinsLayer"
-import { floodAreaLabels, floodSeverityLabels, gaugeName } from "../floods/present"
+import { floodAreaLabel, floodSeverityLabels, gaugeName } from "../floods/present"
 import { FLOOD_AREAS, FLOOD_GAUGES } from "../floods/FloodForecastLayer"
-import type { FloodAreaKind, FloodSeverity } from "../floods/types"
+import type { FloodSeverity } from "../floods/types"
 import { riskLabels } from "../river-risk/present"
 import type { BasinState, ReachRisk, RiverRisk } from "../river-risk/types"
 import { regionLabel } from "../location/present"
@@ -62,7 +63,27 @@ interface Chip {
   y: number
   title: string
   local?: string
+  /** The language of `local`, which is the name in another script. */
+  localLang?: Locale
   lines: string[]
+}
+
+/** A region's name in the language, and beside it the name in one other script. */
+function regionNames(
+  properties: Record<string, unknown>,
+  locale: Locale,
+): { name: string; local?: string; localLang?: Locale } {
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null)
+  const names = {
+    name: text(properties.name) ?? "",
+    nameSi: text(properties.nameSi),
+    nameTa: text(properties.nameTa),
+  }
+  const name = localName(names, locale)
+  // In English the Sinhala name goes beside it, as on official maps; in Sinhala
+  // or Tamil, the English name.
+  if (locale === "en") return { name, local: names.nameSi ?? undefined, localLang: "si" }
+  return name !== names.name && names.name ? { name, local: names.name, localLang: "en" } : { name }
 }
 
 /** Points are easier to hit with a little slack around the pointer. */
@@ -77,8 +98,12 @@ const pointSlack = 5
 export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: HoverChipProps) {
   const map = useMap()
   const canHover = useMediaQuery("(hover: hover) and (pointer: fine)")
+  // The chip's text is built in the language of the moment; a switch rebuilds it.
+  const locale = useLocale()
   const [chip, setChip] = useState<Chip | null>(null)
   const props = useRef({ regions, wind, rivers, basins, hazards, extra })
+  /** The last pointer position over the map, to rebuild the chip after a language switch. */
+  const lastMove = useRef<MapMouseEvent | null>(null)
 
   useEffect(() => {
     props.current = { regions, wind, rivers, basins, hazards, extra }
@@ -151,30 +176,43 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
 
       let title = ""
       let local: string | undefined
+      let localLang: Locale | undefined
       if (point?.layer.id === RIVER_STATIONS) {
-        title = String(point.properties.name ?? "River gauge")
+        title = String(point.properties.name ?? translate("map.chip.riverGauge"))
         const status = point.properties.status as RiverStatus
         const level = point.properties.waterLevel
+        const statusText = statusLabels[status] ?? translate("map.chip.riverGauge")
         lines.push(
-          `${statusLabels[status] ?? "River gauge"}` +
-            (typeof level === "number"
-              ? ` · ${formatLevel(level, point.properties.unit as LevelUnit)}`
-              : ""),
+          typeof level === "number"
+            ? translate("map.chip.riverGaugeLevel", {
+                status: statusText,
+                level: formatLevel(level, point.properties.unit as LevelUnit),
+              })
+            : statusText,
         )
       } else if (reservoir) {
-        title = String(reservoir.properties.name ?? "Reservoir")
+        title = String(reservoir.properties.name ?? translate("map.chip.reservoir"))
         const status = reservoir.properties.status as ReservoirStatus
-        lines.push(`Reservoir: ${(reservoirStatusLabels[status] ?? "No data").toLowerCase()}`)
+        lines.push(
+          translate("map.chip.reservoirStatus", {
+            status: reservoirStatusLabels[status] ?? translate("terms.reservoirStatus.nodata"),
+          }),
+        )
       } else if (point?.layer.id === FLOOD_GAUGES) {
         title = gaugeName({
           gaugeId: String(point.properties.gaugeId),
           siteName: point.properties.siteName as string | undefined,
           river: point.properties.river as string | undefined,
         })
+        const severity = point.properties.severity as FloodSeverity | undefined
         lines.push(
-          `Flood forecast: ${floodSeverityLabels[point.properties.severity as FloodSeverity] ?? "no data"}`,
+          translate("map.chip.floodForecast", {
+            severity: (severity && floodSeverityLabels[severity]) || translate("map.chip.noData"),
+          }),
         )
-        if (point.properties.qualityVerified === false) lines.push("Lower confidence")
+        if (point.properties.qualityVerified === false) {
+          lines.push(translate("map.chip.lowerConfidence"))
+        }
       } else if (hazard) {
         const described = hazardLayers?.describe(hazard)
         if (described) {
@@ -184,43 +222,58 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
         }
       } else if (area) {
         const top = topArea(queryMap(map, event.point, pointSlack)([FLOOD_AREAS], false)) ?? area
-        title = floodAreaLabels[top.properties.kind as FloodAreaKind] ?? "Flood area"
-        lines.push("Google flood forecast")
+        title =
+          typeof top.properties.kind === "string"
+            ? floodAreaLabel(top.properties.kind)
+            : translate("map.chip.floodArea")
+        lines.push(translate("map.chip.googleForecast"))
       } else if (river) {
         const known = riverInfo?.byId.get(String(river.properties.river))
         const reach = typeof river.id === "number" ? riverInfo?.reaches.get(river.id) : undefined
-        title = known?.name ?? "Stream"
+        title = known ? localName(known) : translate("map.chip.stream")
         if (reach) {
           lines.push(reach.name)
-          lines.push(`${riskLabels[reach.level]} · Estimate`)
+          lines.push(translate("map.chip.risk", { risk: riskLabels[reach.level] }))
         } else if (known) {
-          lines.push("Tributary, not assessed")
+          lines.push(translate("map.chip.tributary"))
         }
       } else if (past) {
-        title = String(past.properties.name ?? "Past flood")
-        lines.push("Past event, not a forecast")
+        title = String(past.properties.name ?? translate("map.chip.pastFlood"))
+        lines.push(translate("map.chip.pastEvent"))
       } else if (basin) {
         const fid = typeof basin.id === "number" ? basin.id : -1
         const isSubbasin = basin.layer.id === SUBBASIN_FILL
         const parent = isSubbasin
           ? basinInfo?.byFid.get(Number(basin.properties.basin))
           : basinInfo?.byFid.get(fid)
-        title = parent?.name ?? String(basin.properties.name ?? "River basin")
+        title = parent?.name ?? String(basin.properties.name ?? translate("map.chip.basin"))
         const state: BasinState = isSubbasin
           ? (basinInfo?.subbasins.get(fid) ?? "no_forecast")
           : (parent?.state ?? "no_forecast")
-        lines.push(`${isSubbasin ? "Sub-basin" : "Basin"}: ${basinStateLabels[state]}`)
+        lines.push(
+          translate(isSubbasin ? "map.chip.subbasinState" : "map.chip.basinState", {
+            state: basinStateLabel(state),
+          }),
+        )
       } else if (region) {
         const level = region.properties.level as RegionLevel
-        title = regionLabel({ level, name: String(region.properties.name ?? "") })
-        local = (region.properties.nameSi as string | undefined) ?? undefined
+        const names = regionNames(region.properties, locale)
+        title = regionLabel({ level, name: names.name })
+        local = names.local
+        localLang = names.localLang
         const weather = regionInfo?.lookup.get(String(region.properties.id))
         const variable = regionInfo?.variable
         if (weather && variable) {
           const spec = regionVariables[variable]
           const value = spec.value(weather)
           if (value !== null) {
-            lines.push(`${spec.label}: ${formatNumber(value, spec.decimals)} ${spec.unit}`)
+            lines.push(
+              translate("map.chip.regionValue", {
+                label: spec.label,
+                value: formatNumber(value, spec.decimals),
+                unit: spec.unit,
+              }),
+            )
           }
         }
       }
@@ -232,20 +285,22 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
       lines.push(...(more?.lineAt(event.lngLat.lng, event.lngLat.lat) ?? []))
       if (field) {
         const sample = sampleWind(field, event.lngLat.lng, event.lngLat.lat)
-        if (sample) lines.push(`Wind ${windText(sample[0], sample[1])}`)
+        if (sample) lines.push(translate("map.chip.wind", { wind: windText(sample[0], sample[1]) }))
       }
       if (!title && lines.length === 0) {
         setChip(null)
         return
       }
-      setChip({ x, y, title, local, lines })
+      setChip({ x, y, title, local, localLang, lines })
     }
 
     const move = (event: MapMouseEvent) => {
+      lastMove.current = event
       pending = event
       if (!frame) frame = requestAnimationFrame(update)
     }
     const leave = () => {
+      lastMove.current = null
       pending = null
       if (frame) cancelAnimationFrame(frame)
       frame = 0
@@ -255,6 +310,8 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
     map.on("mousemove", move)
     map.on("mouseout", leave)
     map.on("movestart", leave)
+    // After a language switch, rebuild the chip where the pointer still is.
+    if (lastMove.current) move(lastMove.current)
     return () => {
       map.off("mousemove", move)
       map.off("mouseout", leave)
@@ -262,14 +319,14 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
       if (frame) cancelAnimationFrame(frame)
       clear()
     }
-  }, [map, canHover])
+  }, [map, canHover, locale])
 
   if (!chip) return null
-  const flip = chip.x > window.innerWidth - 280
+  const flip = chip.x > window.innerWidth - 310
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed z-20 max-w-64 rounded-xl bg-tooltip px-3 py-2 text-xs text-tooltip-foreground shadow-panel"
+      className="pointer-events-none fixed z-20 max-w-72 rounded-xl break-words bg-tooltip px-3 py-2 text-xs text-tooltip-foreground shadow-panel"
       style={{
         left: chip.x,
         top: chip.y,
@@ -280,7 +337,7 @@ export function HoverChip({ regions, wind, rivers, basins, hazards, extra }: Hov
         <p className="font-medium">
           {chip.title}
           {chip.local && (
-            <span className="ml-1.5 font-normal opacity-75" lang="si">
+            <span className="ml-1.5 font-normal opacity-75" lang={chip.localLang ?? "si"}>
               {chip.local}
             </span>
           )}

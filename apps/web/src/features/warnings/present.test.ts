@@ -1,16 +1,25 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale, translateIn } from "@/lib/i18n"
 import {
   bannerLead,
+  bannerView,
   bulletinAlert,
   bulletinBadge,
+  bulletinEntries,
+  editionTitle,
   formatReportDate,
+  groupEditions,
   highlightLines,
   landslideAlert,
   landslideNote,
+  landslideStatusNote,
   landslideSummary,
   levelsShown,
   officialSlot,
+  presentEditions,
   pruneDismissed,
+  scriptLang,
+  titleStem,
   visibleBanner,
 } from "./present"
 import type { BannerItem, Bulletin, LandslideHere, LandslideMeta, OfficialAt } from "./types"
@@ -217,5 +226,200 @@ describe("highlights", () => {
       "Mentioned in bulletin: Flood warning",
       "and 1 more",
     ])
+  })
+})
+
+describe("landslide notes in the reader's language", () => {
+  afterEach(() => setLocale("en"))
+
+  it("says in English what the server says, from the status and dates", () => {
+    expect(landslideStatusNote(meta, meta.fetchedAt)).toEqual({ text: meta.note })
+    expect(landslideStatusNote({ ...meta, status: "none", note: "x" }, meta.fetchedAt).text).toBe(
+      "Last report 31 Oct 2026; none currently active as far as we know.",
+    )
+  })
+
+  it("never calls an old feed calm, in any language", () => {
+    const unknown = { ...meta, status: "unknown" as const }
+    expect(landslideStatusNote(unknown, null).text).toContain("cannot say")
+    expect(landslideStatusNote(unknown, meta.fetchedAt, "ta").text).toContain("கூற முடியாது")
+  })
+
+  it("keeps the server's words, marked English, when the facts are missing", () => {
+    expect(landslideStatusNote({ ...meta, reportDate: null }, null, "si")).toEqual({
+      text: meta.note,
+      lang: "en",
+    })
+  })
+
+  it("writes the note and the level in Sinhala", () => {
+    setLocale("si")
+    expect(landslideStatusNote(meta, meta.fetchedAt).text).toContain("වලංගුයි")
+    expect(landslideNote(here)).toContain("Yatinuwara")
+    expect(landslideNote(here)).toContain("ආරක්ෂිත")
+    const alert = landslideAlert({
+      ...here,
+      level: { level: 3, label: "Level 3 (Red)", colour: "Red", action: "Evacuate" },
+    })
+    // The level and colour words are the shared official terms.
+    expect(alert?.badgeLabel).toBe(
+      `${translateIn("si", "terms.landslideLevel.l3")} · ${translateIn("si", "terms.landslideAction.l3")}`,
+    )
+    expect(bulletinBadge(bulletin).label).toBe(
+      `${translateIn("si", "terms.bulletinSeverity.warning")} · ${translateIn("si", "terms.colour.red")}`,
+    )
+  })
+})
+
+describe("editions", () => {
+  // As the DMC published them on 3 Nov 2026: the Tamil edition came 25 minutes
+  // after the English one, with no usable text.
+  const english: Bulletin = {
+    ...bulletin,
+    id: "en-1120",
+    colour: "Amber",
+    messageId: "08 MSA /26/11/03/01",
+    issuedAt: "2026-11-03T05:50:00Z",
+    pdfUrl: "https://www.dmc.gov.lk/en.pdf",
+  }
+  const tamil: Bulletin = {
+    ...bulletin,
+    id: "ta-1145",
+    title: "Warning for strong winds and rough seas (Tamil Language)",
+    language: "ta",
+    colour: null,
+    messageId: null,
+    validUntil: null,
+    text: null,
+    textStatus: "unusable",
+    districts: [],
+    issuedAt: "2026-11-03T06:15:00Z",
+    pdfUrl: "https://www.dmc.gov.lk/ta.pdf",
+  }
+  const report: Bulletin = {
+    ...bulletin,
+    id: "report-ta",
+    type: "weather",
+    severity: "routine",
+    title: "Weather report (Tamil Language)",
+    language: "ta",
+    text: null,
+    districts: [],
+    issuedAt: "2026-11-01T09:30:00Z",
+  }
+
+  it("reduces titles to what their editions share", () => {
+    expect(titleStem(tamil.title)).toBe(titleStem(english.title))
+    expect(titleStem("Weather Forecast - Tamil")).toBe("weather forecast")
+    expect(editionTitle(tamil)).toBe("Warning for strong winds and rough seas")
+    expect(editionTitle({ title: "Weather Forecast - Tamil", language: "ta" })).toBe(
+      "Weather Forecast",
+    )
+    expect(editionTitle(english)).toBe(english.title)
+    expect(scriptLang("කාලගුණ")).toBe("si")
+    expect(scriptLang("வானிலை")).toBe("ta")
+    expect(scriptLang(english.title)).toBe("en")
+  })
+
+  it("pairs the Tamil edition with the English one and leaves others alone", () => {
+    const groups = groupEditions([tamil, english, report])
+    expect(groups.map((group) => group.map((item) => item.id))).toEqual([
+      ["ta-1145", "en-1120"],
+      ["report-ta"],
+    ])
+  })
+
+  it("pairs numbered updates with their own editions, nearest first", () => {
+    const later = { ...english, id: "en-0930", issuedAt: "2026-11-01T09:30:00Z" }
+    const earlier = { ...english, id: "en-0700", issuedAt: "2026-11-01T07:00:00Z" }
+    const laterTa = { ...tamil, id: "ta-0930", issuedAt: "2026-11-01T09:30:00Z" }
+    const earlierTa = { ...tamil, id: "ta-0700", issuedAt: "2026-11-01T07:00:00Z" }
+    const groups = groupEditions([later, laterTa, earlier, earlierTa])
+    expect(groups.map((group) => group.map((item) => item.id).sort())).toEqual([
+      ["en-0930", "ta-0930"],
+      ["en-0700", "ta-0700"],
+    ])
+  })
+
+  it("does not pair editions issued far apart", () => {
+    const old = { ...tamil, issuedAt: "2026-11-02T05:50:00Z" }
+    expect(groupEditions([english, old])).toHaveLength(2)
+  })
+
+  it("shows a Tamil reader the Tamil edition, with the English text marked as such", () => {
+    const entry = presentEditions([tamil, english], "ta")
+    expect(entry.shown.id).toBe("ta-1145")
+    expect(entry.title).toBe("Warning for strong winds and rough seas")
+    expect(entry.others.map((item) => item.id)).toEqual(["en-1120"])
+    expect(entry.note).toBeNull()
+    expect(entry.text).toBe(english.text)
+    expect(entry.textFromEnglish).toBe(true)
+    // The colour, message and period are read from the English text.
+    expect(entry.merged.colour).toBe("Amber")
+    expect(entry.merged.messageId).toBe(english.messageId)
+    expect(entry.merged.validUntil).toBe(english.validUntil)
+    expect(entry.merged.districts).toEqual(english.districts)
+  })
+
+  it("tells a Sinhala reader when there is no Sinhala edition", () => {
+    const entry = presentEditions([tamil, english], "si")
+    expect(entry.shown.id).toBe("en-1120")
+    expect(entry.note).toBe("missingSi")
+    expect(entry.others.map((item) => item.id)).toEqual(["ta-1145"])
+    expect(entry.textFromEnglish).toBe(false)
+    expect(presentEditions([english], "ta").note).toBe("onlyEn")
+  })
+
+  it("shows an English reader the English edition, and a Tamil-only one as published", () => {
+    expect(presentEditions([tamil, english], "en").shown.id).toBe("en-1120")
+    expect(presentEditions([tamil, english], "en").note).toBeNull()
+    expect(presentEditions([report], "en").note).toBe("onlyTa")
+    expect(presentEditions([report], "ta").note).toBeNull()
+  })
+
+  it("finds a filtered-out edition in the full list and hides no bulletin", () => {
+    const entries = bulletinEntries([english, report], [tamil, english, report], "ta")
+    expect(entries.map((entry) => entry.shown.id)).toEqual(["ta-1145", "report-ta"])
+    const all = bulletinEntries([tamil, english, report], [], "en")
+    expect(all.flatMap((entry) => entry.editions).length).toBe(3)
+  })
+
+  it("announces the reader's edition in the banner", () => {
+    const item: BannerItem = {
+      key: "bulletin:en-1120",
+      kind: "bulletin",
+      title: english.title,
+      detail: "Weather",
+      colour: "Amber",
+      issuedAt: english.issuedAt,
+      pdfUrl: english.pdfUrl,
+    }
+    const [tamilView] = bannerView([item], [tamil, english], "ta")
+    expect(tamilView?.title).toBe("Warning for strong winds and rough seas")
+    expect(tamilView?.pdfUrl).toBe(tamil.pdfUrl)
+    expect(tamilView?.detail).toBe(translateIn("ta", "terms.bulletinType.weather"))
+    expect(tamilView?.edition).toBe("ta")
+    expect(tamilView?.key).toBe(item.key)
+    const [englishView] = bannerView([item], [tamil, english], "en")
+    expect(englishView?.title).toBe(english.title)
+    expect(englishView?.edition).toBeUndefined()
+  })
+
+  it("writes the landslide banner from its counts", () => {
+    const item: BannerItem = {
+      key: "landslide:2026-10-31:2:1",
+      kind: "landslide",
+      title: "Landslide early warning",
+      detail: "Level 3 (Red): 2 DS divisions; Level 2 (Amber): 1",
+      level: 3,
+      colour: "Red",
+      issuedAt: null,
+      pdfUrl: null,
+    }
+    expect(bannerView([item], [], "en")[0]?.detail).toBe(item.detail)
+    expect(bannerView([{ ...item, key: "landslide:2026-10-31:0:1" }], [], "en")[0]?.detail).toBe(
+      "Level 2 (Amber): 1 DS division",
+    )
+    expect(bannerView([item], [], "si")[0]?.title).toBe("නායයෑම් පිළිබඳ පූර්ව අනතුරු ඇඟවීම")
   })
 })

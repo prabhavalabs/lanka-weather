@@ -7,6 +7,7 @@ import { StatValue } from "@/components/StatValue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { LevelChart } from "./LevelChart"
 import {
@@ -16,12 +17,13 @@ import {
   headroom,
   levelNumber,
   nextHourLine,
-  statusColors,
+  stationThresholds,
   statusLabels,
   trendArrows,
   trendLabels,
 } from "./present"
 import { useStationHistory } from "./queries"
+import { Template } from "./Template"
 import type { StationProperties } from "./types"
 
 const historyHours = 72
@@ -34,16 +36,10 @@ interface StationPanelProps {
 
 /** Details of one gauging station: current level, thresholds and recent history. */
 export function StationPanel({ station, onClose, className }: StationPanelProps) {
+  const t = useT()
   const history = useStationHistory(station.id, historyHours)
   const room = headroom(station)
-  const thresholds = [
-    { label: "Alert", value: station.alertLevel, color: statusColors.alert },
-    { label: "Minor flood", value: station.minorFloodLevel, color: statusColors.minor_flood },
-    { label: "Major flood", value: station.majorFloodLevel, color: statusColors.major_flood },
-  ].filter(
-    (threshold): threshold is { label: string; value: number; color: string } =>
-      threshold.value !== null,
-  )
+  const thresholds = stationThresholds(station)
   const level = station.waterLevel === null ? "–" : levelNumber(station.waterLevel, station.unit)
   const unit = station.unit === "unknown" ? undefined : station.unit
   const rising = station.trend === "rising"
@@ -53,16 +49,21 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
     <Panel
       icon={<WavesIcon />}
       title={station.name}
-      subtitle={`${station.basin} · river gauge`}
+      subtitle={t("rivers.station.subtitle", { basin: station.basin })}
       className={cn("w-full", className)}
       action={
-        <Button variant="outline" size="icon" onClick={onClose} aria-label="Close station details">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onClose}
+          aria-label={t("rivers.station.close")}
+        >
           <XIcon />
         </Button>
       }
       footer={
         <p>
-          Source: {station.attribution}.{" "}
+          {t("rivers.station.source", { attribution: station.attribution })}{" "}
           {station.sourceUrl && (
             <>
               <a
@@ -71,12 +72,12 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
                 rel="noreferrer"
                 className="underline underline-offset-2 hover:text-foreground"
               >
-                This gauge at the source
+                {t("rivers.station.sourceLink")}
               </a>
               .{" "}
             </>
           )}
-          Official flood warnings come from the Irrigation Department and the DMC.
+          {t("rivers.station.official")}
         </p>
       }
     >
@@ -85,12 +86,12 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
           <Badge variant={station.status}>{statusLabels[station.status]}</Badge>
           {station.stale && (
             <Badge variant="chip" className="text-foreground">
-              Out of date
+              {t("common.outOfDate")}
             </Badge>
           )}
         </div>
         <StatValue
-          label="Water level"
+          label={t("rivers.station.waterLevel")}
           value={level}
           unit={unit}
           delta={
@@ -103,21 +104,23 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
           }
           caption={
             room
-              ? `${formatLevel(room.remaining, station.unit)} below ${room.next} level`
+              ? t(`rivers.station.below.${room.next}`, {
+                  amount: formatLevel(room.remaining, station.unit),
+                })
               : station.waterLevel === null
-                ? "This gauge has no reading at the moment."
+                ? t("rivers.station.noReading")
                 : station.unit === "unknown"
-                  ? "No unit or flood thresholds are published for this gauge, so there is no flood verdict."
+                  ? t("rivers.station.noUnit")
                   : thresholds.length === 0
-                    ? "This station publishes no flood thresholds."
-                    : "Above major flood level"
+                    ? t("rivers.station.noThresholds")
+                    : t("rivers.station.aboveMajor")
           }
           aside={room ? `${Math.round(room.fraction * 100)}%` : undefined}
         />
         {room && (
           <ProgressBar
             value={room.fraction}
-            label={`Level between thresholds, towards ${room.next}`}
+            label={t(`rivers.station.towards.${room.next}`)}
             color={rising ? undefined : "var(--chart-2)"}
           />
         )}
@@ -125,23 +128,40 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
 
       {nextHour && (
         <p className="rounded-xl border border-border bg-inset px-3 py-2 text-xs text-muted-foreground">
-          Next hour (experimental, by Sri Lanka Water Levels):{" "}
-          <span className="numeric whitespace-nowrap text-foreground">{nextHour.value}</span>,{" "}
-          {nextHour.issued}
+          <Template
+            text={t("rivers.station.nextHour")}
+            values={{
+              value: (
+                <span className="numeric whitespace-nowrap text-foreground">{nextHour.value}</span>
+              ),
+              issued: nextHour.issued,
+            }}
+          />
         </p>
       )}
 
       <LabeledRows>
         <LabeledRow
-          label="Observed"
-          value={`${formatAge(station.observedAt)}${station.stale ? " · out of date" : ""}`}
+          label={t("rivers.station.observed")}
+          value={
+            station.stale
+              ? t("rivers.station.observedStale", { age: formatAge(station.observedAt) })
+              : formatAge(station.observedAt)
+          }
           tone={station.stale ? "warning" : "default"}
         />
         {station.ratePerHour === null && (
-          <LabeledRow label="Trend" value={trendLabels[station.trend]} numeric={false} />
+          <LabeledRow
+            label={t("rivers.station.trend")}
+            value={trendLabels[station.trend]}
+            numeric={false}
+          />
         )}
         {station.rainfallMm !== null && (
-          <LabeledRow label="Rainfall at gauge" value={`${station.rainfallMm.toFixed(1)} mm`} />
+          <LabeledRow
+            label={t("rivers.station.rainfall")}
+            value={`${station.rainfallMm.toFixed(1)} mm`}
+          />
         )}
         {thresholds.map((threshold) => (
           <LabeledRow
@@ -155,13 +175,13 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
 
       <div>
         <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-          Last {historyHours} hours
+          {t("rivers.station.history", { hours: historyHours })}
         </h3>
         {history.isPending && (
           <Skeleton
             className="h-40 w-full rounded-2xl"
             role="status"
-            aria-label="Loading history"
+            aria-label={t("rivers.station.loadingHistory")}
           />
         )}
         {history.error && (
@@ -169,14 +189,14 @@ export function StationPanel({ station, onClose, className }: StationPanelProps)
             className="rounded-2xl border border-border bg-inset py-6 text-center text-xs text-muted-foreground"
             role="alert"
           >
-            History is unavailable.
+            {t("rivers.station.historyUnavailable")}
           </p>
         )}
         {history.data && (
           <LevelChart
             readings={history.data.readings}
             thresholds={thresholds}
-            unit={unit ?? "(no unit)"}
+            unit={unit ?? t("rivers.station.noUnitShort")}
             hours={historyHours}
           />
         )}
