@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,6 +36,10 @@ type Scheduler struct {
 	// Tick is how often due collectors are checked.
 	Tick time.Duration
 	Now  func() time.Time
+
+	// running holds the long-running collectors in flight.
+	runningMu sync.Mutex
+	running   map[string]bool
 }
 
 // Run schedules until ctx is cancelled.
@@ -118,16 +123,63 @@ func (scheduler *Scheduler) RunDue(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		last, err := queries.LastRunStart(ctx, collector.Name())
+		last, err := queries.LastRun(ctx, collector.Name())
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			scheduler.Logger.Warn("read last run failed", "source", collector.Name(), "error", err)
 			continue
 		}
-		if err == nil && scheduler.now().Sub(last) < collector.Interval() {
+		if err == nil && scheduler.now().Sub(last.StartedAt) < DueAfter(collector, last.Status) {
+			continue
+		}
+		if _, long := collector.(source.LongRunner); long {
+			scheduler.startLong(ctx, collector)
 			continue
 		}
 		scheduler.RunOne(ctx, collector)
 	}
+}
+
+// startLong runs a long-running collector beside the others, one run at a
+// time, so its download does not hold up the collectors after it.
+func (scheduler *Scheduler) startLong(ctx context.Context, collector source.Collector) {
+	scheduler.runningMu.Lock()
+	defer scheduler.runningMu.Unlock()
+	if scheduler.running[collector.Name()] {
+		return
+	}
+	if scheduler.running == nil {
+		scheduler.running = map[string]bool{}
+	}
+	scheduler.running[collector.Name()] = true
+	go func() {
+		defer func() {
+			scheduler.runningMu.Lock()
+			defer scheduler.runningMu.Unlock()
+			delete(scheduler.running, collector.Name())
+		}()
+		scheduler.RunOne(ctx, collector)
+	}()
+}
+
+// DefaultRetryAfter is how soon a collector whose last run failed is tried
+// again, when its interval is longer: a three-hourly forecast should not
+// stay missing for three hours because its source was briefly down. A
+// collector that implements source.Retrier chooses its own delay instead.
+const DefaultRetryAfter = 15 * time.Minute
+
+// DueAfter is how long after its last run a collector is due again: its
+// interval after a success, or its retry delay after a failure (the
+// collector's own RetryAfter, else DefaultRetryAfter), whichever is shorter.
+func DueAfter(collector source.Collector, lastStatus string) time.Duration {
+	interval := collector.Interval()
+	if lastStatus != "error" {
+		return interval
+	}
+	retry := DefaultRetryAfter
+	if retrier, ok := collector.(source.Retrier); ok && retrier.RetryAfter() > 0 {
+		retry = retrier.RetryAfter()
+	}
+	return min(interval, retry)
 }
 
 // RunOne runs one collector now and records the run.
@@ -140,7 +192,11 @@ func (scheduler *Scheduler) RunOne(ctx context.Context, collector source.Collect
 		return
 	}
 
-	runCtx, cancel := context.WithTimeout(ctx, runTimeout)
+	timeout := runTimeout
+	if long, ok := collector.(source.LongRunner); ok && long.LongRunTimeout() > 0 {
+		timeout = long.LongRunTimeout()
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	records, collectErr := collector.Collect(runCtx, started)
 	cancel()
 
@@ -168,6 +224,19 @@ func (scheduler *Scheduler) cleanup(ctx context.Context, now time.Time) {
 	if err := queries.DeleteSourceRunsBefore(ctx, now.Add(-runRetention)); err != nil {
 		scheduler.Logger.Warn("delete old runs failed", "error", err)
 	}
+	for _, collector := range scheduler.Collectors {
+		if pruner, ok := collector.(source.Pruner); ok {
+			if err := pruner.Prune(ctx, now); err != nil {
+				scheduler.Logger.Warn("prune failed", "source", collector.Name(), "error", err)
+			}
+		}
+	}
+}
+
+// Prune applies every collector's retention limit now, as the worker does
+// hourly; `collect` calls it after its run.
+func (scheduler *Scheduler) Prune(ctx context.Context) {
+	scheduler.cleanup(ctx, scheduler.now())
 }
 
 func (scheduler *Scheduler) now() time.Time {

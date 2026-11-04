@@ -1,19 +1,178 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* Fonts are self-hosted. The Sinhala and Tamil faces declare unicode ranges,
+   so a browser downloads them only for text in those scripts. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/noto-sans-sinhala";
+@import "@fontsource-variable/noto-sans-tamil";
+@import "./styles/theme.css";
+@import "./styles/map.css";
 
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
+@custom-variant dark (&:is(.dark *));
+/* A pressed toggle or a chosen segment. ARIA state as well as data-state,
+   because a tooltip trigger wrapped around a toggle replaces its data-state. */
+@custom-variant toggled (&:is([data-state="on"], [aria-checked="true"], [aria-pressed="true"]));
+
+@theme inline {
+  --font-sans:
+    "Geist Variable", "Noto Sans Sinhala Variable", "Noto Sans Tamil Variable", system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, "Noto Sans Sinhala Variable",
+    "Noto Sans Tamil Variable", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-foreground: var(--brand-soft-foreground);
+  --color-brand-text: var(--brand-text);
+  --color-tooltip: var(--tooltip);
+  --color-tooltip-foreground: var(--tooltip-foreground);
+  --color-hatch: var(--hatch);
+  --color-grid-dot: var(--grid-dot);
+  --color-inset: var(--inset);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-past-flood: var(--past-flood);
+  --color-status-normal: var(--status-normal);
+  --color-status-normal-foreground: var(--status-normal-foreground);
+  --color-status-alert: var(--status-alert);
+  --color-status-alert-foreground: var(--status-alert-foreground);
+  --color-status-minor-flood: var(--status-minor-flood);
+  --color-status-minor-flood-foreground: var(--status-minor-flood-foreground);
+  --color-status-major-flood: var(--status-major-flood);
+  --color-status-major-flood-foreground: var(--status-major-flood-foreground);
+  --color-status-unknown: var(--status-unknown);
+  --color-status-unknown-foreground: var(--status-unknown-foreground);
+  --color-reservoir-spilling: var(--reservoir-spilling);
+  --color-reservoir-spilling-foreground: var(--reservoir-spilling-foreground);
+  --color-reservoir-releasing: var(--reservoir-releasing);
+  --color-reservoir-releasing-foreground: var(--reservoir-releasing-foreground);
+  --color-reservoir-holding: var(--reservoir-holding);
+  --color-reservoir-holding-foreground: var(--reservoir-holding-foreground);
+  --color-reservoir-nodata: var(--reservoir-nodata);
+  --color-reservoir-nodata-foreground: var(--reservoir-nodata-foreground);
+
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: var(--radius);
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.375rem;
+  --radius-3xl: 1.75rem;
+  --radius-4xl: 2rem;
+
+  --shadow-panel: var(--elevation-panel);
 }
 
-body {
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    "Noto Sans Sinhala",
-    "Noto Sans Tamil",
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--brand);
+    color: var(--brand-foreground);
+  }
+}
+
+/* Numbers, dates and values: Geist Mono, tabular, slashed zero (the
+   font's default zero is slashed; `zero` covers fallback fonts). */
+@utility numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.02em;
+}
+
+/* The unfilled remainder of a progress bar. */
+@utility hatched {
+  background-image: repeating-linear-gradient(-45deg, var(--hatch) 0 1.5px, transparent 1.5px 5px);
+}
+
+/* The dotted grid inside inset panels. */
+@utility dot-grid {
+  background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1.25px);
+  background-size: 14px 14px;
+  background-position: 7px 7px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Sinhala and Tamil carry marks above and below the letters, so they need
+   more line height than Latin text. `lang` is set on <html> before first
+   paint (index.html, src/lib/i18n). Unlayered, so it outranks the tight
+   leading utilities, which would otherwise clip the marks. */
+:root:is(:lang(si), :lang(ta)) {
+  --text-xs--line-height: 1.55;
+  --text-sm--line-height: 1.6;
+  --text-base--line-height: 1.6;
+  --text-lg--line-height: 1.55;
+}
+:root:is(:lang(si), :lang(ta)) body {
+  line-height: 1.6;
+}
+:root:is(:lang(si), :lang(ta)) :is(.leading-none, .leading-4) {
+  line-height: 1.3;
+}
+:root:is(:lang(si), :lang(ta)) :is(.leading-tight, .leading-snug) {
+  line-height: 1.45;
 }

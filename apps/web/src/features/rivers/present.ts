@@ -1,21 +1,62 @@
-import type { RiverStatus, RiverTrend, StationProperties } from "./types"
+import { formatClock } from "@/lib/format"
+import { translate, type MessageKey } from "@/lib/i18n"
+import type { LevelUnit, NextHour, RiverStatus, RiverTrend, StationProperties } from "./types"
 
-/** Colours by status, from calm to severe; chosen to stay distinct for common colour-vision deficiencies. */
+export { formatAge } from "@/lib/format"
+
+/**
+ * A record of labels read in the current language each time a value is
+ * looked up, so `labels[status]` stays a plain lookup at every call site.
+ * The component that shows it must subscribe with `useT()` or `useLocale()`.
+ */
+export function liveLabels<K extends string>(
+  keys: readonly K[],
+  key: (name: K) => MessageKey,
+): Readonly<Record<K, string>> {
+  const record = {} as Record<K, string>
+  for (const name of keys) {
+    Object.defineProperty(record, name, { enumerable: true, get: () => translate(key(name)) })
+  }
+  return record
+}
+
+/**
+ * Theme tokens by status, from calm to severe (src/styles/theme.css): blue,
+ * yellow, orange, red and grey, distinct in lightness as well as hue so they
+ * stay apart for common colour-vision deficiencies. Each has a matching
+ * `-foreground` token for text on it.
+ */
+export const statusTokens: Record<RiverStatus, `--${string}`> = {
+  normal: "--status-normal",
+  alert: "--status-alert",
+  minor_flood: "--status-minor-flood",
+  major_flood: "--status-major-flood",
+  unknown: "--status-unknown",
+}
+
+/** CSS colours by status, for styles and SVG; they follow the theme. */
 export const statusColors: Record<RiverStatus, string> = {
-  normal: "#0ea5e9",
-  alert: "#facc15",
-  minor_flood: "#f97316",
-  major_flood: "#dc2626",
-  unknown: "#94a3b8",
+  normal: "var(--status-normal)",
+  alert: "var(--status-alert)",
+  minor_flood: "var(--status-minor-flood)",
+  major_flood: "var(--status-major-flood)",
+  unknown: "var(--status-unknown)",
 }
 
-export const statusLabels: Record<RiverStatus, string> = {
-  normal: "Normal",
-  alert: "Alert",
-  minor_flood: "Minor flood",
-  major_flood: "Major flood",
-  unknown: "No thresholds",
-}
+/** The Irrigation Department's status words, in the current language. */
+export const statusLabels = liveLabels<RiverStatus>(
+  ["normal", "alert", "minor_flood", "major_flood", "unknown"],
+  (status) => `terms.riverStatus.${status}`,
+)
+
+/** The thresholds a gauge publishes, lowest first. */
+export type Threshold = "alert" | "minor_flood" | "major_flood"
+
+/** "Alert level", "Minor flood level", "Major flood level", in the current language. */
+export const thresholdLabels = liveLabels<Threshold>(
+  ["alert", "minor_flood", "major_flood"],
+  (threshold) => `terms.riverLevel.${threshold}`,
+)
 
 /** Display order for legends and summaries, most severe first. */
 export const statusOrder: RiverStatus[] = [
@@ -26,12 +67,10 @@ export const statusOrder: RiverStatus[] = [
   "unknown",
 ]
 
-export const trendLabels: Record<RiverTrend, string> = {
-  rising: "Rising",
-  falling: "Falling",
-  steady: "Steady",
-  unknown: "Trend unknown",
-}
+export const trendLabels = liveLabels<RiverTrend>(
+  ["rising", "falling", "steady", "unknown"],
+  (trend) => `terms.trend.${trend}`,
+)
 
 export const trendArrows: Record<RiverTrend, string> = {
   rising: "↑",
@@ -40,28 +79,54 @@ export const trendArrows: Record<RiverTrend, string> = {
   unknown: "",
 }
 
-/** A level with its unit, to two decimals for metres and one for feet. */
-export function formatLevel(value: number | null, unit: "m" | "ft"): string {
+/** A level alone, to two decimals for metres and one for feet. */
+export function levelNumber(value: number, unit: LevelUnit): string {
+  return value.toFixed(unit === "ft" ? 1 : 2)
+}
+
+/** A level with its unit, or with none when the agency publishes none. */
+export function formatLevel(value: number | null, unit: LevelUnit): string {
   if (value === null) return "–"
-  return `${value.toFixed(unit === "ft" ? 1 : 2)} ${unit}`
+  const number = levelNumber(value, unit)
+  return unit === "unknown" ? number : `${number} ${unit}`
 }
 
 /** A rate of change per hour with an explicit sign. */
-export function formatRate(value: number | null, unit: "m" | "ft"): string {
+export function formatRate(value: number | null, unit: LevelUnit): string {
   if (value === null) return "–"
   const sign = value > 0 ? "+" : value < 0 ? "−" : "±"
-  return `${sign}${Math.abs(value).toFixed(2)} ${unit}/h`
+  const number = `${sign}${Math.abs(value).toFixed(2)}`
+  return unit === "unknown" ? `${number}/h` : `${number} ${unit}/h`
 }
 
-/** How long ago a time was, in words: "just now", "12 min ago", "3 h ago", "2 days ago". */
-export function formatAge(iso: string | null, now: Date = new Date()): string {
-  if (!iso) return "never"
-  const minutes = Math.round((now.getTime() - new Date(iso).getTime()) / 60_000)
-  if (minutes < 1) return "just now"
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 48) return `${hours} h ago`
-  return `${Math.round(hours / 24)} days ago`
+/** How old a next-hour forecast may be and still be shown. */
+export const nextHourMaxAgeMs = 2 * 60 * 60 * 1000
+
+/**
+ * The experimental next-hour forecast as one line, or null when there is none
+ * or it is too old, for example from a page left open or a persisted cache.
+ * Worded so it cannot be read as the station's official status.
+ */
+export function nextHourLine(
+  forecast: NextHour | null,
+  now: Date = new Date(),
+): { value: string; issued: string } | null {
+  if (!forecast) return null
+  const age = now.getTime() - new Date(forecast.issuedAt).getTime()
+  if (!Number.isFinite(age) || age > nextHourMaxAgeMs) return null
+  const level = formatLevel(forecast.level, forecast.unit)
+  const value =
+    forecast.low !== null && forecast.high !== null
+      ? translate("rivers.nextHour.range", {
+          level,
+          low: levelNumber(forecast.low, forecast.unit),
+          high: levelNumber(forecast.high, forecast.unit),
+        })
+      : level
+  return {
+    value,
+    issued: translate("rivers.nextHour.issued", { time: formatClock(forecast.issuedAt) }),
+  }
 }
 
 /**
@@ -84,10 +149,10 @@ export function headroom(
   ) {
     return null
   }
-  const steps: [number, number, string][] = [
+  const steps: [number, number, Threshold][] = [
     [0, alertLevel, "alert"],
-    [alertLevel, minorFloodLevel, "minor flood"],
-    [minorFloodLevel, majorFloodLevel, "major flood"],
+    [alertLevel, minorFloodLevel, "minor_flood"],
+    [minorFloodLevel, majorFloodLevel, "major_flood"],
   ]
   for (const [from, to, next] of steps) {
     if (waterLevel < to) {
@@ -99,6 +164,25 @@ export function headroom(
     }
   }
   return null
+}
+
+/**
+ * A gauge's published thresholds as chart lines and rows, lowest first,
+ * named in the current language.
+ */
+export function stationThresholds(
+  station: Pick<StationProperties, "alertLevel" | "minorFloodLevel" | "majorFloodLevel">,
+) {
+  const levels: [Threshold, number | null][] = [
+    ["alert", station.alertLevel],
+    ["minor_flood", station.minorFloodLevel],
+    ["major_flood", station.majorFloodLevel],
+  ]
+  return levels.flatMap(([threshold, value]) =>
+    value === null
+      ? []
+      : [{ label: thresholdLabels[threshold], value, color: statusColors[threshold] }],
+  )
 }
 
 /** Count of stations per status. */

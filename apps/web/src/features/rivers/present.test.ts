@@ -1,5 +1,40 @@
-import { describe, expect, it } from "vitest"
-import { countByStatus, formatAge, formatLevel, formatRate, headroom } from "./present"
+import { afterEach, describe, expect, it } from "vitest"
+import { setLocale } from "@/lib/i18n"
+import {
+  countByStatus,
+  formatAge,
+  formatLevel,
+  formatRate,
+  headroom,
+  nextHourLine,
+  statusLabels,
+  thresholdLabels,
+  trendLabels,
+} from "./present"
+
+afterEach(() => setLocale("en"))
+
+describe("labels", () => {
+  it("use the Irrigation Department's words in the current language", () => {
+    expect(statusLabels.minor_flood).toBe("Minor flood")
+    expect(thresholdLabels.alert).toBe("Alert level")
+    setLocale("si")
+    expect(statusLabels.minor_flood).toBe("සුළු ගංවතුර")
+    expect(trendLabels.rising).toBe("ඉහළ නගිමින්")
+    setLocale("ta")
+    expect(statusLabels.major_flood).toBe("பாரிய வெள்ளம்")
+  })
+
+  it("list every status", () => {
+    expect(Object.keys(statusLabels)).toEqual([
+      "normal",
+      "alert",
+      "minor_flood",
+      "major_flood",
+      "unknown",
+    ])
+  })
+})
 
 describe("formatLevel", () => {
   it("uses two decimals for metres and one for feet", () => {
@@ -37,7 +72,7 @@ describe("headroom", () => {
       fraction: 0.5,
     })
     expect(headroom({ waterLevel: 6, ...thresholds })).toEqual({
-      next: "major flood",
+      next: "major_flood",
       remaining: 1,
       fraction: 0.5,
     })
@@ -61,5 +96,68 @@ describe("countByStatus", () => {
         unknown: 0,
       },
     )
+  })
+})
+
+describe("levels with no published unit", () => {
+  it("shows the number without a unit", () => {
+    expect(formatLevel(0, "unknown")).toBe("0.00")
+    expect(formatRate(0.1, "unknown")).toBe("+0.10/h")
+  })
+  it("keeps units that are published", () => {
+    expect(formatLevel(1.76, "m")).toBe("1.76 m")
+    expect(formatLevel(1.6, "ft")).toBe("1.6 ft")
+    expect(formatRate(-0.2, "m")).toBe("−0.20 m/h")
+  })
+})
+
+describe("next-hour line", () => {
+  const issuedAt = "2026-11-02T18:32:00Z"
+  const forecast = {
+    level: 1.8,
+    low: 1.76,
+    high: 1.85,
+    unit: "m" as const,
+    direction: "rising",
+    crossing: null,
+    method: "model",
+    issuedAt,
+    experimental: true,
+    attribution: "Sri Lanka Water Levels (waterlevels.lk)",
+  }
+
+  it("gives the level, range and issue time", () => {
+    const line = nextHourLine(forecast, new Date("2026-11-02T19:00:00Z"))
+    expect(line?.value).toBe("1.80 m, range 1.76–1.85")
+    expect(line?.issued).toBe("issued 00:02")
+  })
+
+  it("writes feet to one decimal", () => {
+    const line = nextHourLine(
+      { ...forecast, unit: "ft", level: 5.92, low: 5.79, high: 6.06 },
+      new Date("2026-11-02T19:00:00Z"),
+    )
+    expect(line?.value).toBe("5.9 ft, range 5.8–6.1")
+  })
+
+  it("leaves out the range of a trend estimate", () => {
+    const line = nextHourLine(
+      { ...forecast, low: null, high: null, method: "trend" },
+      new Date("2026-11-02T19:00:00Z"),
+    )
+    expect(line?.value).toBe("1.80 m")
+  })
+
+  it("words the range in the reader's language", () => {
+    setLocale("ta")
+    const line = nextHourLine(forecast, new Date("2026-11-02T19:00:00Z"))
+    expect(line?.value).toContain("1.76–1.85")
+    expect(line?.value).not.toContain("range")
+  })
+
+  it("hides a missing or old forecast", () => {
+    expect(nextHourLine(null)).toBeNull()
+    expect(nextHourLine(forecast, new Date("2026-11-02T20:31:00Z"))).not.toBeNull()
+    expect(nextHourLine(forecast, new Date("2026-11-02T20:33:00Z"))).toBeNull()
   })
 })

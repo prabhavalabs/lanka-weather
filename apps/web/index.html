@@ -4,8 +4,51 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Weather and disaster early-warning map for Sri Lanka." />
-    <meta name="theme-color" content="#0b1220" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#efefed" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#050505" />
+    <meta name="apple-mobile-web-app-title" content="Lanka Weather" />
+    <!-- Installed app (ADR 0017): full screen from the Home Screen; the map runs under the
+         status bar, and the layout keeps clear of it with the safe-area insets. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/apple-touch-icon-167.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <title>Lanka Weather · Sri Lanka</title>
+    <script>
+      // Applies the saved theme before first paint (see src/lib/theme.ts).
+      ;(function () {
+        var mode = "system"
+        try {
+          mode = localStorage.getItem("lanka-weather:theme") || "system"
+        } catch (error) {}
+        var dark =
+          mode === "dark" ||
+          (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+        document.documentElement.classList.toggle("dark", dark)
+        document.documentElement.style.colorScheme = dark ? "dark" : "light"
+      })()
+      // Sets the saved or device language before first paint (see src/lib/i18n).
+      ;(function () {
+        var tags = { si: "si-LK", ta: "ta-LK", en: "en-GB" }
+        var locale = null
+        try {
+          locale = localStorage.getItem("lanka-weather:locale")
+        } catch (error) {}
+        if (!tags[locale]) {
+          var languages = navigator.languages || []
+          for (var i = 0; i < languages.length && !tags[locale]; i++)
+            locale = languages[i].toLowerCase().split("-")[0]
+        }
+        document.documentElement.lang = tags[locale] || "en-GB"
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -53,7 +53,7 @@ func (collector *Collector) Interval() time.Duration { return 15 * time.Minute }
 func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, error) {
 	queries := store.New(collector.Pool)
 	since := now.Add(-backfill)
-	if latest, err := queries.LatestRiverObservation(ctx); err == nil {
+	if latest, err := queries.LatestRiverObservation(ctx, SourceName); err == nil {
 		if candidate := latest.Add(-overlap); candidate.After(since) {
 			since = candidate
 		}

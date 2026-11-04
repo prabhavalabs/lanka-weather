@@ -1,0 +1,90 @@
+{
+  "objectIdFieldName": "objectid",
+  "uniqueIdField": { "name": "objectid", "isSystemMaintained": true },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": { "wkid": 102100, "latestWkid": 3857 },
+  "fields": [
+    {
+      "name": "station",
+      "type": "esriFieldTypeString",
+      "alias": "station",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "basin",
+      "type": "esriFieldTypeString",
+      "alias": "basin",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Tributory",
+      "type": "esriFieldTypeString",
+      "alias": "Tributory",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "latitude",
+      "type": "esriFieldTypeDouble",
+      "alias": "latitude",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "longitude",
+      "type": "esriFieldTypeDouble",
+      "alias": "longitude",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "station": "Nagalagam Street",
+        "basin": "Kelani Ganga     ",
+        "Tributory": "Kelani Ganga",
+        "latitude": 6.958265,
+        "longitude": 79.878642
+      }
+    },
+    {
+      "attributes": {
+        "station": "Holombuwa",
+        "basin": "Kelani Ganga",
+        "Tributory": "Gurugoda Oya",
+        "latitude": 7.188201,
+        "longitude": 80.266331
+      }
+    },
+    {
+      "attributes": {
+        "station": "Ampara",
+        "basin": "Gal Oya",
+        "Tributory": "Gal Oya",
+        "latitude": 7.290711,
+        "longitude": 81.670343
+      }
+    },
+    {
+      "attributes": {
+        "station": "Moragaswewa",
+        "basin": "Deduru Oya",
+        "Tributory": "Deduru Oya",
+        "latitude": 7.7,
+        "longitude": 79.99
+      }
+    }
+  ]
+}

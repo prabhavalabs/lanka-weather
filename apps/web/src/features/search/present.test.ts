@@ -1,0 +1,366 @@
+import { describe, expect, it } from "vitest"
+import type { RiverRisk } from "../river-risk/types"
+import type { StationFeature } from "../rivers/types"
+import {
+  addRecent,
+  maxRecent,
+  relabel,
+  reservoirEntries,
+  riverEntries,
+  searchEntry,
+  stationEntries,
+  validRecent,
+} from "./present"
+import type { PlaceSearchResult } from "./types"
+
+const kandyCity: PlaceSearchResult = {
+  id: "osm-node-2908772560",
+  type: "place",
+  kind: "city",
+  name: "Kandy",
+  names: { en: "Kandy", si: "මහනුවර", ta: "கண்டி" },
+  matchedName: "Kandy",
+  lat: 7.293121,
+  lon: 80.635036,
+  bbox: null,
+  population: 125000,
+  hierarchy: [
+    { id: "LK-2", level: "province", name: "Central" },
+    { id: "LK-21", level: "district", name: "Kandy" },
+    { id: "LK-2130", level: "ds", name: "Gangawata Korale" },
+    { id: "LK-2130120", level: "gn", name: "Mahanuwara" },
+  ],
+  score: 1.029,
+}
+
+const kandyDistrict: PlaceSearchResult = {
+  id: "LK-21",
+  type: "region",
+  kind: "district",
+  name: "Kandy",
+  names: { en: "Kandy", si: "මහනුවර දිස්ත්‍රික" },
+  matchedName: "Kandy",
+  lat: 7.334296,
+  lon: 80.86275,
+  bbox: [80.421171, 6.939991, 81.01643, 7.490084],
+  population: 1461895,
+  hierarchy: [{ id: "LK-2", level: "province", name: "Central" }],
+  score: 0.975,
+}
+
+describe("searchEntry", () => {
+  it("shows a place with its kind, DS division and district", () => {
+    expect(searchEntry(kandyCity)).toMatchObject({
+      id: "osm-node-2908772560",
+      kind: "place",
+      title: "Kandy",
+      localName: "මහනුවර",
+      subtitle: "City · Gangawata Korale, Kandy District",
+      choice: { type: "place", kind: "city", lat: 7.293121, lon: 80.635036, name: "Kandy" },
+    })
+  })
+
+  it("shows a region by its level, with its bounding box to fit", () => {
+    expect(searchEntry(kandyDistrict)).toMatchObject({
+      kind: "area",
+      title: "Kandy District",
+      subtitle: "District · Central Province",
+      choice: { type: "region", id: "LK-21", level: "district", bbox: kandyDistrict.bbox },
+    })
+  })
+
+  it("leaves out a local name equal to the title", () => {
+    expect(
+      searchEntry({ ...kandyCity, names: { en: "kandy", si: "Kandy" } }).localName,
+    ).toBeUndefined()
+  })
+})
+
+describe("stationEntries", () => {
+  const station = (id: string, name: string, basin: string): StationFeature => ({
+    type: "Feature",
+    id,
+    geometry: { type: "Point", coordinates: [80.59, 7.27] },
+    properties: {
+      id,
+      name,
+      basin,
+      unit: "m",
+      alertLevel: 5,
+      minorFloodLevel: 7,
+      majorFloodLevel: 9,
+      waterLevel: 3.641,
+      rainfallMm: null,
+      observedAt: null,
+      status: "normal",
+      trend: "rising",
+      ratePerHour: null,
+      stale: false,
+      source: "irrigation-gauges",
+      attribution: "Irrigation Department of Sri Lanka",
+      sourceUrl: null,
+      nextHour: null,
+    },
+  })
+  const stations = [
+    station("peradeniya", "Peradeniya", "Mahaweli Ganga"),
+    station("nagalagam-street", "Nagalagam Street", "Kelani Ganga"),
+  ]
+
+  it("matches the start of a word of the name or basin", () => {
+    expect(stationEntries(stations, "pera").map((entry) => entry.title)).toEqual(["Peradeniya"])
+    expect(stationEntries(stations, "street").map((entry) => entry.title)).toEqual([
+      "Nagalagam Street",
+    ])
+    expect(stationEntries(stations, "kelani")[0]).toMatchObject({
+      kind: "station",
+      subtitle: "Kelani Ganga · river gauge",
+      meta: "3.64 m",
+      choice: { type: "station", id: "nagalagam-street", lat: 7.27, lon: 80.59 },
+    })
+  })
+
+  it("needs two letters", () => {
+    expect(stationEntries(stations, "p")).toEqual([])
+  })
+})
+
+describe("recent searches", () => {
+  const entry = searchEntry(kandyCity)
+
+  it("puts the latest first without duplicates and keeps a few", () => {
+    const district = searchEntry(kandyDistrict)
+    expect(addRecent([district, entry], entry).map((item) => item.id)).toEqual([
+      entry.id,
+      district.id,
+    ])
+    let recent: (typeof entry)[] = []
+    for (let index = 0; index < 10; index += 1)
+      recent = addRecent(recent, { ...entry, id: `${index}` })
+    expect(recent).toHaveLength(maxRecent)
+    expect(recent[0]!.id).toBe("9")
+  })
+
+  it("drops malformed stored entries", () => {
+    expect(validRecent("nope")).toEqual([])
+    expect(validRecent([entry, { id: 1 }, { ...entry, choice: { lat: "x" } }])).toEqual([entry])
+  })
+})
+
+describe("riverEntries", () => {
+  const river = (id: string, name: string, extra: Partial<RiverRisk> = {}): RiverRisk => ({
+    id,
+    name,
+    nameSi: null,
+    aliases: [],
+    named: true,
+    parentId: null,
+    level: "normal",
+    reasons: [],
+    uplandKm2: 1000,
+    lengthKm: 100,
+    bbox: [80, 7, 81, 8],
+    reaches: [],
+    gaugedReaches: 0,
+    observedAt: null,
+    ...extra,
+  })
+
+  it("finds a river by a word of its name, largest first, fitted to its box", () => {
+    const entries = riverEntries(
+      [
+        river("kalu-ganga", "Kalu Ganga", { uplandKm2: 2900 }),
+        river("kelani-ganga", "Kelani Ganga", { uplandKm2: 2300 }),
+        river("mahaweli-ganga", "Mahaweli Ganga", { uplandKm2: 10000 }),
+      ],
+      "ganga",
+    )
+    expect(entries.map((entry) => entry.title)).toEqual([
+      "Mahaweli Ganga",
+      "Kalu Ganga",
+      "Kelani Ganga",
+    ])
+    expect(entries[0]!.kind).toBe("river")
+    expect(entries[0]!.choice).toMatchObject({
+      type: "river",
+      id: "mahaweli-ganga",
+      bbox: [80, 7, 81, 8],
+    })
+  })
+
+  it("finds a river by its Sinhala or other name", () => {
+    const list = [
+      river("malwathu-oya", "Malwathu Oya", { nameSi: "මල්වතු ඔය", aliases: ["Aruvi Aru"] }),
+    ]
+    expect(riverEntries(list, "aruvi")).toHaveLength(1)
+    expect(riverEntries(list, "මල්වතු")).toHaveLength(1)
+    expect(riverEntries(list, "nothing")).toHaveLength(0)
+  })
+
+  it("leaves out unnamed rivers and very short queries", () => {
+    const list = [
+      river("river-1", "Unnamed river near Mannar", { named: false }),
+      river("kelani-ganga", "Kelani Ganga"),
+    ]
+    expect(riverEntries(list, "mannar")).toHaveLength(0)
+    expect(riverEntries(list, "k")).toHaveLength(0)
+  })
+
+  it("is kept in recent searches", () => {
+    const [entry] = riverEntries([river("kelani-ganga", "Kelani Ganga")], "kelani")
+    expect(validRecent([entry])).toHaveLength(1)
+  })
+})
+
+describe("reservoirEntries", () => {
+  const reservoirs = [
+    {
+      type: "Feature" as const,
+      id: "maussakele",
+      geometry: { type: "Point" as const, coordinates: [80.55, 6.82] as [number, number] },
+      properties: {
+        id: "maussakele",
+        name: "Maussakele",
+        district: null,
+        river: "Kelani Ganga",
+        type: "mahaweli",
+        status: "holding" as const,
+        storagePercent: 88,
+        storageFresh: true,
+        flow: null,
+        readingDay: "2026-11-02",
+        agency: "Mahaweli Authority",
+        source: "waterlevels-lk-reservoirs",
+        sourceUrl: null,
+        fetchedAt: "2026-11-02T19:45:00Z",
+        stale: false,
+        mapped: true,
+        osmName: "Maskeliya Reservoir",
+        osmKind: "water" as const,
+        altNames: ["Mousakelle"],
+      },
+    },
+    {
+      type: "Feature" as const,
+      id: "ellewela",
+      geometry: null,
+      properties: {
+        id: "ellewela",
+        name: "Ellewela",
+        district: "Matara",
+        river: null,
+        type: "major",
+        status: "spilling" as const,
+        storagePercent: 100,
+        storageFresh: true,
+        flow: null,
+        readingDay: "2026-11-02",
+        agency: "Irrigation Department",
+        source: "waterlevels-lk-reservoirs",
+        sourceUrl: null,
+        fetchedAt: "2026-11-02T19:45:00Z",
+        stale: false,
+        mapped: false,
+        osmName: null,
+        osmKind: null,
+        altNames: null,
+      },
+    },
+  ]
+
+  it("finds a reservoir by its name, other spellings and river", () => {
+    for (const query of ["maussa", "Mousakelle", "maskeliya", "kelani"]) {
+      expect(reservoirEntries(reservoirs, query).map((entry) => entry.choice.id)).toEqual([
+        "maussakele",
+      ])
+    }
+  })
+
+  it("flies to a mapped reservoir and opens one with no position without moving", () => {
+    const [mapped] = reservoirEntries(reservoirs, "maussa")
+    expect(mapped?.choice).toMatchObject({ type: "reservoir", lat: 6.82, lon: 80.55 })
+    const [unmapped] = reservoirEntries(reservoirs, "ellewela")
+    expect(unmapped?.choice).toMatchObject({ type: "reservoir", lat: null, lon: null })
+    expect(unmapped?.subtitle).toContain("not on the map")
+  })
+
+  it("needs at least two letters", () => {
+    expect(reservoirEntries(reservoirs, "m")).toEqual([])
+  })
+
+  it("keeps a recent reservoir with no position, and no other place without one", () => {
+    const entry = reservoirEntries(reservoirs, "ellewela")[0]!
+    expect(validRecent([entry])).toHaveLength(1)
+    expect(
+      validRecent([
+        {
+          id: "x",
+          title: "x",
+          kind: "place",
+          choice: { type: "place", id: "x", name: "x", kind: "city", lat: null, lon: null },
+        },
+      ]),
+    ).toHaveLength(0)
+  })
+})
+
+describe("in Sinhala and Tamil", () => {
+  it("names a place in the reader's language, with the English name beside it", () => {
+    expect(searchEntry(kandyCity, "si")).toMatchObject({
+      title: "මහනුවර",
+      localName: "Kandy",
+      subtitle: "නගරය · Gangawata Korale, Kandy දිස්ත්‍රික්කය",
+    })
+    expect(searchEntry(kandyCity, "ta")).toMatchObject({ title: "கண்டி", localName: "Kandy" })
+  })
+
+  it("mends a district name the data cuts short, and falls back to English", () => {
+    expect(searchEntry(kandyDistrict, "si").title).toBe("මහනුවර දිස්ත්‍රික්කය")
+    expect(searchEntry(kandyDistrict, "si").subtitle).toBe("දිස්ත්‍රික්කය · Central පළාත")
+    expect(
+      searchEntry({ ...kandyDistrict, names: { en: "Kandy", ta: "கண்டி மாவ" } }, "ta").title,
+    ).toBe("கண்டி மாவட்டம்")
+    expect(searchEntry({ ...kandyDistrict, names: { en: "Kandy" } }, "ta").title).toBe(
+      "Kandy மாவட்டம்",
+    )
+  })
+
+  it("shows the name the query matched when it is in another script", () => {
+    const entry = searchEntry({ ...kandyCity, matchedName: "கண்டி" }, "en")
+    expect(entry).toMatchObject({ title: "Kandy", localName: "கண்டி" })
+  })
+
+  it("finds a river by its Sinhala name, ignoring joiners, and shows it in Sinhala", () => {
+    const river: RiverRisk = {
+      id: "kalu-ganga",
+      name: "Kalu Ganga",
+      nameSi: "කළු ගඟ",
+      aliases: [],
+      named: true,
+      parentId: null,
+      level: "watch",
+      reasons: [],
+      uplandKm2: 2900,
+      lengthKm: 129,
+      bbox: [80, 6.4, 80.8, 6.9],
+      reaches: [],
+      gaugedReaches: 0,
+      observedAt: null,
+    }
+    const [en] = riverEntries([river], "කළු", 5, "en")
+    expect(en).toMatchObject({ title: "Kalu Ganga", localName: "කළු ගඟ" })
+    const [si] = riverEntries([river], "කළු", 5, "si")
+    expect(si).toMatchObject({ title: "කළු ගඟ", localName: "Kalu Ganga", subtitle: "ගඟ" })
+    const zwj = [{ ...river, nameSi: "ප්‍රධාන ඇළ" }]
+    expect(riverEntries(zwj, "ප්රධාන", 5, "si")).toHaveLength(1)
+  })
+
+  it("labels a recent search again in the language of the moment", () => {
+    const [stored] = validRecent(JSON.parse(JSON.stringify([searchEntry(kandyCity, "en")])))
+    expect(relabel(stored!, "ta")).toMatchObject({
+      title: "கண்டி",
+      subtitle: expect.stringContaining("நகரம்"),
+    })
+    expect(relabel({ ...stored!, from: { type: "result" } as never }, "ta").title).toBe("Kandy")
+  })
+})

@@ -39,3 +39,44 @@ func TestByID(t *testing.T) {
 		t.Fatal("missing should not exist")
 	}
 }
+
+func TestAdminRegionsLayerIsAvailableAsTiles(t *testing.T) {
+	layer, ok := ByID("admin-regions")
+	if !ok || layer.Status != StatusAvailable || layer.TilePath != "/v1/tiles/regions/{z}/{x}/{y}.pbf" || layer.MaxZoom != 14 {
+		t.Fatalf("admin-regions = %+v", layer)
+	}
+	layer.TilePath = ""
+	if err := Validate([]Layer{layer}); err == nil {
+		t.Fatal("expected an error for an available vector layer without a tile path")
+	}
+}
+
+func TestWeatherLayersAreAvailable(t *testing.T) {
+	cases := map[string]string{
+		"wind":             "/v1/weather/wind",
+		"flood-forecast":   "/v1/floods/forecast",
+		"temperature":      "/v1/weather/current",
+		"rainfall":         "/v1/rain/steps",
+		"weather-stations": "/v1/stations",
+		"air-quality":      "/v1/air/current",
+		"sea-conditions":   "/v1/sea/current",
+	}
+	for id, path := range cases {
+		layer, ok := ByID(id)
+		if !ok || layer.Status != StatusAvailable || layer.DataPath != path {
+			t.Errorf("%s = %+v", id, layer)
+		}
+	}
+	temperature, _ := ByID("temperature")
+	if temperature.Kind != KindGrid || temperature.RefreshSeconds != 3600 {
+		t.Fatalf("temperature = %+v", temperature)
+	}
+}
+
+func TestValidateRequiresDataPathForAPILayers(t *testing.T) {
+	layer, _ := ByID("wind")
+	layer.DataPath = ""
+	if err := Validate([]Layer{layer}); err == nil {
+		t.Fatal("an available wind layer without a data path must be rejected")
+	}
+}

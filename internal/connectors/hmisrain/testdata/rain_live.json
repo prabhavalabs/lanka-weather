@@ -1,0 +1,46 @@
+{
+  "updatedAt": "2026-11-02T22:37:22.845Z",
+  "devices": {
+    "ARGTEST 07": {
+      "n": "ASC_Test North",
+      "i": "Met Department",
+      "lat": 7.5,
+      "lon": 81.5,
+      "pts": [
+        [29893880, 1.5],
+        [29893880, 1.5],
+        [29893700, 0],
+        [29894060, 12.5]
+      ]
+    },
+    "Test Oya_Testgama": {
+      "n": "Testgama",
+      "i": "Irrigation Department",
+      "lat": 6.5,
+      "lon": 80.5,
+      "pts": [[29894000, 0]]
+    },
+    "R99": {
+      "n": "Agrarian Service Center ,Alapilli",
+      "i": "",
+      "lat": 6.9,
+      "lon": 80.9,
+      "pts": []
+    },
+    "T1": { "n": "Silent", "i": "NBRO", "lat": 6.1, "lon": 80.1, "pts": [[29800000, 3.5]] },
+    "BAD VALUES": {
+      "n": "Bad",
+      "i": "NBRO",
+      "lat": 6.2,
+      "lon": 80.2,
+      "pts": [
+        [29894000, -4],
+        [29894010, 99999],
+        [39894010, 1]
+      ]
+    },
+    "OUTSIDE": { "n": "Chennai", "i": "NBRO", "lat": 13.0, "lon": 80.2, "pts": [[29894000, 1]] },
+    "NO PLACE": { "n": "Nowhere", "i": "NBRO", "pts": [[29894000, 1]] },
+    "NONAME": { "n": " ", "i": "NBRO", "lat": 6.3, "lon": 80.3, "pts": [[29894000, 1]] }
+  }
+}

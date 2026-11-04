@@ -13,8 +13,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/overview"
+	"github.com/prabhavalabs/lanka-weather/internal/places"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/summary"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
+	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
 // Envelope is the shape of every JSON response.
@@ -35,10 +43,86 @@ type Rivers interface {
 	StationHistory(ctx context.Context, id string, period time.Duration) (rivers.History, error)
 }
 
+// Regions serves administrative regions.
+type Regions interface {
+	Collection(ctx context.Context, level regions.Level, ancestor string) (regions.Document, error)
+	Region(ctx context.Context, id string, geometry bool) (regions.Detail, error)
+	Lookup(ctx context.Context, lon, lat float64) (regions.Lookup, error)
+	Tile(ctx context.Context, z, x, y int) (regions.Document, error)
+}
+
+// Places searches places and regions by name.
+type Places interface {
+	Search(ctx context.Context, query string, limit int) (places.Result, error)
+}
+
+// Weather serves the weather grid, point forecasts, regions and wind.
+type Weather interface {
+	CurrentGridJSON(ctx context.Context) (plain, gzipped []byte, err error)
+	Point(ctx context.Context, lon, lat float64, hours, days int) (*weather.Point, error)
+	WindJSON(ctx context.Context, at time.Time) (plain, gzipped []byte, err error)
+	RegionWeather(ctx context.Context, level, parent string) (*weather.RegionsResponse, error)
+}
+
+// Floods serves the Google flood-forecast layer.
+type Floods interface {
+	Layer(ctx context.Context) (floods.FeatureCollection, error)
+}
+
+// Summaries serves the location summary.
+type Summaries interface {
+	Summary(ctx context.Context, lon, lat float64) (*summary.Summary, error)
+}
+
+// Warnings serves official warnings: landslide levels and DMC bulletins.
+type Warnings interface {
+	Landslides(ctx context.Context) (warnings.LandslideLayer, error)
+	Division(ctx context.Context, id string) (*warnings.Division, error)
+	Overview(ctx context.Context, filter warnings.Filter) (*warnings.Overview, error)
+}
+
+// Hazards serves the earthquake and cyclone layers.
+type Hazards interface {
+	Earthquakes(ctx context.Context) (hazards.EarthquakeLayer, error)
+	Cyclones(ctx context.Context) (hazards.CycloneLayer, error)
+}
+
+// Overviews serves "Sri Lanka now".
+type Overviews interface {
+	Overview(ctx context.Context) (*overview.Overview, error)
+}
+
 // Dependencies are the services the API reads from.
 type Dependencies struct {
-	Logger *slog.Logger
-	Rivers Rivers
+	Logger      *slog.Logger
+	Rivers      Rivers
+	Regions     Regions
+	Places      Places
+	Weather     Weather
+	Floods      Floods
+	Summary     Summaries
+	Stations    Stations
+	Rain        Rain
+	Environment Environment
+	// RiverRisk serves the river network, its risk estimate and flood basins.
+	RiverRisk RiverRisk
+
+	// Warnings and Hazards serve official warnings and the hazard layers.
+	Warnings Warnings
+	Hazards  Hazards
+
+	// Reservoirs serves the reservoirs layer.
+	Reservoirs Reservoirs
+	// RainGauges serves the live rain gauges, and Canals Colombo's canal levels.
+	RainGauges RainGauges
+	Canals     Canals
+	// Overview composes the others into one first look.
+	Overview Overviews
+	// Push manages Web Push alert subscriptions under /api/push.
+	Push Push
+	// Now is the clock for requests without an explicit time; nil is
+	// time.Now.
+	Now func() time.Time
 	// Ready reports whether the service can serve requests (database reachable).
 	Ready func(ctx context.Context) error
 }
@@ -64,11 +148,45 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Get("/readyz", api.ready)
 
 	r.Route("/v1", func(r chi.Router) {
+		r.Use(middleware.Compress(5, "application/json", "application/geo+json", tileContentType))
 		r.Get("/layers", listLayers)
 		r.Get("/layers/{id}", getLayer)
 		r.Get("/rivers/levels", api.riverLevels)
 		r.Get("/rivers/stations/{id}/readings", api.stationReadings)
+		r.Get("/regions", api.regionCollection)
+		r.Get("/regions/lookup", api.regionLookup)
+		r.Get("/regions/{id}", api.region)
+		r.Get("/tiles/regions/{z}/{x}/{y}.pbf", api.regionTile)
+		r.Get("/places/search", api.searchPlaces)
+		r.Get("/weather/current", api.weatherCurrent)
+		r.Get("/weather/point", api.weatherPoint)
+		r.Get("/weather/wind", api.weatherWind)
+		r.Get("/weather/regions", api.weatherRegions)
+		r.Get("/floods/forecast", api.floodForecast)
+		r.Get("/summary", api.summary)
+		r.Get("/overview", api.overview)
+		api.riverRoutes(r)
+		r.Get("/warnings", api.warningsOverview)
+		r.Get("/warnings/landslides", api.landslideWarnings)
+		r.Get("/warnings/landslides/{id}", api.landslideDivision)
+		r.Get("/hazards/earthquakes", api.earthquakes)
+		r.Get("/hazards/cyclones", api.cyclones)
+		r.Get("/stations", api.stationLayer)
+		r.Get("/stations/{id}", api.stationDetail)
+		r.Get("/rain/steps", api.rainSteps)
+		r.Get("/rain/observed", api.rainObserved)
+		r.Get("/rain/gauges", api.rainGauges)
+		r.Get("/rain/gauges/{id}", api.rainGauge)
+		r.Get("/rivers/canals", api.canals)
+		r.Get("/rain/tiles/{time}/{z}/{x}/{y}.png", api.rainTile)
+		r.Get("/air/current", api.airCurrent)
+		r.Get("/sea/current", api.seaCurrent)
+		r.Get("/reservoirs", api.reservoirLayer)
+		r.Get("/reservoirs/areas", api.reservoirAreas)
+		r.Get("/reservoirs/{id}/readings", api.reservoirReadings)
 	})
+
+	api.pushRoutes(r)
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "resource not found")
@@ -150,6 +268,22 @@ func (api *api) stationReadings(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, Envelope{Data: history})
+}
+
+// overview returns "Sri Lanka now". A feed that fails is said to be unread inside
+// the answer, so this fails only if the service itself does.
+func (api *api) overview(w http.ResponseWriter, r *http.Request) {
+	if api.deps.Overview == nil {
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "the overview is not configured")
+		return
+	}
+	document, err := api.deps.Overview.Overview(r.Context())
+	if err != nil {
+		api.internalError(w, "overview", err)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	writeJSON(w, http.StatusOK, Envelope{Data: document})
 }
 
 func (api *api) internalError(w http.ResponseWriter, what string, err error) {

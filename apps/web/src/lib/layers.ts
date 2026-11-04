@@ -1,6 +1,13 @@
+import { isNotReady } from "./api"
+import { hasMessage, translate, type MessageKey } from "./i18n"
+
 /** Mirrors internal/layers.Layer in the Go service. */
 export type LayerCategory = "hydrology" | "weather" | "hazard" | "geography"
-export type LayerKind = "geojson" | "raster" | "vector" | "wind"
+/**
+ * How a layer is drawn: GeoJSON features, raster image tiles, vector tiles,
+ * the animated wind particles, or values on a regular grid (colour field).
+ */
+export type LayerKind = "geojson" | "raster" | "vector" | "wind" | "grid"
 export type LayerStatus = "planned" | "available"
 
 export interface Layer {
@@ -16,15 +23,33 @@ export interface Layer {
   attribution: string
   /** API path serving the layer's data, for layers whose data comes from the API. */
   dataPath?: string
+  /** URL template of a vector layer's tiles, with {z}, {x} and {y} placeholders. */
+  tilePath?: string
+  /** Zooms the tiles are served at; clients overzoom beyond maxZoom. */
+  minZoom?: number
+  maxZoom?: number
 }
 
 export const categoryOrder: LayerCategory[] = ["hazard", "hydrology", "weather", "geography"]
 
-export const categoryLabels: Record<LayerCategory, string> = {
-  hazard: "Hazards and warnings",
-  hydrology: "Rivers and floods",
-  weather: "Weather",
-  geography: "Geography",
+/** "Hazards and warnings", in the current language. */
+export function categoryLabel(category: LayerCategory): string {
+  return translate(`layers.category.${category}`)
+}
+
+/**
+ * A layer's name in the current language. The catalogue comes from the API
+ * in English; a layer the app has no words for keeps the API's title.
+ */
+export function layerTitle(layer: Pick<Layer, "id" | "title">): string {
+  const key = `layers.title.${layer.id}`
+  return hasMessage(key) ? translate(key as MessageKey) : layer.title
+}
+
+/** A layer's one-line description in the current language, else the API's. */
+export function layerDescription(layer: Pick<Layer, "id" | "description">): string {
+  const key = `layers.description.${layer.id}`
+  return hasMessage(key) ? translate(key as MessageKey) : layer.description
 }
 
 /** Floor for refetching so a misconfigured layer cannot hammer the API. */
@@ -40,6 +65,23 @@ export function queryTimings(layer: Pick<Layer, "refreshSeconds">) {
   return { staleTime: Math.round(refreshMs / 2), refetchInterval: refreshMs }
 }
 
+/** How often to ask again while a layer's data has not been collected yet. */
+export const notReadyPollMs = 60_000
+
+/**
+ * Query options for a layer's data: the catalogue's timings, except that
+ * while the API answers "not collected yet" (503 no_data) the query asks
+ * again every minute, so data appears soon after the collectors run.
+ */
+export function layerQueryOptions(layer: Pick<Layer, "refreshSeconds">) {
+  const { staleTime, refetchInterval } = queryTimings(layer)
+  return {
+    staleTime,
+    refetchInterval: (query: { state: { error: unknown } }) =>
+      isNotReady(query.state.error) ? notReadyPollMs : refetchInterval,
+  }
+}
+
 /** Whether data observed at `observedAt` is too old to be shown as current. */
 export function isStale(
   layer: Pick<Layer, "staleAfterSeconds">,
@@ -50,12 +92,32 @@ export function isStale(
 }
 
 /** Layers grouped by category in display order, omitting empty groups. */
+/** Within a group, what people look for first: official before derived, current before past. */
+const layerOrder = [
+  "official-warnings",
+  "landslide-warnings",
+  "cyclones",
+  "earthquakes",
+  "rivers",
+  "river-levels",
+  "flood-forecast",
+  "reservoirs",
+  "past-floods",
+]
+
+function orderOf(layer: Layer): number {
+  const index = layerOrder.indexOf(layer.id)
+  return index < 0 ? layerOrder.length : index
+}
+
 export function groupByCategory(layers: Layer[]) {
   return categoryOrder
     .map((category) => ({
       category,
-      label: categoryLabels[category],
-      layers: layers.filter((layer) => layer.category === category),
+      label: categoryLabel(category),
+      layers: layers
+        .filter((layer) => layer.category === category)
+        .toSorted((a, b) => orderOf(a) - orderOf(b)),
     }))
     .filter((group) => group.layers.length > 0)
 }

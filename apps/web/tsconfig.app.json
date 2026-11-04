@@ -16,7 +16,12 @@
     "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The service worker has its own globals (tsconfig.sw.json).
+  "exclude": ["src/sw.ts"]
 }

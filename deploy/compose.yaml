@@ -1,0 +1,83 @@
+# Production stack for weather.prabhavalabs.com (runbook: deploy/README.md).
+#
+# migrate runs once on each start, then api and worker start; web serves the app
+# and forwards the API, on 127.0.0.1 for the host's nginx. The database is the
+# host's shared platform-postgres, reached over the external "platform" network.
+# Settings and secrets live in ../.env.production on the server, never in Git.
+name: lanka-weather
+
+x-app: &app
+  image: lanka-weather-api:${LANKAWEATHER_VERSION:-local}
+  pull_policy: never
+  env_file: ../.env.production
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  networks: [default, platform]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "3" }
+
+services:
+  migrate:
+    <<: *app
+    build:
+      context: ..
+      target: api
+    pull_policy: build
+    command: ["migrate"]
+    restart: "no"
+
+  api:
+    <<: *app
+    command: ["serve"]
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 10s
+    cpus: "1.0"
+    mem_limit: 512m
+    stop_grace_period: 20s
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    cpus: "1.0"
+    mem_limit: 1536m
+    stop_grace_period: 30s
+
+  web:
+    image: lanka-weather-web:${LANKAWEATHER_VERSION:-local}
+    build:
+      context: ..
+      target: web
+    pull_policy: build
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${LANKAWEATHER_WEB_PORT:-18750}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: "0.5"
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+
+networks:
+  platform:
+    name: platform
+    external: true

@@ -1,18 +1,17 @@
-import type {
-  ExpressionSpecification,
-  GeoJSONSource,
-  MapLayerMouseEvent,
-  Map as MapLibreMap,
-} from "maplibre-gl"
+import type { ExpressionSpecification, GeoJSONSource, Map as MapLibreMap } from "maplibre-gl"
 import type { FeatureCollection } from "geojson"
 import { useEffect, useRef } from "react"
+import { readTokens } from "@/lib/tokens"
 import { useMap } from "../map/MapContext"
-import { statusColors } from "./present"
+import { slotBefore, styleReady } from "../map/slots"
+import { statusTokens } from "./present"
 import type { RiverLevelsCollection } from "./types"
 
 const SOURCE = "river-levels"
 const HALO = "river-levels-rising"
-const CIRCLES = "river-levels-circles"
+/** The stations: what clicks and hovers hit. */
+export const RIVER_STATIONS = "river-levels-circles"
+const CIRCLES = RIVER_STATIONS
 const LABELS = "river-levels-labels"
 
 const empty: RiverLevelsCollection = {
@@ -21,18 +20,39 @@ const empty: RiverLevelsCollection = {
   meta: { source: "", attribution: "", fetchedAt: null, generatedAt: "" },
 }
 
-const statusColor: ExpressionSpecification = [
-  "match",
+/** Theme colours for the layer, read when the layers are added (on every style load). */
+function readPalette() {
+  return readTokens({
+    ...statusTokens,
+    stroke: "--status-stroke",
+    strokeSelected: "--status-stroke-selected",
+    label: "--map-label-strong",
+    halo: "--map-label-halo",
+  })
+}
+
+type Palette = ReturnType<typeof readPalette>
+
+function statusColor(palette: Palette): ExpressionSpecification {
+  return [
+    "match",
+    ["get", "status"],
+    "alert",
+    palette.alert,
+    "minor_flood",
+    palette.minor_flood,
+    "major_flood",
+    palette.major_flood,
+    "unknown",
+    palette.unknown,
+    palette.normal,
+  ]
+}
+
+const raised: ExpressionSpecification = [
+  "in",
   ["get", "status"],
-  "alert",
-  statusColors.alert,
-  "minor_flood",
-  statusColors.minor_flood,
-  "major_flood",
-  statusColors.major_flood,
-  "unknown",
-  statusColors.unknown,
-  statusColors.normal,
+  ["literal", ["alert", "minor_flood", "major_flood"]],
 ]
 
 /** Draws severe stations above calm ones. */
@@ -51,69 +71,102 @@ const severity: ExpressionSpecification = [
 ]
 
 function addLayers(map: MapLibreMap, data: RiverLevelsCollection) {
+  const palette = readPalette()
+  const selected: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false]
   if (!map.getSource(SOURCE)) {
     map.addSource(SOURCE, {
       type: "geojson",
       data: data as unknown as FeatureCollection,
       promoteId: "id",
-      attribution: "River levels: Irrigation Department of Sri Lanka",
+      attribution: "River levels: Irrigation Dept; RiverNet (DMC) via waterlevels.lk",
     })
   }
   if (!map.getLayer(HALO)) {
-    map.addLayer({
-      id: HALO,
-      type: "circle",
-      source: SOURCE,
-      filter: ["all", ["==", ["get", "trend"], "rising"], ["!", ["get", "stale"]]],
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 10, 10, 16],
-        "circle-color": statusColor,
-        "circle-opacity": 0.28,
+    map.addLayer(
+      {
+        id: HALO,
+        type: "circle",
+        source: SOURCE,
+        filter: ["all", ["==", ["get", "trend"], "rising"], ["!", ["get", "stale"]]],
+        minzoom: 5.5,
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 6, 8, 9, 10, 16],
+          "circle-color": statusColor(palette),
+          "circle-opacity": 0.3,
+        },
       },
-    })
+      slotBefore(map, "points"),
+    )
   }
   if (!map.getLayer(CIRCLES)) {
-    map.addLayer({
-      id: CIRCLES,
-      type: "circle",
-      source: SOURCE,
-      layout: { "circle-sort-key": severity },
-      paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 5, 10, 9],
-        "circle-color": statusColor,
-        "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
-        "circle-stroke-width": ["case", ["boolean", ["feature-state", "selected"], false], 3, 1.5],
-        "circle-stroke-color": [
-          "case",
-          ["boolean", ["feature-state", "selected"], false],
-          "#0f172a",
-          "#ffffff",
-        ],
+    map.addLayer(
+      {
+        id: CIRCLES,
+        type: "circle",
+        source: SOURCE,
+        layout: { "circle-sort-key": severity },
+        paint: {
+          // A country's worth of calm gauges stay small, so the rivers read; one
+          // that needs attention is clear at any zoom.
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            ["case", selected, 6, raised, 4, 1.5],
+            6,
+            ["case", selected, 7, raised, 6, 3],
+            8,
+            ["case", selected, 8, raised, 7, 4.5],
+            10,
+            ["case", selected, 11, 9],
+          ],
+          "circle-color": statusColor(palette),
+          "circle-opacity": ["case", ["get", "stale"], 0.4, 1],
+          "circle-stroke-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            ["case", selected, 2, raised, 1, 0],
+            6,
+            ["case", selected, 3, 1.25],
+          ],
+          "circle-stroke-color": ["case", selected, palette.strokeSelected, palette.stroke],
+        },
       },
-    })
+      slotBefore(map, "points"),
+    )
   }
   if (!map.getLayer(LABELS)) {
-    map.addLayer({
-      id: LABELS,
-      type: "symbol",
-      source: SOURCE,
-      minzoom: 8.5,
-      layout: {
-        "text-field": ["get", "name"],
-        "text-font": ["Noto Sans Regular"],
-        "text-size": 12,
-        "text-offset": [0, 1.2],
-        "text-anchor": "top",
-        "text-optional": true,
+    map.addLayer(
+      {
+        id: LABELS,
+        type: "symbol",
+        source: SOURCE,
+        minzoom: 8.5,
+        layout: {
+          "text-field": ["get", "name"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 12,
+          "text-offset": [0, 1.2],
+          "text-anchor": "top",
+          "text-optional": true,
+        },
+        paint: {
+          "text-color": palette.label,
+          "text-halo-color": palette.halo,
+          "text-halo-width": 1.5,
+        },
       },
-      paint: { "text-color": "#0f172a", "text-halo-color": "#ffffff", "text-halo-width": 1.5 },
-    })
+      slotBefore(map, "points"),
+    )
   }
 }
 
 function removeLayers(map: MapLibreMap) {
   // The map may already be torn down or mid style change.
-  if (!map.getStyle()) return
+  if (!styleReady(map)) return
   for (const id of [LABELS, CIRCLES, HALO]) if (map.getLayer(id)) map.removeLayer(id)
   if (map.getSource(SOURCE)) map.removeSource(SOURCE)
 }
@@ -121,19 +174,17 @@ function removeLayers(map: MapLibreMap) {
 interface RiverLevelsLayerProps {
   data: RiverLevelsCollection | undefined
   selectedId: string | null
-  onSelect: (id: string | null) => void
 }
 
-/** River gauging stations, coloured by flood status, with a halo when rising. */
-export function RiverLevelsLayer({ data, selectedId, onSelect }: RiverLevelsLayerProps) {
+/**
+ * River gauging stations, coloured by flood status, with a halo when rising.
+ * Clicks are handled by the map's click handler (App), which knows which
+ * layer is on top.
+ */
+export function RiverLevelsLayer({ data, selectedId }: RiverLevelsLayerProps) {
   const map = useMap()
   const dataRef = useRef(data ?? empty)
   const selectedRef = useRef(selectedId)
-  const onSelectRef = useRef(onSelect)
-
-  useEffect(() => {
-    onSelectRef.current = onSelect
-  }, [onSelect])
 
   useEffect(() => {
     if (!map) return
@@ -143,23 +194,10 @@ export function RiverLevelsLayer({ data, selectedId, onSelect }: RiverLevelsLaye
         map.setFeatureState({ source: SOURCE, id: selectedRef.current }, { selected: true })
       }
     }
-    const click = (event: MapLayerMouseEvent) => {
-      const id = event.features?.[0]?.properties?.id
-      if (typeof id === "string") onSelectRef.current(id)
-    }
-    const enter = () => (map.getCanvas().style.cursor = "pointer")
-    const leave = () => (map.getCanvas().style.cursor = "")
-
     add()
     map.on("style.load", add)
-    map.on("click", CIRCLES, click)
-    map.on("mouseenter", CIRCLES, enter)
-    map.on("mouseleave", CIRCLES, leave)
     return () => {
       map.off("style.load", add)
-      map.off("click", CIRCLES, click)
-      map.off("mouseenter", CIRCLES, enter)
-      map.off("mouseleave", CIRCLES, leave)
       removeLayers(map)
     }
   }, [map])

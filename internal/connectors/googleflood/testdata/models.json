@@ -1,0 +1,16 @@
+{
+  "gaugeModels": [
+    {
+      "gaugeId": "hybas_4121601300",
+      "thresholds": {
+        "warningLevel": 183.89723205566406,
+        "dangerLevel": 347.30426025390625,
+        "extremeDangerLevel": 678.6715087890625
+      },
+      "gaugeValueUnit": "CUBIC_METERS_PER_SECOND",
+      "qualityVerified": true,
+      "gaugeModelId": "995f93a6"
+    },
+    { "gaugeId": "hybas_4121156400", "gaugeValueUnit": "METERS" }
+  ]
+}

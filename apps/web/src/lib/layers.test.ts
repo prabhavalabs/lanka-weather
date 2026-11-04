@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { groupByCategory, isStale, queryTimings, type Layer } from "./layers"
+import { ApiError } from "./api"
+import { groupByCategory, isStale, layerQueryOptions, queryTimings, type Layer } from "./layers"
 
 const layer = (overrides: Partial<Layer> = {}): Layer => ({
   id: "river-levels",
@@ -44,5 +45,23 @@ describe("groupByCategory", () => {
       layer({ id: "cyclones", category: "hazard" }),
     ])
     expect(groups.map((group) => group.category)).toEqual(["hazard", "weather"])
+  })
+})
+
+describe("layerQueryOptions", () => {
+  const notReady = new ApiError(503, "no_data", "weather has not been collected yet")
+
+  it("polls at the catalogue's interval once data has arrived", () => {
+    const options = layerQueryOptions(layer({ refreshSeconds: 3600 }))
+    expect(options.staleTime).toBe(1_800_000)
+    expect(options.refetchInterval({ state: { error: null } })).toBe(3_600_000)
+  })
+
+  it("asks every minute while the data is not collected yet", () => {
+    const options = layerQueryOptions(layer({ refreshSeconds: 3600 }))
+    expect(options.refetchInterval({ state: { error: notReady } })).toBe(60_000)
+    expect(
+      options.refetchInterval({ state: { error: new ApiError(500, "internal", "boom") } }),
+    ).toBe(3_600_000)
   })
 })

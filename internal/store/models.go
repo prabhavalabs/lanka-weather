@@ -6,7 +6,553 @@ package store
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type AdminRegion struct {
+	ID         string  `json:"id"`
+	Level      string  `json:"level"`
+	Name       string  `json:"name"`
+	ParentID   *string `json:"parent_id"`
+	ProvinceID string  `json:"province_id"`
+	DistrictID *string `json:"district_id"`
+	DsID       *string `json:"ds_id"`
+	AreaKm2    float64 `json:"area_km2"`
+	LabelPoint []byte  `json:"label_point"`
+	Geom       []byte  `json:"geom"`
+}
+
+type CanalContext struct {
+	ID            bool       `json:"id"`
+	Credit        string     `json:"credit"`
+	Licence       string     `json:"licence"`
+	UpstreamUrl   string     `json:"upstream_url"`
+	SeaLevelM     *float64   `json:"sea_level_m"`
+	SeaTrend      *string    `json:"sea_trend"`
+	SeaObservedAt *time.Time `json:"sea_observed_at"`
+	TideNote      string     `json:"tide_note"`
+	Tide          []byte     `json:"tide"`
+	Source        string     `json:"source"`
+	SourceTime    time.Time  `json:"source_time"`
+	FetchedAt     time.Time  `json:"fetched_at"`
+}
+
+type CanalGauge struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	CanalGroup string     `json:"canal_group"`
+	State      string     `json:"state"`
+	LevelM     *float64   `json:"level_m"`
+	ObservedAt *time.Time `json:"observed_at"`
+	Change3hM  *float64   `json:"change_3h_m"`
+	Last24h    []byte     `json:"last_24h"`
+	Source     string     `json:"source"`
+	SourceTime time.Time  `json:"source_time"`
+	FetchedAt  time.Time  `json:"fetched_at"`
+}
+
+type Cyclone struct {
+	EventID        int64     `json:"event_id"`
+	EpisodeID      int32     `json:"episode_id"`
+	Name           string    `json:"name"`
+	AlertLevel     string    `json:"alert_level"`
+	WindKmh        *float64  `json:"wind_kmh"`
+	SeverityText   string    `json:"severity_text"`
+	Lon            float64   `json:"lon"`
+	Lat            float64   `json:"lat"`
+	Country        string    `json:"country"`
+	StartedAt      time.Time `json:"started_at"`
+	LatestAt       time.Time `json:"latest_at"`
+	AdvisorySource string    `json:"advisory_source"`
+	ReportUrl      string    `json:"report_url"`
+	IsCurrent      bool      `json:"is_current"`
+	Features       []byte    `json:"features"`
+	Source         string    `json:"source"`
+	SourceTime     time.Time `json:"source_time"`
+	FetchedAt      time.Time `json:"fetched_at"`
+}
+
+type Earthquake struct {
+	ID           string    `json:"id"`
+	Magnitude    float64   `json:"magnitude"`
+	MagType      string    `json:"mag_type"`
+	Place        string    `json:"place"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	Lon          float64   `json:"lon"`
+	Lat          float64   `json:"lat"`
+	DepthKm      float64   `json:"depth_km"`
+	Url          string    `json:"url"`
+	Alert        *string   `json:"alert"`
+	Tsunami      bool      `json:"tsunami"`
+	Significance int32     `json:"significance"`
+	EventType    string    `json:"event_type"`
+	Status       string    `json:"status"`
+	Source       string    `json:"source"`
+	SourceTime   time.Time `json:"source_time"`
+	FetchedAt    time.Time `json:"fetched_at"`
+}
+
+type FloodArea struct {
+	ID         string     `json:"id"`
+	Kind       string     `json:"kind"`
+	Source     string     `json:"source"`
+	GaugeID    *string    `json:"gauge_id"`
+	Severity   string     `json:"severity"`
+	IssuedAt   *time.Time `json:"issued_at"`
+	ValidFrom  *time.Time `json:"valid_from"`
+	ValidUntil *time.Time `json:"valid_until"`
+	Properties []byte     `json:"properties"`
+	Geom       []byte     `json:"geom"`
+	FetchedAt  time.Time  `json:"fetched_at"`
+}
+
+type FloodGauge struct {
+	GaugeID            string      `json:"gauge_id"`
+	Source             string      `json:"source"`
+	GaugeSource        string      `json:"gauge_source"`
+	SiteName           string      `json:"site_name"`
+	River              string      `json:"river"`
+	Lon                float64     `json:"lon"`
+	Lat                float64     `json:"lat"`
+	Geom               interface{} `json:"geom"`
+	QualityVerified    bool        `json:"quality_verified"`
+	Severity           string      `json:"severity"`
+	Trend              string      `json:"trend"`
+	IssuedAt           time.Time   `json:"issued_at"`
+	ForecastStart      *time.Time  `json:"forecast_start"`
+	ForecastEnd        *time.Time  `json:"forecast_end"`
+	WarningLevel       *float64    `json:"warning_level"`
+	DangerLevel        *float64    `json:"danger_level"`
+	ExtremeDangerLevel *float64    `json:"extreme_danger_level"`
+	ValueUnit          string      `json:"value_unit"`
+	FetchedAt          time.Time   `json:"fetched_at"`
+}
+
+type LandslideLevel struct {
+	ReportDate pgtype.Date `json:"report_date"`
+	DsID       string      `json:"ds_id"`
+	DistrictID string      `json:"district_id"`
+	Level      int16       `json:"level"`
+}
+
+type LandslideReport struct {
+	ReportDate pgtype.Date `json:"report_date"`
+	Source     string      `json:"source"`
+	SourceTime time.Time   `json:"source_time"`
+	FetchedAt  time.Time   `json:"fetched_at"`
+}
+
+type MetReadings3h struct {
+	StationID   string    `json:"station_id"`
+	ObservedAt  time.Time `json:"observed_at"`
+	RainMm      *float64  `json:"rain_mm"`
+	TempC       *float64  `json:"temp_c"`
+	HumidityPct *float64  `json:"humidity_pct"`
+	Source      string    `json:"source"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+type MetReadingsDaily struct {
+	StationID  string      `json:"station_id"`
+	ReportDate pgtype.Date `json:"report_date"`
+	ObservedAt time.Time   `json:"observed_at"`
+	RainMm     *float64    `json:"rain_mm"`
+	TempMinC   *float64    `json:"temp_min_c"`
+	TempMaxC   *float64    `json:"temp_max_c"`
+	Source     string      `json:"source"`
+	FetchedAt  time.Time   `json:"fetched_at"`
+}
+
+type MetStation struct {
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	WmoID          *string     `json:"wmo_id"`
+	Lon            float64     `json:"lon"`
+	Lat            float64     `json:"lat"`
+	ElevationM     *float64    `json:"elevation_m"`
+	PositionSource string      `json:"position_source"`
+	Geom           interface{} `json:"geom"`
+	Source         string      `json:"source"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
+type OfficialBasin struct {
+	Fid        int64     `json:"fid"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Named      bool      `json:"named"`
+	AreaKm2    float64   `json:"area_km2"`
+	LabelPoint []byte    `json:"label_point"`
+	Geom       []byte    `json:"geom"`
+	Geom3857   []byte    `json:"geom_3857"`
+	Source     string    `json:"source"`
+	Version    string    `json:"version"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type OfficialBulletin struct {
+	DocID           string     `json:"doc_id"`
+	BulletinType    string     `json:"bulletin_type"`
+	Title           string     `json:"title"`
+	Severity        string     `json:"severity"`
+	Colour          *string    `json:"colour"`
+	MessageID       *string    `json:"message_id"`
+	IssuedAt        time.Time  `json:"issued_at"`
+	ValidFrom       *time.Time `json:"valid_from"`
+	ValidUntil      *time.Time `json:"valid_until"`
+	PdfUrl          string     `json:"pdf_url"`
+	SourcePageUrl   string     `json:"source_page_url"`
+	Lang            string     `json:"lang"`
+	Body            *string    `json:"body"`
+	TextStatus      string     `json:"text_status"`
+	Districts       []string   `json:"districts"`
+	Source          string     `json:"source"`
+	SourceTime      time.Time  `json:"source_time"`
+	FetchedAt       time.Time  `json:"fetched_at"`
+	TextFetchedAt   *time.Time `json:"text_fetched_at"`
+	WithdrawnBasins []string   `json:"withdrawn_basins"`
+}
+
+type OfficialStation struct {
+	Station   string    `json:"station"`
+	Basin     string    `json:"basin"`
+	Tributary string    `json:"tributary"`
+	Lon       float64   `json:"lon"`
+	Lat       float64   `json:"lat"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+type OfficialStreamName struct {
+	Fid       int64     `json:"fid"`
+	Name      string    `json:"name"`
+	Geom      []byte    `json:"geom"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+type PastFloodEvent struct {
+	Fid            int64       `json:"fid"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	SourceName     string      `json:"source_name"`
+	River          string      `json:"river"`
+	Year           int32       `json:"year"`
+	EventDate      pgtype.Date `json:"event_date"`
+	Magnitude      *string     `json:"magnitude"`
+	AreaKm2        float64     `json:"area_km2"`
+	Districts      []string    `json:"districts"`
+	West           float64     `json:"west"`
+	South          float64     `json:"south"`
+	East           float64     `json:"east"`
+	North          float64     `json:"north"`
+	Geom           []byte      `json:"geom"`
+	GeomSimple3857 []byte      `json:"geom_simple_3857"`
+	Service        string      `json:"service"`
+	Source         string      `json:"source"`
+	Version        string      `json:"version"`
+	SourceTime     time.Time   `json:"source_time"`
+	FetchedAt      time.Time   `json:"fetched_at"`
+}
+
+type PastFloodPart struct {
+	Fid      int64  `json:"fid"`
+	Geom3857 []byte `json:"geom_3857"`
+}
+
+type Place struct {
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	NameSi     *string   `json:"name_si"`
+	NameTa     *string   `json:"name_ta"`
+	AltNames   []string  `json:"alt_names"`
+	Kind       string    `json:"kind"`
+	Population *int32    `json:"population"`
+	Lon        float64   `json:"lon"`
+	Lat        float64   `json:"lat"`
+	Geom       []byte    `json:"geom"`
+	GnID       *string   `json:"gn_id"`
+	Source     string    `json:"source"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type PlaceStaging struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	NameSi     *string  `json:"name_si"`
+	NameTa     *string  `json:"name_ta"`
+	AltNames   []string `json:"alt_names"`
+	Kind       string   `json:"kind"`
+	Population *int32   `json:"population"`
+	Lon        float64  `json:"lon"`
+	Lat        float64  `json:"lat"`
+}
+
+type PushAlertState struct {
+	Subject      string     `json:"subject"`
+	Kind         string     `json:"kind"`
+	Level        int16      `json:"level"`
+	AlertedLevel int16      `json:"alerted_level"`
+	AlertedAt    *time.Time `json:"alerted_at"`
+	BelowSince   *time.Time `json:"below_since"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type PushDelivery struct {
+	SubscriptionID int64     `json:"subscription_id"`
+	EventKey       string    `json:"event_key"`
+	NoticeID       int64     `json:"notice_id"`
+	Severity       string    `json:"severity"`
+	SentAt         time.Time `json:"sent_at"`
+}
+
+type PushEvent struct {
+	DedupeKey  string    `json:"dedupe_key"`
+	Kind       string    `json:"kind"`
+	Variant    string    `json:"variant"`
+	Topic      string    `json:"topic"`
+	Severity   string    `json:"severity"`
+	Subject    string    `json:"subject"`
+	National   bool      `json:"national"`
+	Districts  []string  `json:"districts"`
+	Lon        *float64  `json:"lon"`
+	Lat        *float64  `json:"lat"`
+	Facts      []byte    `json:"facts"`
+	Url        string    `json:"url"`
+	Tag        string    `json:"tag"`
+	DetectedAt time.Time `json:"detected_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+}
+
+type PushSubscription struct {
+	ID                  int64      `json:"id"`
+	Endpoint            string     `json:"endpoint"`
+	P256dh              string     `json:"p256dh"`
+	Auth                string     `json:"auth"`
+	Locale              string     `json:"locale"`
+	UserAgent           string     `json:"user_agent"`
+	Topics              []string   `json:"topics"`
+	MinSeverity         string     `json:"min_severity"`
+	WholeCountry        bool       `json:"whole_country"`
+	Districts           []string   `json:"districts"`
+	NearLon             *float64   `json:"near_lon"`
+	NearLat             *float64   `json:"near_lat"`
+	NearRadiusKm        *int32     `json:"near_radius_km"`
+	NearDistricts       []string   `json:"near_districts"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	LastSuccessAt       *time.Time `json:"last_success_at"`
+	LastFailureAt       *time.Time `json:"last_failure_at"`
+	SuccessCount        int32      `json:"success_count"`
+	FailureCount        int32      `json:"failure_count"`
+	ConsecutiveFailures int32      `json:"consecutive_failures"`
+	RetryAfter          *time.Time `json:"retry_after"`
+	LastTestAt          *time.Time `json:"last_test_at"`
+}
+
+type RainGauge struct {
+	ID               string     `json:"id"`
+	Device           string     `json:"device"`
+	Name             string     `json:"name"`
+	Institution      string     `json:"institution"`
+	Lon              float64    `json:"lon"`
+	Lat              float64    `json:"lat"`
+	LatestObservedAt *time.Time `json:"latest_observed_at"`
+	LatestRainMm     *float64   `json:"latest_rain_mm"`
+	Source           string     `json:"source"`
+	SourceTime       time.Time  `json:"source_time"`
+	FetchedAt        time.Time  `json:"fetched_at"`
+}
+
+type RainGaugeReading struct {
+	GaugeID    string    `json:"gauge_id"`
+	ObservedAt time.Time `json:"observed_at"`
+	RainMm     float64   `json:"rain_mm"`
+	Source     string    `json:"source"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type RainTile struct {
+	ValidAt   time.Time `json:"valid_at"`
+	Z         int32     `json:"z"`
+	X         int32     `json:"x"`
+	Y         int32     `json:"y"`
+	Png       []byte    `json:"png"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+type Region struct {
+	ID             string    `json:"id"`
+	Fid            int64     `json:"fid"`
+	Level          string    `json:"level"`
+	Name           string    `json:"name"`
+	NameSi         *string   `json:"name_si"`
+	NameTa         *string   `json:"name_ta"`
+	ParentID       *string   `json:"parent_id"`
+	ProvinceID     string    `json:"province_id"`
+	DistrictID     *string   `json:"district_id"`
+	DsID           *string   `json:"ds_id"`
+	IsoCode        *string   `json:"iso_code"`
+	GnNumber       *string   `json:"gn_number"`
+	AreaKm2        float64   `json:"area_km2"`
+	Population     *int32    `json:"population"`
+	PopulationYear *int16    `json:"population_year"`
+	Centroid       []byte    `json:"centroid"`
+	LabelPoint     []byte    `json:"label_point"`
+	West           float64   `json:"west"`
+	South          float64   `json:"south"`
+	East           float64   `json:"east"`
+	North          float64   `json:"north"`
+	Geom           []byte    `json:"geom"`
+	GeomSimple     []byte    `json:"geom_simple"`
+	Geom3857       []byte    `json:"geom_3857"`
+	GeomSimple3857 []byte    `json:"geom_simple_3857"`
+	Source         string    `json:"source"`
+	SourceVersion  string    `json:"source_version"`
+	SourceTime     time.Time `json:"source_time"`
+	FetchedAt      time.Time `json:"fetched_at"`
+}
+
+type RegionStaging struct {
+	ID             string  `json:"id"`
+	Fid            int64   `json:"fid"`
+	Level          string  `json:"level"`
+	Name           string  `json:"name"`
+	NameSi         *string `json:"name_si"`
+	NameTa         *string `json:"name_ta"`
+	ParentID       *string `json:"parent_id"`
+	ProvinceID     string  `json:"province_id"`
+	DistrictID     *string `json:"district_id"`
+	DsID           *string `json:"ds_id"`
+	IsoCode        *string `json:"iso_code"`
+	GnNumber       *string `json:"gn_number"`
+	AreaKm2        float64 `json:"area_km2"`
+	Population     *int32  `json:"population"`
+	PopulationYear *int16  `json:"population_year"`
+	CenterLon      float64 `json:"center_lon"`
+	CenterLat      float64 `json:"center_lat"`
+	GeomWkb        []byte  `json:"geom_wkb"`
+	SimpleWkb      []byte  `json:"simple_wkb"`
+}
+
+type Reservoir struct {
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	District      *string    `json:"district"`
+	River         *string    `json:"river"`
+	Kind          string     `json:"kind"`
+	Source        string     `json:"source"`
+	SourceUrl     *string    `json:"source_url"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	Lon           *float64   `json:"lon"`
+	Lat           *float64   `json:"lat"`
+	Area          []byte     `json:"area"`
+	OsmID         *string    `json:"osm_id"`
+	OsmName       *string    `json:"osm_name"`
+	OsmKind       *string    `json:"osm_kind"`
+	MapSource     *string    `json:"map_source"`
+	MapSourceTime *time.Time `json:"map_source_time"`
+	MapFetchedAt  *time.Time `json:"map_fetched_at"`
+}
+
+type ReservoirCandidateStaging struct {
+	OsmID string `json:"osm_id"`
+	Lines string `json:"lines"`
+}
+
+type ReservoirReading struct {
+	ReservoirID    string      `json:"reservoir_id"`
+	SnapshotDay    pgtype.Date `json:"snapshot_day"`
+	ReadingDay     pgtype.Date `json:"reading_day"`
+	Status         string      `json:"status"`
+	StoragePercent *float64    `json:"storage_percent"`
+	StorageFresh   *bool       `json:"storage_fresh"`
+	FlowKind       *string     `json:"flow_kind"`
+	FlowCusecs     *float64    `json:"flow_cusecs"`
+	FlowAgency     *string     `json:"flow_agency"`
+	FlowDay        pgtype.Date `json:"flow_day"`
+	Agency         *string     `json:"agency"`
+	Source         string      `json:"source"`
+	SourceTime     time.Time   `json:"source_time"`
+	FetchedAt      time.Time   `json:"fetched_at"`
+}
+
+type River struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	NameSi    *string   `json:"name_si"`
+	Aliases   []string  `json:"aliases"`
+	Named     bool      `json:"named"`
+	ParentID  *string   `json:"parent_id"`
+	MainRiv   int64     `json:"main_riv"`
+	MouthID   int64     `json:"mouth_id"`
+	LengthKm  float64   `json:"length_km"`
+	UplandKm2 float64   `json:"upland_km2"`
+	BasinFid  *int64    `json:"basin_fid"`
+	West      float64   `json:"west"`
+	South     float64   `json:"south"`
+	East      float64   `json:"east"`
+	North     float64   `json:"north"`
+	LabelGeom []byte    `json:"label_geom"`
+	BuiltAt   time.Time `json:"built_at"`
+}
+
+type RiverGaugeMatch struct {
+	Kind      string    `json:"kind"`
+	GaugeID   string    `json:"gauge_id"`
+	HyrivID   int64     `json:"hyriv_id"`
+	RiverID   *string   `json:"river_id"`
+	DistanceM float64   `json:"distance_m"`
+	Method    string    `json:"method"`
+	MatchedAt time.Time `json:"matched_at"`
+}
+
+type RiverNextHour struct {
+	StationID string    `json:"station_id"`
+	IssuedAt  time.Time `json:"issued_at"`
+	LevelFt   float64   `json:"level_ft"`
+	LowFt     *float64  `json:"low_ft"`
+	HighFt    *float64  `json:"high_ft"`
+	ChangeFt  *float64  `json:"change_ft"`
+	Direction *string   `json:"direction"`
+	Crossing  *string   `json:"crossing"`
+	Method    *string   `json:"method"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+type RiverReach struct {
+	Fid       int64   `json:"fid"`
+	RiverID   string  `json:"river_id"`
+	Name      string  `json:"name"`
+	Gauged    bool    `json:"gauged"`
+	LengthKm  float64 `json:"length_km"`
+	UplandKm2 float64 `json:"upland_km2"`
+	Position  int32   `json:"position"`
+	Geom      []byte  `json:"geom"`
+}
+
+type RiverReachGauge struct {
+	ReachFid int64  `json:"reach_fid"`
+	Kind     string `json:"kind"`
+	GaugeID  string `json:"gauge_id"`
+	Role     string `json:"role"`
+}
+
+type RiverReachPart struct {
+	ReachFid   int64  `json:"reach_fid"`
+	WidthClass int16  `json:"width_class"`
+	RiverID    string `json:"river_id"`
+	RiverName  string `json:"river_name"`
+	Named      bool   `json:"named"`
+	MinZoom    int16  `json:"min_zoom"`
+	Geom3857   []byte `json:"geom_3857"`
+}
 
 type RiverReading struct {
 	StationID  string    `json:"station_id"`
@@ -14,6 +560,54 @@ type RiverReading struct {
 	WaterLevel float64   `json:"water_level"`
 	RainfallMm *float64  `json:"rainfall_mm"`
 	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type RiverSegment struct {
+	HyrivID       int64     `json:"hyriv_id"`
+	NextDown      int64     `json:"next_down"`
+	MainRiv       int64     `json:"main_riv"`
+	LengthKm      float64   `json:"length_km"`
+	DistDnKm      float64   `json:"dist_dn_km"`
+	DistUpKm      float64   `json:"dist_up_km"`
+	CatchKm2      float64   `json:"catch_km2"`
+	UplandKm2     float64   `json:"upland_km2"`
+	DischargeCms  float64   `json:"discharge_cms"`
+	OrdStra       int16     `json:"ord_stra"`
+	OrdClas       int16     `json:"ord_clas"`
+	OrdFlow       int16     `json:"ord_flow"`
+	HybasL12      int64     `json:"hybas_l12"`
+	Geom          []byte    `json:"geom"`
+	Geom3857      []byte    `json:"geom_3857"`
+	RiverID       *string   `json:"river_id"`
+	ReachFid      *int64    `json:"reach_fid"`
+	Source        string    `json:"source"`
+	SourceVersion string    `json:"source_version"`
+	SourceTime    time.Time `json:"source_time"`
+	FetchedAt     time.Time `json:"fetched_at"`
+}
+
+type RiverSegmentStaging struct {
+	HyrivID      int64   `json:"hyriv_id"`
+	NextDown     int64   `json:"next_down"`
+	MainRiv      int64   `json:"main_riv"`
+	LengthKm     float64 `json:"length_km"`
+	DistDnKm     float64 `json:"dist_dn_km"`
+	DistUpKm     float64 `json:"dist_up_km"`
+	CatchKm2     float64 `json:"catch_km2"`
+	UplandKm2    float64 `json:"upland_km2"`
+	DischargeCms float64 `json:"discharge_cms"`
+	OrdStra      int16   `json:"ord_stra"`
+	OrdClas      int16   `json:"ord_clas"`
+	OrdFlow      int16   `json:"ord_flow"`
+	HybasL12     int64   `json:"hybas_l12"`
+	Wkb          []byte  `json:"wkb"`
+}
+
+type RiverSourceName struct {
+	RivID     int64     `json:"riv_id"`
+	Name      string    `json:"name"`
+	Source    string    `json:"source"`
+	FetchedAt time.Time `json:"fetched_at"`
 }
 
 type RiverStation struct {
@@ -29,6 +623,32 @@ type RiverStation struct {
 	MajorFloodLevel *float64    `json:"major_flood_level"`
 	Source          string      `json:"source"`
 	UpdatedAt       time.Time   `json:"updated_at"`
+	SourceUrl       *string     `json:"source_url"`
+	Upstream        *string     `json:"upstream"`
+}
+
+type RiverSubbasin struct {
+	HybasID    int64     `json:"hybas_id"`
+	NextDown   int64     `json:"next_down"`
+	MainBas    int64     `json:"main_bas"`
+	AreaKm2    float64   `json:"area_km2"`
+	UpAreaKm2  float64   `json:"up_area_km2"`
+	BasinFid   *int64    `json:"basin_fid"`
+	Geom       []byte    `json:"geom"`
+	Geom3857   []byte    `json:"geom_3857"`
+	Source     string    `json:"source"`
+	Version    string    `json:"version"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type SearchName struct {
+	TargetKind string  `json:"target_kind"`
+	TargetID   string  `json:"target_id"`
+	Name       string  `json:"name"`
+	Lang       string  `json:"lang"`
+	Folded     string  `json:"folded"`
+	Importance float32 `json:"importance"`
 }
 
 type SourceRun struct {
@@ -39,4 +659,66 @@ type SourceRun struct {
 	Status     string     `json:"status"`
 	Records    int32      `json:"records"`
 	Error      *string    `json:"error"`
+}
+
+type SourceVersion struct {
+	Source     string    `json:"source"`
+	Version    string    `json:"version"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+	Records    int32     `json:"records"`
+}
+
+type WeatherField struct {
+	RunID       int64     `json:"run_id"`
+	Variable    string    `json:"variable"`
+	Source      string    `json:"source"`
+	ValidFrom   time.Time `json:"valid_from"`
+	StepSeconds int32     `json:"step_seconds"`
+	Steps       int32     `json:"steps"`
+	NodeValues  []float32 `json:"node_values"`
+	FetchedAt   time.Time `json:"fetched_at"`
+}
+
+type WeatherGridNode struct {
+	Grid       string      `json:"grid"`
+	Node       int32       `json:"node"`
+	Lon        float64     `json:"lon"`
+	Lat        float64     `json:"lat"`
+	Land       bool        `json:"land"`
+	ElevationM *float64    `json:"elevation_m"`
+	Cell       []byte      `json:"cell"`
+	Geom       interface{} `json:"geom"`
+	Source     string      `json:"source"`
+	UpdatedAt  time.Time   `json:"updated_at"`
+}
+
+type WeatherRun struct {
+	ID         int64     `json:"id"`
+	Kind       string    `json:"kind"`
+	Source     string    `json:"source"`
+	Model      string    `json:"model"`
+	Grid       string    `json:"grid"`
+	Nodes      []int32   `json:"nodes"`
+	SourceTime time.Time `json:"source_time"`
+	FetchedAt  time.Time `json:"fetched_at"`
+}
+
+type WindField struct {
+	RunAt        time.Time `json:"run_at"`
+	ForecastHour int32     `json:"forecast_hour"`
+	ValidAt      time.Time `json:"valid_at"`
+	Source       string    `json:"source"`
+	Model        string    `json:"model"`
+	Level        string    `json:"level"`
+	Lon0         float64   `json:"lon0"`
+	Lat0         float64   `json:"lat0"`
+	Dlon         float64   `json:"dlon"`
+	Dlat         float64   `json:"dlat"`
+	Nx           int32     `json:"nx"`
+	Ny           int32     `json:"ny"`
+	Scale        float64   `json:"scale"`
+	U            []byte    `json:"u"`
+	V            []byte    `json:"v"`
+	FetchedAt    time.Time `json:"fetched_at"`
 }

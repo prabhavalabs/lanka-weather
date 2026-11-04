@@ -1,0 +1,552 @@
+// Package summary answers "what is happening here?" for one place: the
+// weather and a short forecast, the nearest river gauges and Google flood
+// forecasts, alerts derived from them, and official warnings. Derived alerts
+// are estimates; official warnings are authoritative and have their own slot.
+package summary
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"math"
+	"sort"
+	"time"
+
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
+	"github.com/prabhavalabs/lanka-weather/internal/environment"
+	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
+	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
+	"github.com/prabhavalabs/lanka-weather/internal/rivers"
+	"github.com/prabhavalabs/lanka-weather/internal/stations"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
+	"github.com/prabhavalabs/lanka-weather/internal/weather"
+)
+
+// WeatherSource interpolates the weather grid at a point.
+type WeatherSource interface {
+	Point(ctx context.Context, lon, lat float64, hours, days int) (*weather.Point, error)
+}
+
+// RiverSource serves the river-levels layer.
+type RiverSource interface {
+	Layer(ctx context.Context) (rivers.FeatureCollection, error)
+}
+
+// FloodSource serves the Google flood forecasts.
+type FloodSource interface {
+	Gauges(ctx context.Context) ([]floods.Gauge, error)
+	AreasAt(ctx context.Context, lon, lat float64) ([]floods.AreaAt, error)
+}
+
+// RegionLookup finds the administrative regions containing a point.
+type RegionLookup interface {
+	Lookup(ctx context.Context, lon, lat float64) (regions.Lookup, error)
+}
+
+// RiverRiskSource estimates the risk of the rivers near a place.
+type RiverRiskSource interface {
+	Near(ctx context.Context, lon, lat float64) ([]riverrisk.NearbyRiver, error)
+}
+
+// OfficialSource gathers official warnings for a place's district and DS
+// division.
+type OfficialSource interface {
+	Official(ctx context.Context, districtID, dsID string) (*warnings.OfficialAt, error)
+}
+
+// StationSource finds the observed reading nearest a place.
+type StationSource interface {
+	Nearest(ctx context.Context, lon, lat float64) (*stations.Nearby, error)
+}
+
+// EnvironmentSource reads the air-quality and sea grids at a place.
+type EnvironmentSource interface {
+	AirAt(ctx context.Context, lon, lat float64) (*environment.AirPoint, error)
+	SeaAt(ctx context.Context, lon, lat float64) (*environment.SeaPoint, error)
+}
+
+// ReservoirSource serves the reservoirs layer.
+type ReservoirSource interface {
+	Layer(ctx context.Context) (reservoirs.FeatureCollection, error)
+}
+
+// RainGaugeSource finds the live rain gauge nearest a place.
+type RainGaugeSource interface {
+	Nearest(ctx context.Context, lon, lat float64) (*raingauges.Nearby, error)
+}
+
+// CanalSource says what the Colombo canals read, for a place in the Colombo area.
+type CanalSource interface {
+	BriefAt(ctx context.Context, lon, lat float64) (*canals.Brief, error)
+}
+
+// Service builds summaries. Any source may be nil.
+type Service struct {
+	Weather    WeatherSource
+	Rivers     RiverSource
+	Floods     FloodSource
+	Regions    RegionLookup
+	RiverRisk  RiverRiskSource
+	Official   OfficialSource
+	Reservoirs ReservoirSource
+	// Stations and Environment add observed readings, air quality and the
+	// sea state; without them those parts are simply null.
+	Stations    StationSource
+	Environment EnvironmentSource
+	RainGauges  RainGaugeSource
+	Canals      CanalSource
+	Logger      *slog.Logger
+	Now         func() time.Time
+}
+
+const (
+	// Short forecast in a summary.
+	summaryHours = 24
+	summaryDays  = 3
+	// nearbyRivers and nearbyFloods bound the gauges listed, within
+	// riverSearchKm and floodSearchKm.
+	nearbyRivers  = 3
+	nearbyFloods  = 3
+	riverSearchKm = 50.0
+	floodSearchKm = 75.0
+	// nearbyReservoirs bounds the reservoirs spilling or releasing listed,
+	// within reservoirSearchKm.
+	nearbyReservoirs  = 5
+	reservoirSearchKm = 50.0
+)
+
+// Summary is GET /v1/summary.
+type Summary struct {
+	Location    weather.Location `json:"location"`
+	GeneratedAt time.Time        `json:"generatedAt"`
+	// Regions are the province, district, DS and GN division containing
+	// the place; null outside Sri Lanka or before regions are loaded.
+	Regions *Regions `json:"regions"`
+	// Weather is the current conditions, the next 24 hours and three days;
+	// null when the place is outside the grid or nothing is collected.
+	Weather *weather.Point `json:"weather"`
+	Rivers  []River        `json:"rivers"`
+	// NearbyRivers are the rivers near the place with the estimated risk of
+	// their nearest stretch.
+	NearbyRivers  []riverrisk.NearbyRiver `json:"nearbyRivers"`
+	FloodForecast FloodForecast           `json:"floodForecast"`
+	// Reservoirs are mapped reservoirs near the place that are spilling or
+	// releasing on a current reading; never an official warning.
+	Reservoirs []Reservoir `json:"reservoirs"`
+	// Alerts are derived by lanka-weather and are estimates.
+	Alerts []Alert `json:"alerts"`
+	// Observed is the nearest station's latest reading, measured rather than
+	// modelled; null when no station is within 75 km.
+	Observed *stations.Nearby `json:"observed"`
+	// RainGauge is the nearest live rain gauge with its rolling 24-hour total,
+	// measured; null when none is within 30 km.
+	RainGauge *raingauges.Nearby `json:"rainGauge"`
+	// Canals says how Colombo's canals read, as context and never a warning, for a
+	// place in the Colombo area; null elsewhere.
+	Canals *canals.Brief `json:"canals"`
+	// AirQuality is the model estimate here; null outside its grid.
+	AirQuality *environment.AirPoint `json:"airQuality"`
+	// Sea is the model sea state on the water or at a coast; null inland.
+	Sea *environment.SeaPoint `json:"sea"`
+	// Official holds NBRO, Department of Meteorology and DMC warnings, which
+	// are authoritative: the landslide level of the place's DS division,
+	// bulletins naming its district and the latest general bulletins.
+	Official *warnings.OfficialAt `json:"official"`
+	// Unavailable lists the parts that could not be filled: weather, regions,
+	// rivers, nearbyRivers, floodForecast, official, observed, rainGauge, canals,
+	// airQuality, sea or reservoirs.
+	Unavailable []string `json:"unavailable"`
+}
+
+// Regions is the administrative hierarchy of the place. A level is null
+// where no region of it contains the place (at sea, for example).
+type Regions struct {
+	Province *regions.Ref `json:"province"`
+	District *regions.Ref `json:"district"`
+	DS       *regions.Ref `json:"ds"`
+	GN       *regions.Ref `json:"gn"`
+}
+
+// River is a river gauge near the place.
+type River struct {
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Basin           string     `json:"basin"`
+	DistanceKm      float64    `json:"distanceKm"`
+	Status          string     `json:"status"`
+	Trend           string     `json:"trend"`
+	WaterLevel      *float64   `json:"waterLevel"`
+	Unit            string     `json:"unit"`
+	AlertLevel      *float64   `json:"alertLevel"`
+	MinorFloodLevel *float64   `json:"minorFloodLevel"`
+	MajorFloodLevel *float64   `json:"majorFloodLevel"`
+	ObservedAt      *time.Time `json:"observedAt"`
+	Stale           bool       `json:"stale"`
+	Lon             float64    `json:"lon"`
+	Lat             float64    `json:"lat"`
+	// Source and Attribution say who the reading comes from.
+	Source      string `json:"source"`
+	Attribution string `json:"attribution"`
+}
+
+// Reservoir is a reservoir near the place that is spilling or releasing.
+type Reservoir struct {
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	DistanceKm     float64          `json:"distanceKm"`
+	Status         string           `json:"status"`
+	StoragePercent *float64         `json:"storagePercent"`
+	Flow           *reservoirs.Flow `json:"flow"`
+	ReadingDay     *string          `json:"readingDay"`
+	Lon            float64          `json:"lon"`
+	Lat            float64          `json:"lat"`
+}
+
+// FloodForecast is the Google flood forecast near the place.
+type FloodForecast struct {
+	Gauges []FloodGauge    `json:"gauges"`
+	Areas  []floods.AreaAt `json:"areas"`
+}
+
+// FloodGauge is a Google flood-forecast gauge near the place.
+type FloodGauge struct {
+	GaugeID         string     `json:"gaugeId"`
+	DistanceKm      float64    `json:"distanceKm"`
+	Severity        string     `json:"severity"`
+	Trend           string     `json:"trend"`
+	IssuedAt        time.Time  `json:"issuedAt"`
+	ForecastStart   *time.Time `json:"forecastStart"`
+	ForecastEnd     *time.Time `json:"forecastEnd"`
+	QualityVerified bool       `json:"qualityVerified"`
+	Lon             float64    `json:"lon"`
+	Lat             float64    `json:"lat"`
+}
+
+// officialUnavailable says official warnings could not be read, and does not
+// let that read as calm.
+func officialUnavailable() *warnings.OfficialAt {
+	return &warnings.OfficialAt{Status: "not_available", Warnings: []warnings.Bulletin{}, General: []warnings.Bulletin{}, Stale: true,
+		Note: "Official warnings could not be read just now. Check with the Disaster Management Centre and the Department of Meteorology."}
+}
+
+// Summary builds the summary for a place. A failing source leaves its part
+// empty and is listed in Unavailable; the summary itself does not fail.
+func (service *Service) Summary(ctx context.Context, lon, lat float64) (*Summary, error) {
+	summary := &Summary{
+		Location: weather.Location{Lat: lat, Lon: lon}, GeneratedAt: service.now(),
+		Rivers: []River{}, NearbyRivers: []riverrisk.NearbyRiver{}, FloodForecast: FloodForecast{Gauges: []FloodGauge{}, Areas: []floods.AreaAt{}}, Reservoirs: []Reservoir{},
+		Official:    officialUnavailable(),
+		Unavailable: []string{},
+	}
+	inputs := Inputs{}
+
+	if service.Weather != nil {
+		point, err := service.Weather.Point(ctx, lon, lat, summaryHours, summaryDays)
+		switch {
+		case err == nil:
+			summary.Weather = point
+			inputs.Hours, inputs.Days = hours(point), days(point)
+		case errors.Is(err, weather.ErrOutsideGrid) || errors.Is(err, weather.ErrNoData):
+			summary.Unavailable = append(summary.Unavailable, "weather")
+		default:
+			service.warn("summary weather", err)
+			summary.Unavailable = append(summary.Unavailable, "weather")
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "weather")
+	}
+
+	if service.Regions != nil {
+		lookup, err := service.Regions.Lookup(ctx, lon, lat)
+		switch {
+		case err != nil:
+			service.warn("summary regions", err)
+			summary.Unavailable = append(summary.Unavailable, "regions")
+		case lookup.Province != nil || lookup.District != nil || lookup.DS != nil || lookup.GN != nil:
+			summary.Regions = &Regions{Province: lookup.Province, District: lookup.District, DS: lookup.DS, GN: lookup.GN}
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "regions")
+	}
+
+	if service.Rivers != nil {
+		layer, err := service.Rivers.Layer(ctx)
+		if err != nil {
+			service.warn("summary rivers", err)
+			summary.Unavailable = append(summary.Unavailable, "rivers")
+		} else {
+			summary.Rivers = nearestRivers(layer, lon, lat)
+			for _, river := range summary.Rivers {
+				inputs.Rivers = append(inputs.Rivers, NearbyRiver{Name: river.Name, DistanceKm: river.DistanceKm, Status: river.Status, Stale: river.Stale, Source: river.Source, Attribution: river.Attribution})
+			}
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "rivers")
+	}
+
+	if service.Floods != nil {
+		gauges, err := service.Floods.Gauges(ctx)
+		var areas []floods.AreaAt
+		if err == nil {
+			areas, err = service.Floods.AreasAt(ctx, lon, lat)
+		}
+		if err != nil {
+			service.warn("summary flood forecast", err)
+			summary.Unavailable = append(summary.Unavailable, "floodForecast")
+		} else {
+			summary.FloodForecast.Gauges = nearestFloods(gauges, lon, lat)
+			summary.FloodForecast.Areas = areas
+			for _, gauge := range summary.FloodForecast.Gauges {
+				inputs.Floods = append(inputs.Floods, NearbyFloodGauge{GaugeID: gauge.GaugeID, DistanceKm: gauge.DistanceKm,
+					Severity: gauge.Severity, ForecastStart: gauge.ForecastStart, ForecastEnd: gauge.ForecastEnd})
+			}
+			for _, area := range areas {
+				inputs.Areas = append(inputs.Areas, FloodArea{Kind: area.Kind, Severity: area.Severity, ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil})
+			}
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "floodForecast")
+	}
+
+	if service.RiverRisk != nil {
+		nearby, err := service.RiverRisk.Near(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary nearby rivers", err)
+			summary.Unavailable = append(summary.Unavailable, "nearbyRivers")
+		} else {
+			summary.NearbyRivers = nearby
+		}
+	}
+	if service.Official != nil {
+		districtID, dsID := "", ""
+		if summary.Regions != nil && summary.Regions.District != nil {
+			districtID = summary.Regions.District.ID
+		}
+		if summary.Regions != nil && summary.Regions.DS != nil {
+			dsID = summary.Regions.DS.ID
+		}
+		official, err := service.Official.Official(ctx, districtID, dsID)
+		if err != nil {
+			service.warn("summary official warnings", err)
+			summary.Unavailable = append(summary.Unavailable, "official")
+		} else {
+			summary.Official = official
+		}
+	} else {
+		summary.Unavailable = append(summary.Unavailable, "official")
+	}
+	if service.Stations != nil {
+		observed, err := service.Stations.Nearest(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary observed", err)
+			summary.Unavailable = append(summary.Unavailable, "observed")
+		} else {
+			summary.Observed = observed
+		}
+	}
+	if service.RainGauges != nil {
+		gauge, err := service.RainGauges.Nearest(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary rain gauge", err)
+			summary.Unavailable = append(summary.Unavailable, "rainGauge")
+		} else {
+			summary.RainGauge = gauge
+		}
+	}
+	if service.Canals != nil {
+		brief, err := service.Canals.BriefAt(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary canals", err)
+			summary.Unavailable = append(summary.Unavailable, "canals")
+		} else {
+			summary.Canals = brief
+		}
+	}
+	if service.Environment != nil {
+		air, err := service.Environment.AirAt(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary air quality", err)
+			summary.Unavailable = append(summary.Unavailable, "airQuality")
+		} else {
+			summary.AirQuality = air
+		}
+		sea, err := service.Environment.SeaAt(ctx, lon, lat)
+		if err != nil {
+			service.warn("summary sea", err)
+			summary.Unavailable = append(summary.Unavailable, "sea")
+		} else {
+			summary.Sea = sea
+		}
+	}
+	if service.Reservoirs != nil {
+		layer, err := service.Reservoirs.Layer(ctx)
+		if err != nil {
+			service.warn("summary reservoirs", err)
+			summary.Unavailable = append(summary.Unavailable, "reservoirs")
+		} else {
+			summary.Reservoirs = activeReservoirs(layer, lon, lat)
+		}
+	}
+
+	summary.Alerts = Evaluate(inputs)
+	return summary, nil
+}
+
+// hours reads the point's hourly forecast for the alert rules.
+func hours(point *weather.Point) []Hour {
+	if point.Hourly == nil {
+		return nil
+	}
+	times, _ := point.Hourly["times"].([]time.Time)
+	series := func(name string) []float64 { return values(point.Hourly, name, len(times)) }
+	rain, temperature, humidity := series("precipitationMm"), series("temperatureC"), series("relativeHumidityPct")
+	speed, gusts := series("windSpeedKmh"), series("windGustsKmh")
+	out := make([]Hour, len(times))
+	for index, at := range times {
+		out[index] = Hour{At: at, PrecipitationMm: rain[index], TemperatureC: temperature[index], HumidityPct: humidity[index],
+			WindSpeedKmh: speed[index], WindGustsKmh: gusts[index]}
+	}
+	return out
+}
+
+// days reads the point's daily forecast for the alert rules.
+func days(point *weather.Point) []Day {
+	if point.Daily == nil {
+		return nil
+	}
+	dates, _ := point.Daily["dates"].([]string)
+	rain := values(point.Daily, "precipitationSumMm", len(dates))
+	speed := values(point.Daily, "windSpeedMaxKmh", len(dates))
+	gusts := values(point.Daily, "windGustsMaxKmh", len(dates))
+	out := make([]Day, 0, len(dates))
+	for index, date := range dates {
+		day, err := time.Parse(time.DateOnly, date)
+		if err != nil {
+			continue
+		}
+		start := day.Add(-5*time.Hour - 30*time.Minute) // local midnight in UTC
+		out = append(out, Day{Start: start, PrecipitationMm: rain[index], WindSpeedKmh: speed[index], WindGustsKmh: gusts[index]})
+	}
+	return out
+}
+
+func values(series map[string]any, name string, count int) []float64 {
+	out := make([]float64, count)
+	list, _ := series[name].(weather.Values)
+	for index := range out {
+		out[index] = math.NaN()
+		if index < len(list) {
+			out[index] = float64(list[index])
+		}
+	}
+	return out
+}
+
+func nearestRivers(layer rivers.FeatureCollection, lon, lat float64) []River {
+	var out []River
+	for _, feature := range layer.Features {
+		distance := DistanceKm(lon, lat, feature.Geometry.Coordinates[0], feature.Geometry.Coordinates[1])
+		if distance > riverSearchKm {
+			continue
+		}
+		properties := feature.Properties
+		out = append(out, River{
+			ID: properties.ID, Name: properties.Name, Basin: properties.Basin, DistanceKm: round1(distance),
+			Status: string(properties.Status), Trend: string(properties.Trend), WaterLevel: properties.WaterLevel,
+			Unit: properties.Unit, AlertLevel: properties.AlertLevel, MinorFloodLevel: properties.MinorFloodLevel,
+			MajorFloodLevel: properties.MajorFloodLevel, ObservedAt: properties.ObservedAt, Stale: properties.Stale,
+			Lon: feature.Geometry.Coordinates[0], Lat: feature.Geometry.Coordinates[1],
+			Source: properties.Source, Attribution: properties.Attribution,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
+	if len(out) > nearbyRivers {
+		out = out[:nearbyRivers]
+	}
+	if out == nil {
+		out = []River{}
+	}
+	return out
+}
+
+// activeReservoirs lists the nearest mapped reservoirs spilling or releasing,
+// nearest first. A stale reading is left out: it says nothing about today.
+func activeReservoirs(layer reservoirs.FeatureCollection, lon, lat float64) []Reservoir {
+	out := []Reservoir{}
+	for _, feature := range layer.Features {
+		properties := feature.Properties
+		if feature.Geometry == nil || !properties.Active() {
+			continue
+		}
+		distance := DistanceKm(lon, lat, feature.Geometry.Coordinates[0], feature.Geometry.Coordinates[1])
+		if distance > reservoirSearchKm {
+			continue
+		}
+		out = append(out, Reservoir{
+			ID: properties.ID, Name: properties.Name, DistanceKm: round1(distance), Status: properties.Status,
+			StoragePercent: properties.StoragePercent, Flow: properties.Flow, ReadingDay: properties.ReadingDay,
+			Lon: feature.Geometry.Coordinates[0], Lat: feature.Geometry.Coordinates[1],
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
+	if len(out) > nearbyReservoirs {
+		out = out[:nearbyReservoirs]
+	}
+	return out
+}
+
+// nearestFloods lists the nearest verified gauges. Lower-confidence gauges are
+// not offered here: there are about thirty for every verified one, so they would
+// crowd the verified ones out, and their forecast must not raise a place's alerts.
+func nearestFloods(gauges []floods.Gauge, lon, lat float64) []FloodGauge {
+	var out []FloodGauge
+	for _, gauge := range gauges {
+		if !gauge.QualityVerified {
+			continue
+		}
+		distance := DistanceKm(lon, lat, gauge.Lon, gauge.Lat)
+		if distance > floodSearchKm {
+			continue
+		}
+		out = append(out, FloodGauge{
+			GaugeID: gauge.GaugeID, DistanceKm: round1(distance), Severity: gauge.Severity, Trend: gauge.Trend,
+			IssuedAt: gauge.IssuedAt, ForecastStart: gauge.ForecastStart, ForecastEnd: gauge.ForecastEnd,
+			QualityVerified: gauge.QualityVerified, Lon: gauge.Lon, Lat: gauge.Lat,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
+	if len(out) > nearbyFloods {
+		out = out[:nearbyFloods]
+	}
+	if out == nil {
+		out = []FloodGauge{}
+	}
+	return out
+}
+
+// DistanceKm is the great-circle distance between two points.
+func DistanceKm(lon1, lat1, lon2, lat2 float64) float64 {
+	const earthRadiusKm = 6371.0088
+	toRadians := math.Pi / 180
+	dLat, dLon := (lat2-lat1)*toRadians, (lon2-lon1)*toRadians
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(lat1*toRadians)*math.Cos(lat2*toRadians)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	return 2 * earthRadiusKm * math.Asin(math.Min(1, math.Sqrt(a)))
+}
+
+func round1(value float64) float64 { return math.Round(value*10) / 10 }
+
+func (service *Service) warn(what string, err error) {
+	if service.Logger != nil {
+		service.Logger.Warn("summary part failed", "part", what, "error", err)
+	}
+}
+
+func (service *Service) now() time.Time {
+	if service.Now != nil {
+		return service.Now().UTC()
+	}
+	return time.Now().UTC()
+}

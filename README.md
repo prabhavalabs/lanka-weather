@@ -5,8 +5,9 @@ forecasts, observations and hazard data from public sources into one
 interactive map, so that people can see what is happening now and what
 is likely to happen next in their area.
 
-> Status: early development. The service serves the layer catalogue and
-> the map shows Sri Lanka; data collectors are being added layer by
+> Status: early development. The service collects river levels, a weather
+> grid (Open-Meteo), the GFS wind field and Google flood forecasts, and
+> serves them with the layer catalogue; more collectors are added layer by
 > layer. See `docs/architecture/overview.md`.
 
 ## Purpose
@@ -33,9 +34,10 @@ Planned data layers include:
 
 | Path | Contents |
 |---|---|
-| `cmd/lankaweather/` | Go entry point: `serve` (HTTP API); `worker` and `migrate` follow |
-| `internal/` | Go packages: layer catalogue, HTTP API, and later connectors, ingest and store |
-| `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre |
+| `cmd/lankaweather/` | Go entry point: `migrate`, `serve`, `worker` and `collect` |
+| `internal/` | Go packages: layer catalogue, HTTP API, connectors, ingest, store, regions and place search, weather grid and services |
+| `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre, shadcn/ui |
+| `brand/` | Logo, wordmark and icon sources, with usage and colours |
 | `packages/` | Shared TypeScript packages, when needed |
 | `docs/` | Architecture overview, data-source catalogue and decision records |
 | `.github/` | Pull-request template and CI workflow |
@@ -61,7 +63,8 @@ through Corepack: `corepack enable`) and Docker.
 cp .env.example .env   # local settings; .env is never committed
 make bootstrap         # install Node and Go dependencies
 make db-up             # PostgreSQL with PostGIS on 127.0.0.1:55440
-make collect           # migrate, then fetch every source once
+make collect           # migrate, then fetch every source once (a few minutes;
+                       # about 470 of Open-Meteo's 10,000 free daily calls)
 make dev-api           # terminal 1: API on http://localhost:8080
 make dev-worker        # terminal 2: scheduler that keeps data current
 make dev-web           # terminal 3: web app on http://localhost:5173
@@ -70,6 +73,11 @@ make dev-web           # terminal 3: web app on http://localhost:5173
 The Vite dev server proxies `/v1` and `/healthz` to the API. Set
 `LANKAWEATHER_API_URL` to point it elsewhere, and `LANKAWEATHER_ADDR` to
 change the API's listen address.
+
+In development, `http://localhost:5173/?kit` shows the design kit: every
+component in the current theme with placeholder data. After changing the
+artwork in `brand/`, regenerate the icons with
+`pnpm --filter @lanka-weather/web icons`.
 
 ### Commands
 
@@ -88,6 +96,40 @@ change the API's listen address.
 | `GET /v1/layers` | Layer catalogue with refresh cadence and staleness limits |
 | `GET /v1/rivers/levels` | River gauging stations as GeoJSON: level, flood status, trend, data age |
 | `GET /v1/rivers/stations/{id}/readings?hours=72` | One station's readings (1 to 720 hours) |
+| `GET /v1/regions?level=province\|district\|ds` | Region boundaries as GeoJSON, simplified per level; `level=gn&parent=LK-2130` for the GN divisions of one district or DS division |
+| `GET /v1/tiles/regions/{z}/{x}/{y}.pbf` | Mapbox Vector Tiles of every level (`province` z0+, `district` z6+, `ds` z8+, `gn` z10+, up to z14) |
+| `GET /v1/regions/{id}?geometry=true` | One region: names in English, Sinhala and Tamil, hierarchy, centroid, bounding box, area, 2024 population |
+| `GET /v1/regions/lookup?lat=6.9271&lon=79.8612` | The province, district, DS and GN division containing a point |
+| `GET /v1/places/search?q=kandy&limit=10` | Cities, towns, villages and regions by name, typo-tolerant, with coordinates, hierarchy and bounding box |
+| `GET /v1/weather/current` | Current weather on the 0.2° grid over Sri Lanka: one array per variable (gzipped) |
+| `GET /v1/weather/point?lat=&lon=` | Current conditions, a 72-hour hourly and a 7-day daily forecast at a point |
+| `GET /v1/weather/wind?t=` | Wind field (GFS, 10 m) for the particle layer, valid nearest `t` (default now) |
+| `GET /v1/weather/regions?level=province\|district\|ds\|gn&parent=LK-11` | Weather per administrative region, optionally within one parent region |
+| `GET /v1/floods/forecast` | Google flood forecasts for Sri Lanka as GeoJSON: gauges and flood areas |
+| `GET /v1/summary?lat=&lon=` | One place: its regions, weather, nearest river and flood gauges, derived alerts |
+
+Region ids are Department of Census and Statistics codes: `LK-2`
+(province), `LK-21` (district), `LK-2130` (DS division), `LK-2130120`
+(GN division). Boundary responses carry an `ETag` and a day's
+`Cache-Control`. The full contract, with example responses, is in
+[ADR 0006](docs/decisions/0006-admin-regions-and-search.md#api-contract).
+
+The weather and flood endpoints are described, with example responses, in
+[docs/api/weather-and-floods.md](docs/api/weather-and-floods.md).
+
+### Web application
+
+One map of Sri Lanka with weather by region (province, district, DS or GN
+division), a smooth weather field (temperature, rain, humidity, cloud or
+wind), animated GFS wind with a 72-hour time scrubber, Google flood
+forecasts and river levels. Search with ⌘K or Ctrl+K; click the map, a
+region or a gauge for its weather, 72-hour and 7-day forecast, nearby
+gauges and alerts. Alerts derived by lanka-weather are labelled
+"Estimate"; official warnings come from the Department of Meteorology
+and the DMC. A selection is kept in the URL, for example
+`/?at=7.2931,80.6350&name=Kandy`, `/?region=LK-21`,
+`/?station=peradeniya` or `/?gauge=hybas_4121155030`. ADR 0009 records
+how the map is put together.
 
 Before opening a pull request, run everything CI runs:
 

@@ -1,0 +1,35 @@
+[
+  {
+    "latitude": 6.9000015,
+    "longitude": 79.80002,
+    "generationtime_ms": 0.31828880310058594,
+    "utc_offset_seconds": 0,
+    "timezone": "GMT",
+    "timezone_abbreviation": "GMT",
+    "elevation": 0.0,
+    "current_units": {
+      "time": "unixtime",
+      "interval": "seconds",
+      "us_aqi": "USAQI",
+      "pm2_5": "μg/m³"
+    },
+    "current": { "time": 1793646000, "interval": 3600, "us_aqi": 51, "pm2_5": 5.9 }
+  },
+  {
+    "latitude": 7.300003,
+    "longitude": 80.600006,
+    "generationtime_ms": 0.33986568450927734,
+    "utc_offset_seconds": 0,
+    "timezone": "GMT",
+    "timezone_abbreviation": "GMT",
+    "elevation": 596.0,
+    "location_id": 1,
+    "current_units": {
+      "time": "unixtime",
+      "interval": "seconds",
+      "us_aqi": "USAQI",
+      "pm2_5": "μg/m³"
+    },
+    "current": { "time": 1793646000, "interval": 3600, "us_aqi": 63, "pm2_5": 10.1 }
+  }
+]

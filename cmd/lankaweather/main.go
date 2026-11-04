@@ -6,6 +6,8 @@
 //	lankaweather serve     run the HTTP API
 //	lankaweather worker    run the scheduler that collects data sources
 //	lankaweather collect   run every collector once and exit
+//	lankaweather collect NAME...   run the named collectors once and exit
+//	lankaweather vapid-keys  print a new VAPID key pair for Web Push alerts
 //
 // Configuration comes from the environment; see .env.example.
 package main
@@ -18,21 +20,59 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/alerts"
+	"github.com/prabhavalabs/lanka-weather/internal/canals"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/adminregions"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/dmcbulletins"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/gdacs"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/gfs"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/googleflood"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/hmisrain"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrobasins"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/hydrorivers"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/imerg"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigationgis"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/landslides"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/metstations"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/openmeteo"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmplaces"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/osmreservoirs"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/usgs"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/waterlevels"
+	"github.com/prabhavalabs/lanka-weather/internal/environment"
+	"github.com/prabhavalabs/lanka-weather/internal/floods"
+	"github.com/prabhavalabs/lanka-weather/internal/grid"
+	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/httpapi"
 	"github.com/prabhavalabs/lanka-weather/internal/ingest"
 	"github.com/prabhavalabs/lanka-weather/internal/layers"
+	"github.com/prabhavalabs/lanka-weather/internal/overview"
+	"github.com/prabhavalabs/lanka-weather/internal/places"
 	"github.com/prabhavalabs/lanka-weather/internal/platform/database"
+	"github.com/prabhavalabs/lanka-weather/internal/push"
+	"github.com/prabhavalabs/lanka-weather/internal/push/webpush"
+	"github.com/prabhavalabs/lanka-weather/internal/rainfall"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
+	"github.com/prabhavalabs/lanka-weather/internal/regions"
+	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
+	"github.com/prabhavalabs/lanka-weather/internal/rivernet"
+	"github.com/prabhavalabs/lanka-weather/internal/riverrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/source"
+	"github.com/prabhavalabs/lanka-weather/internal/stations"
+	"github.com/prabhavalabs/lanka-weather/internal/summary"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
+	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
-const usage = "usage: lankaweather migrate|serve|worker|collect"
+const usage = "usage: lankaweather migrate|serve|worker|vapid-keys|collect [NAME...]"
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -46,11 +86,18 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, logger *slog.Logger) error {
-	if len(args) != 1 {
+	if len(args) == 0 || (len(args) > 1 && args[0] != "collect") {
 		return errors.New(usage)
 	}
 	databaseURL := os.Getenv("LANKAWEATHER_DATABASE_URL")
 	switch args[0] {
+	case "vapid-keys":
+		public, private, err := webpush.GenerateKeys()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s=%s\n%s=%s\n%s=mailto:alerts@example.org\n", push.EnvPublicKey, public, push.EnvPrivateKey, private, push.EnvSubject)
+		return nil
 	case "migrate":
 		if databaseURL == "" {
 			return errors.New("LANKAWEATHER_DATABASE_URL is not set")
@@ -73,12 +120,27 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 			return err
 		}
 		defer pool.Close()
-		scheduler := &ingest.Scheduler{Pool: pool, Collectors: collectors(pool), Logger: logger}
+		scheduler := &ingest.Scheduler{Pool: pool, Collectors: collectors(pool, logger), Logger: logger}
+		// The alert engine sends notices, so it runs in the worker, after every
+		// collector, and in collect only when named.
+		engine := alertEngine(pool, logger)
 		if args[0] == "collect" {
-			for _, collector := range scheduler.Collectors {
+			all := scheduler.Collectors
+			if engine != nil && slices.Contains(args[1:], alerts.SourceName) {
+				all = append(all, engine)
+			}
+			chosen, err := chooseCollectors(all, args[1:])
+			if err != nil {
+				return err
+			}
+			for _, collector := range chosen {
 				scheduler.RunOne(ctx, collector)
 			}
+			scheduler.Prune(ctx)
 			return nil
+		}
+		if engine != nil {
+			scheduler.Collectors = append(scheduler.Collectors, engine)
 		}
 		logger.Info("worker started")
 		scheduler.Run(ctx)
@@ -88,12 +150,121 @@ func run(ctx context.Context, args []string, logger *slog.Logger) error {
 	}
 }
 
-// collectors lists every data source the worker collects.
-func collectors(pool *pgxpool.Pool) []source.Collector {
-	client := source.NewClient(os.Getenv("LANKAWEATHER_CONTACT"))
-	return []source.Collector{
-		&irrigation.Collector{Pool: pool, Fetcher: client},
+// chooseCollectors picks collectors by name, or all of them with no names. Naming
+// them spends one source's requests rather than every source's: a full run costs
+// about 470 of Open-Meteo's weighted calls (ADR 0007).
+func chooseCollectors(all []source.Collector, names []string) ([]source.Collector, error) {
+	if len(names) == 0 {
+		return all, nil
 	}
+	chosen := make([]source.Collector, 0, len(names))
+	for _, name := range names {
+		index := slices.IndexFunc(all, func(collector source.Collector) bool { return collector.Name() == name })
+		if index < 0 {
+			return nil, fmt.Errorf("no collector named %q", name)
+		}
+		chosen = append(chosen, all[index])
+	}
+	return chosen, nil
+}
+
+// collectors lists every data source the worker collects.
+func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
+	client := source.NewClient(os.Getenv("LANKAWEATHER_CONTACT"))
+	weatherGrid := grid.SriLanka()
+	// Regions load before places, so places can be placed in their regions.
+	list := []source.Collector{
+		&irrigation.Collector{Pool: pool, Fetcher: client},
+		&adminregions.Collector{Pool: pool, Fetcher: client},
+		&osmplaces.Collector{Pool: pool, Fetcher: client},
+		&waterlevels.GaugeCollector{Pool: pool, Fetcher: client, Logger: logger},
+		&waterlevels.ReservoirCollector{Pool: pool, Fetcher: client},
+		&waterlevels.CanalCollector{Pool: pool, Fetcher: client},
+		&hmisrain.Collector{Pool: pool, Client: client, Logger: logger},
+		&osmreservoirs.Collector{Pool: pool, Fetcher: client, Logger: logger},
+		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindCurrent, Logger: logger},
+		&openmeteo.Collector{Pool: pool, Client: client, Grid: weatherGrid, Kind: openmeteo.KindForecast, Logger: logger},
+		&gfs.Collector{Pool: pool, Client: client, Logger: logger},
+		&hydrorivers.Collector{Pool: pool, Fetcher: client},
+		&irrigationgis.BasinsCollector{Pool: pool, Fetcher: client, Logger: logger},
+		&irrigationgis.PastFloodsCollector{Pool: pool, Fetcher: client, Logger: logger},
+		&hydrobasins.Collector{Pool: pool, Client: client, Logger: logger},
+		&dmcbulletins.Collector{Pool: pool, Fetcher: client},
+		&landslides.Collector{Pool: pool, Fetcher: client},
+		&usgs.Collector{Pool: pool, Fetcher: client},
+		&gdacs.Collector{Pool: pool, Fetcher: client},
+		&imerg.Collector{Pool: pool, Client: client, Logger: logger},
+		&metstations.ThreeHourlyCollector{Pool: pool, Client: client, Logger: logger},
+		&metstations.DailyCollector{Pool: pool, Client: client, Logger: logger},
+		&openmeteo.EnvironmentCollector{Pool: pool, Client: client, Grid: grid.AirQuality(), Kind: openmeteo.KindAirQuality, Logger: logger},
+		&openmeteo.EnvironmentCollector{Pool: pool, Client: client, Grid: grid.Sea(), Kind: openmeteo.KindMarine, Logger: logger},
+	}
+	if key := os.Getenv("LANKAWEATHER_GOOGLE_API_KEY"); key != "" {
+		list = append(list, &googleflood.Collector{Pool: pool, Client: client, APIKey: key, Logger: logger,
+			IncludeUnverified: googleflood.IncludeUnverified(os.Getenv("LANKAWEATHER_GOOGLE_FLOOD_UNVERIFIED"))})
+	} else {
+		logger.Info("LANKAWEATHER_GOOGLE_API_KEY is not set; Google flood forecasts are not collected")
+	}
+	// Derived from the collectors above, so it runs last.
+	return append(list, &rivernet.Collector{Pool: pool, Logger: logger})
+}
+
+// pushIdentity reads the VAPID keys. Without them push alerts are off: the API
+// says so and the worker sends nothing.
+func pushIdentity(logger *slog.Logger) *webpush.VAPID {
+	vapid, err := push.VAPIDFromEnv()
+	if errors.Is(err, push.ErrNotConfigured) {
+		logger.Info("VAPID keys are not set; push alerts are off")
+		return nil
+	}
+	if err != nil {
+		logger.Error("VAPID keys are not usable; push alerts are off", "error", err)
+		return nil
+	}
+	return vapid
+}
+
+// alertEngine builds the alert engine over the same services the API serves,
+// or nil when push alerts are off.
+func alertEngine(pool *pgxpool.Pool, logger *slog.Logger) *alerts.Engine {
+	vapid := pushIdentity(logger)
+	if vapid == nil {
+		return nil
+	}
+	staleAfter := func(id string) time.Duration {
+		layer, _ := layers.ByID(id)
+		return time.Duration(layer.StaleAfterSeconds) * time.Second
+	}
+	return &alerts.Engine{
+		Pool: pool,
+		Warnings: &warnings.Service{Pool: pool, LandslideStaleAfter: staleAfter("landslide-warnings"),
+			BulletinStaleAfter: staleAfter("official-warnings")},
+		Rivers: &rivers.Service{Pool: pool, StaleAfter: staleAfter("river-levels")},
+		Floods: &floods.Service{Pool: pool, Configured: os.Getenv("LANKAWEATHER_GOOGLE_API_KEY") != "",
+			StaleAfter: staleAfter("flood-forecast")},
+		Hazards:    &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")},
+		Reservoirs: &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")},
+		Dispatcher: &push.Dispatcher{Pool: pool, Sender: push.NewClient(vapid), Logger: logger},
+		Logger:     logger,
+	}
+}
+
+// regionSource is the source of administrative regions for
+// /v1/weather/regions: the admin_regions view over the regions table
+// (migration 00004), or the relation named by
+// LANKAWEATHER_WEATHER_REGIONS_RELATION. Until the regions collector has
+// loaded a level, requests for it answer 503 not_available.
+// LANKAWEATHER_WEATHER_REGIONS=none switches region weather off.
+func regionSource(pool *pgxpool.Pool, logger *slog.Logger) weather.RegionSource {
+	if os.Getenv("LANKAWEATHER_WEATHER_REGIONS") == "none" {
+		logger.Info("weather regions are switched off")
+		return weather.UnavailableRegions{}
+	}
+	relation := os.Getenv("LANKAWEATHER_WEATHER_REGIONS_RELATION")
+	if relation == "" {
+		relation = weather.DefaultRegionsRelation
+	}
+	return &weather.PostGISRegions{Pool: pool, Relation: relation, Grid: grid.SriLanka()}
 }
 
 func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
@@ -101,13 +272,69 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	if addr == "" {
 		addr = ":8080"
 	}
-	riverLayer, _ := layers.ByID("river-levels")
+	staleAfter := func(id string) time.Duration {
+		layer, _ := layers.ByID(id)
+		return time.Duration(layer.StaleAfterSeconds) * time.Second
+	}
+	riverService := &rivers.Service{Pool: pool, StaleAfter: staleAfter("river-levels")}
+	weatherRegions := regionSource(pool, logger)
+	weatherService := &weather.Service{Pool: pool, Regions: weatherRegions,
+		CurrentStaleAfter: staleAfter("temperature"), ForecastStaleAfter: 12 * time.Hour}
+	if warmer, ok := weatherRegions.(interface{ Warm(context.Context) error }); ok {
+		// Join regions to grid cells now rather than in the first requests.
+		go func() {
+			started := time.Now()
+			if err := warmer.Warm(ctx); err != nil {
+				logger.Warn("weather regions warm-up failed", "error", err)
+				return
+			}
+			logger.Info("weather regions ready", "duration_ms", time.Since(started).Milliseconds())
+		}()
+	}
+	floodService := &floods.Service{Pool: pool, Configured: os.Getenv("LANKAWEATHER_GOOGLE_API_KEY") != "",
+		StaleAfter: staleAfter("flood-forecast")}
+	regionService := &regions.Service{Pool: pool}
+	reservoirService := &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")}
+	riverRiskService := &riverrisk.Service{Pool: pool, Rivers: riverService, Floods: floodService, Weather: weatherService, Reservoirs: reservoirService, Logger: logger}
+	warningService := &warnings.Service{Pool: pool, LandslideStaleAfter: staleAfter("landslide-warnings"),
+		BulletinStaleAfter: staleAfter("official-warnings")}
+	stationService := &stations.Service{Pool: pool, StaleAfter: staleAfter("weather-stations")}
+	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
+	rainGaugeService := &raingauges.Service{Pool: pool, StaleAfter: staleAfter("rain-gauges")}
+	canalService := &canals.Service{Pool: pool}
+	hazardService := &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")}
+	// Always present, so a subscription can be deleted even with push off.
+	pushService := &push.Service{Pool: pool}
+	if vapid := pushIdentity(logger); vapid != nil {
+		pushService.VAPID, pushService.Sender = vapid, push.NewClient(vapid)
+	}
 	server := &http.Server{
 		Addr: addr,
 		Handler: httpapi.NewRouter(httpapi.Dependencies{
-			Logger: logger,
-			Rivers: &rivers.Service{Pool: pool, StaleAfter: time.Duration(riverLayer.StaleAfterSeconds) * time.Second},
-			Ready:  pool.Ping,
+			Logger:  logger,
+			Rivers:  riverService,
+			Regions: regionService,
+			Places:  &places.Service{Pool: pool},
+			Weather: weatherService,
+			Floods:  floodService,
+			Summary: &summary.Service{Weather: weatherService, Rivers: riverService, Floods: floodService,
+				Regions: regionService, RiverRisk: riverRiskService, Official: warningService,
+				Stations: stationService, Environment: environmentService, Reservoirs: reservoirService,
+				RainGauges: rainGaugeService, Canals: canalService, Logger: logger},
+			RiverRisk: riverRiskService,
+			Warnings:  warningService,
+			Overview: &overview.Service{Warnings: warningService, Risk: riverRiskService, Gauges: riverService,
+				Reservoirs: reservoirService, Hazards: hazardService, Weather: weatherService, Rain: stationService, RainGauges: rainGaugeService,
+				Environment: environmentService, Regions: regionService, WeatherStaleAfter: staleAfter("temperature"), Logger: logger},
+			Hazards:     hazardService,
+			Stations:    stationService,
+			Rain:        &rainfall.Service{Pool: pool, StaleAfter: staleAfter("rainfall")},
+			Environment: environmentService,
+			Reservoirs:  reservoirService,
+			RainGauges:  rainGaugeService,
+			Canals:      canalService,
+			Push:        pushService,
+			Ready:       pool.Ping,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

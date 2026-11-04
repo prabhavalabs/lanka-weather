@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
+	"github.com/prabhavalabs/lanka-weather/internal/connectors/waterlevels"
 	"github.com/prabhavalabs/lanka-weather/internal/store"
 )
 
@@ -37,6 +38,16 @@ type LayerMeta struct {
 	Attribution string     `json:"attribution"`
 	FetchedAt   *time.Time `json:"fetchedAt"`
 	GeneratedAt time.Time  `json:"generatedAt"`
+	// Sources lists every collector behind the layer with when it last ran;
+	// Source and FetchedAt above are the authoritative Irrigation Department feed.
+	Sources []SourceMeta `json:"sources"`
+}
+
+// SourceMeta describes one collector behind the layer.
+type SourceMeta struct {
+	Source      string     `json:"source"`
+	Attribution string     `json:"attribution"`
+	FetchedAt   *time.Time `json:"fetchedAt"`
 }
 
 // Feature is one station as a GeoJSON point.
@@ -69,7 +80,33 @@ type StationProperties struct {
 	Trend           Trend      `json:"trend"`
 	RatePerHour     *float64   `json:"ratePerHour"`
 	Stale           bool       `json:"stale"`
+	// Source is the collector the station comes from; Attribution says who to
+	// credit; SourceURL is where to read more, when the source has a page.
+	Source      string  `json:"source"`
+	Attribution string  `json:"attribution"`
+	SourceURL   *string `json:"sourceUrl"`
+	// NextHour is an experimental forecast by a third party. It is shown beside
+	// the status and never changes it; null when none is recent enough.
+	NextHour *NextHour `json:"nextHour"`
 }
+
+// NextHour is the experimental next-hour forecast at a station, in the
+// station's unit.
+type NextHour struct {
+	Level        float64   `json:"level"`
+	Low          *float64  `json:"low"`
+	High         *float64  `json:"high"`
+	Unit         string    `json:"unit"`
+	Direction    *string   `json:"direction"`
+	Crossing     *string   `json:"crossing"`
+	Method       *string   `json:"method"`
+	IssuedAt     time.Time `json:"issuedAt"`
+	Experimental bool      `json:"experimental"`
+	Attribution  string    `json:"attribution"`
+}
+
+// NextHourMaxAge is how old a next-hour forecast may be and still be shown.
+const NextHourMaxAge = 2 * time.Hour
 
 // lookback bounds the readings read to build the layer: enough to find a
 // stale station's last reading and every station's trend.
@@ -96,19 +133,39 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 		samples[row.StationID] = append(samples[row.StationID], Sample{ObservedAt: row.ObservedAt, Level: row.WaterLevel})
 	}
 
+	forecasts, err := queries.LatestNextHour(ctx, now.Add(-NextHourMaxAge))
+	if err != nil {
+		return FeatureCollection{}, fmt.Errorf("read next-hour forecasts: %w", err)
+	}
+	nextHours := make(map[string]store.RiverNextHour, len(forecasts))
+	for _, forecast := range forecasts {
+		nextHours[forecast.StationID] = forecast
+	}
+
 	collection := FeatureCollection{
 		Type:     "FeatureCollection",
 		Features: make([]Feature, 0, len(stations)),
 		Meta: LayerMeta{
 			Source:      irrigation.SourceName,
-			Attribution: "Irrigation Department of Sri Lanka",
+			Attribution: IrrigationAttribution,
 			GeneratedAt: now,
+			Sources:     []SourceMeta{},
 		},
 	}
-	if run, err := queries.LastSuccessfulRun(ctx, irrigation.SourceName); err == nil {
-		collection.Meta.FetchedAt = run.FinishedAt
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return FeatureCollection{}, fmt.Errorf("read last run: %w", err)
+	for _, meta := range []SourceMeta{
+		{Source: irrigation.SourceName, Attribution: IrrigationAttribution},
+		{Source: waterlevels.GaugesSource, Attribution: waterlevels.Attribution},
+	} {
+		run, err := queries.LastSuccessfulRun(ctx, meta.Source)
+		if err == nil {
+			meta.FetchedAt = run.FinishedAt
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return FeatureCollection{}, fmt.Errorf("read last run: %w", err)
+		}
+		if meta.Source == irrigation.SourceName {
+			collection.Meta.FetchedAt = meta.FetchedAt
+		}
+		collection.Meta.Sources = append(collection.Meta.Sources, meta)
 	}
 
 	for _, station := range stations {
@@ -117,6 +174,10 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 			ID: station.ID, Name: station.Name, Basin: station.Basin, Unit: station.Unit,
 			AlertLevel: station.AlertLevel, MinorFloodLevel: station.MinorFloodLevel, MajorFloodLevel: station.MajorFloodLevel,
 			Status: StatusUnknown, Trend: TrendUnknown, Stale: true,
+			Source: station.Source, Attribution: attribution(station.Source, station.Upstream), SourceURL: station.SourceUrl,
+		}
+		if forecast, ok := nextHours[station.ID]; ok {
+			properties.NextHour = nextHour(forecast, station.Unit)
 		}
 		if series := samples[station.ID]; len(series) > 0 {
 			latest := series[0]
@@ -170,6 +231,7 @@ func (service *Service) StationHistory(ctx context.Context, id string, period ti
 			ID: station.ID, Name: station.Name, Basin: station.Basin, Unit: station.Unit,
 			AlertLevel: station.AlertLevel, MinorFloodLevel: station.MinorFloodLevel, MajorFloodLevel: station.MajorFloodLevel,
 			Status: StatusUnknown, Trend: TrendUnknown, Stale: true,
+			Source: station.Source, Attribution: attribution(station.Source, station.Upstream), SourceURL: station.SourceUrl,
 		},
 		Readings: make([]HistoryReading, 0, len(rows)),
 	}
@@ -189,6 +251,44 @@ func (service *Service) StationHistory(ctx context.Context, id string, period ti
 		history.Station.Stale = service.now().Sub(observed) > service.StaleAfter
 	}
 	return history, nil
+}
+
+// IrrigationAttribution credits the department's own feed.
+const IrrigationAttribution = "Irrigation Department of Sri Lanka"
+
+// attribution credits a station: the department for its own feed; otherwise the
+// site it was read from, naming the agency behind it where the site does.
+func attribution(source string, upstream *string) string {
+	if source != waterlevels.GaugesSource {
+		return IrrigationAttribution
+	}
+	if upstream != nil && *upstream != "" {
+		return *upstream + " via " + waterlevels.Attribution
+	}
+	return waterlevels.Attribution + " (upstream agency not stated)"
+}
+
+// nextHour converts a stored forecast to the station's unit, keeping a sensible
+// precision. A station without a known unit cannot show it: a forecast in feet
+// next to a level of unknown unit would invite a comparison that means nothing.
+func nextHour(row store.RiverNextHour, unit string) *NextHour {
+	convert := func(feet float64) float64 {
+		value, _ := waterlevels.FromFeet(feet, unit)
+		return value
+	}
+	if unit != "m" && unit != "ft" {
+		return nil
+	}
+	forecast := &NextHour{
+		Level: convert(row.LevelFt), Unit: unit, Direction: row.Direction, Crossing: row.Crossing, Method: row.Method,
+		IssuedAt: row.IssuedAt, Experimental: true, Attribution: waterlevels.Attribution,
+	}
+	// A range is shown only as a whole.
+	if row.LowFt != nil && row.HighFt != nil {
+		low, high := convert(*row.LowFt), convert(*row.HighFt)
+		forecast.Low, forecast.High = &low, &high
+	}
+	return forecast
 }
 
 func (service *Service) now() time.Time {
