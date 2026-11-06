@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -94,7 +95,7 @@ func TestTranslationsKeepTheEnglishPlaceholdersAndKeys(t *testing.T) {
 func TestEveryNoticeRendersCompletelyInEveryLanguage(t *testing.T) {
 	facts := map[string]string{"district": "LK-91", "districts": "LK-91,LK-92", "station": "Ratnapura", "river": "Kalu Ganga",
 		"site": "Putupaula", "name": "MONTHA", "title": "Flood warning for Kalu River", "place": "Sumatra, Indonesia",
-		"magnitude": "6.8", "distance": "1450", "source": "irrigation", "level": "3"}
+		"magnitude": "6.8", "distance": "1450", "source": "irrigation", "level": "3", "issuedAt": "2026-11-06T14:45:58Z"}
 	for kind, variants := range Variants {
 		for _, variant := range variants {
 			for _, count := range []int{1, 3} {
@@ -163,6 +164,29 @@ func TestGroupedNumbers(t *testing.T) {
 	for value, want := range map[int]string{5: "5", 999: "999", 1000: "1,000", 1450: "1,450", 1234567: "1,234,567"} {
 		if got := grouped(value); got != want {
 			t.Errorf("grouped(%d) = %q", value, got)
+		}
+	}
+}
+
+func TestFlashFloodsSayWhenGoogleIssuedThem(t *testing.T) {
+	// 20:15 in Sri Lanka on 6 November 2026, written at 00:15 the next day.
+	now := time.Date(2026, 11, 6, 18, 45, 0, 0, time.UTC)
+	facts := map[string]string{"district": "LK-91", "districts": "LK-91", "issuedAt": "2026-11-06T14:45:58Z"}
+	_, body := Render("en", Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now}, testNames)
+	if !strings.Contains(body, "Google issued it at 20:15 yesterday.") {
+		t.Fatalf("body %q", body)
+	}
+	_, body = Render("en", Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now.Add(-3 * time.Hour)}, testNames)
+	if !strings.Contains(body, "issued it at 20:15.") {
+		t.Fatalf("same day %q", body)
+	}
+	_, body = Render("en", Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now.Add(48 * time.Hour)}, testNames)
+	if !strings.Contains(body, "issued it at 6/11 20:15.") {
+		t.Fatalf("older %q", body)
+	}
+	for _, locale := range []string{"si", "ta"} {
+		if _, body := Render(locale, Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now}, testNames); !strings.Contains(body, "20:15") {
+			t.Errorf("%s body %q", locale, body)
 		}
 	}
 }

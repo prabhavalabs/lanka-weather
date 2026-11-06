@@ -138,7 +138,7 @@ func urgencyFor(severity Severity) string {
 // headers it is sent with.
 func (notice Notice) Message(subscriber Subscriber, names messages.Names, now time.Time) (Payload, webpush.Message) {
 	title, body := messages.Render(subscriber.Locale, messages.Input{Kind: notice.Kind, Variant: notice.Variant,
-		Count: notice.Count, Facts: notice.Facts}, names)
+		Count: notice.Count, Facts: notice.Facts, Now: now}, names)
 	payload := Payload{Title: title, Body: body, URL: notice.URL, Tag: notice.Tag, Severity: notice.Severity,
 		SentAt: now.UTC(), RequireInteraction: notice.Severity == SeverityDanger, Lang: subscriber.Locale}
 	return payload, webpush.Message{Endpoint: subscriber.Endpoint, P256dh: subscriber.P256dh, Auth: subscriber.Auth,

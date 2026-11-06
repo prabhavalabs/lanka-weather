@@ -64,7 +64,7 @@ raises an event.
 | NBRO landslide levels | A district: the highest level of its DS divisions in the report in force | 1, 2, 3 | watch (opt-in topic), warning, danger |
 | River gauges, Irrigation Department and waterlevels.lk | A gauge, mapped to the district containing it or nearest within about 5 km | alert 1, minor flood 2, major flood 3 | watch, warning, danger |
 | Google flood forecasts, verified gauges only | A gauge | Warning 1, Danger 2, Extreme 3 | warning, warning, danger |
-| Google flash floods | An area, with the districts it overlaps | likely 1, highly likely 2 | warning |
+| Google flash floods, read every 10 minutes | A district: the highest of the areas over it (Google reissues an area under a new ID every few hours, which had alerted again each time) | likely 1, highly likely 2 | warning |
 | GDACS cyclones | A system | forecast track within 1,000 km 1; centre within 1,000 km 2; within 300 km 3 | watch, warning, danger |
 | USGS earthquakes of the last 6 hours | An event | see below | watch, warning |
 | Reservoirs spilling, current readings only | A reservoir with a known district | spilling 1 | watch (opt-in topic) |
@@ -74,6 +74,10 @@ about (15° S to 25° N, 60 to 105° E), or M4 within 300 km, which may be felt 
 within 1,500 km, M7 anywhere in the region, or USGS's tsunami flag with M6. A level 2 notice says it
 is **not a tsunami warning** and refers people to the DMC and the Department of Meteorology. We
 never issue a tsunami warning.
+
+A flash-flood notice says when Google issued the forecast ("Google issued it at 20:15"), so a
+forecast that reached us late cannot pass for an early warning. A forecast that lapses sends
+nothing: an "all clear" from a forecast says nothing about the rain to come.
 
 Forecasts reach danger only at Google's Extreme: they are estimates, and danger passes the hourly
 cap. Their text says "an estimate, not an official warning". Spills and Level 1 landslides are

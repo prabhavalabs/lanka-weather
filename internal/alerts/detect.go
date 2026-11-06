@@ -310,35 +310,87 @@ func FloodForecasts(collection floods.FeatureCollection, districtOf DistrictOf, 
 // AreaDistricts finds the districts a flood area overlaps.
 type AreaDistricts func(areaID string) []string
 
-// FlashFloods reads Google's flash-flood areas over Sri Lanka (there have been
-// none so far): likely 1, highly likely 2.
+// FlashStaleAfter is how old the last read of flash floods may be for their
+// absence to mean anything: three missed runs of FlashCollector.
+const FlashStaleAfter = 30 * time.Minute
+
+// FlashFloods reads Google's flash-flood areas over Sri Lanka by district:
+// likely 1, highly likely 2, the highest area over the district. The subject is
+// the district, not Google's area: Google reissues a forecast as a new area
+// every few hours, and each reissue had alerted again (five Colombo notices in
+// four days, November 2026). A district whose area disappears falls to 0 and,
+// after the hold, can alert again; no "all clear" is sent, as a forecast that
+// lapses says nothing about the rain to come.
 func FlashFloods(collection floods.FeatureCollection, areaDistricts AreaDistricts, now time.Time) Reading {
-	reading := Reading{Kind: messages.KindFlashFlood, HoldFor: HoldForecast, Complete: collection.Meta.Configured && collection.Meta.FetchedAt != nil}
+	fresh := collection.Meta.FlashFetchedAt != nil && now.Sub(*collection.Meta.FlashFetchedAt) <= FlashStaleAfter
+	reading := Reading{Kind: messages.KindFlashFlood, HoldFor: HoldForecast, Complete: collection.Meta.Configured && fresh}
 	if collection.Meta.Seeded {
 		reading.Complete = false
 		return reading
 	}
+	type lead struct {
+		area  floods.Area
+		level int
+	}
+	leads := map[string]lead{}
 	for _, feature := range collection.Features {
 		area, ok := feature.Properties.(floods.Area)
 		if !ok || (area.Kind != googleflood.KindFlashLikely && area.Kind != googleflood.KindFlashHighly) {
 			continue
 		}
-		level, variant := 1, "likely"
+		level := 1
 		if area.Kind == googleflood.KindFlashHighly {
-			level, variant = 2, "highly_likely"
+			level = 2
 		}
-		districts := areaDistricts(area.ID)
-		if len(districts) == 0 {
-			continue
+		for _, district := range areaDistricts(area.ID) {
+			current, ok := leads[district]
+			// The highest level leads, then the newest issue.
+			if !ok || level > current.level || (level == current.level && issuedAfter(area, current.area)) {
+				leads[district] = lead{area: area, level: level}
+			}
+		}
+	}
+	districts := make([]string, 0, len(leads))
+	for district := range leads {
+		districts = append(districts, district)
+	}
+	sort.Strings(districts)
+	for _, district := range districts {
+		area, level := leads[district].area, leads[district].level
+		variant := "likely"
+		if level == 2 {
+			variant = "highly_likely"
+		}
+		issued := area.FirstSeenAt
+		if area.IssuedAt != nil {
+			issued = *area.IssuedAt
+		}
+		if issued.IsZero() {
+			issued = now
+		}
+		facts := map[string]string{"district": district, "districts": district, "issuedAt": issued.UTC().Format(time.RFC3339)}
+		if !area.FirstSeenAt.IsZero() {
+			facts["firstSeenAt"] = area.FirstSeenAt.UTC().Format(time.RFC3339)
 		}
 		reading.Observations = append(reading.Observations, Observation{
-			Subject: "flash:" + area.ID, Level: level,
+			Subject: FlashSubject(district), Level: level,
 			Event: push.Event{Kind: messages.KindFlashFlood, Variant: variant, Topic: push.TopicFloodForecast, Severity: push.SeverityWarning,
-				Districts: districts, Facts: map[string]string{"district": districts[0], "districts": strings.Join(districts, ",")},
-				URL: "/?area=" + area.ID, Tag: "flash:area:" + area.ID, ExpiresAt: clampExpiry(area.ValidUntil, now, 12*time.Hour, 24*time.Hour)},
+				Districts: []string{district}, Facts: facts,
+				URL: "/?area=" + area.ID, Tag: "flash:district:" + district, ExpiresAt: clampExpiry(area.ValidUntil, now, 12*time.Hour, 24*time.Hour)},
 		})
 	}
 	return reading
+}
+
+// FlashSubject is a district's flash-flood subject (migration 00013 moved the
+// earlier per-area subjects onto these).
+func FlashSubject(district string) string { return "flash:district:" + district }
+
+func issuedAfter(a, b floods.Area) bool {
+	if a.IssuedAt == nil || b.IssuedAt == nil {
+		return a.IssuedAt != nil
+	}
+	return a.IssuedAt.After(*b.IssuedAt)
 }
 
 // geometryPoints lists the positions of a Point or LineString.
