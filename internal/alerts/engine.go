@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/prabhavalabs/lanka-weather/internal/floodrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/push"
@@ -18,6 +18,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/store"
 	"github.com/prabhavalabs/lanka-weather/internal/warnings"
+	"github.com/prabhavalabs/lanka-weather/internal/weather"
 )
 
 // SourceName is the engine's name in source_runs.
@@ -52,6 +53,9 @@ type (
 	RainGaugesSource interface {
 		Intensities(ctx context.Context) (raingauges.Intensities, error)
 	}
+	WeatherSource interface {
+		RainOutlooks(ctx context.Context, level string) (*weather.RainOutlooks, error)
+	}
 )
 
 // Engine raises events from our own tables and has them sent. It is a
@@ -64,12 +68,14 @@ type Engine struct {
 	Hazards    HazardsSource
 	Reservoirs ReservoirsSource
 	RainGauges RainGaugesSource
+	// Weather gives the rain forecast ahead, for the combined estimate.
+	Weather    WeatherSource
 	Dispatcher *push.Dispatcher
 	Logger     *slog.Logger
+	// Locator places gauges and areas in districts; one is made if nil.
+	Locator *floodrisk.Locator
 
-	mu        sync.Mutex
-	districts map[string]string
-	areas     map[string][]string
+	once sync.Once
 }
 
 // Name implements source.Collector.
@@ -143,15 +149,19 @@ func (engine *Engine) Detect(ctx context.Context, now time.Time) (int, error) {
 	return raised, nil
 }
 
-// read gathers what each source says now.
+// read gathers what each source says now, and the combined flood-risk
+// estimate from the same layers.
 func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 	readings := []Reading{}
+	layers := floodrisk.Layers{}
 	fail := func(what string, err error) {
 		engine.logger().Warn("alert source failed", "source", what, "error", err)
 	}
+	places := engine.places(ctx)
 	if engine.Warnings != nil {
 		if overview, err := engine.Warnings.Overview(ctx, warnings.Filter{Limit: 1}); err == nil {
 			readings = append(readings, Bulletins(overview, now))
+			layers.Bulletins = overview
 		} else {
 			fail("bulletins", err)
 		}
@@ -163,14 +173,16 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 	}
 	if engine.Rivers != nil {
 		if layer, err := engine.Rivers.Layer(ctx); err == nil {
-			readings = append(readings, Rivers(layer, engine.districtOf(ctx), now))
+			readings = append(readings, Rivers(layer, places.DistrictOf, now))
+			layers.Rivers = &layer
 		} else {
 			fail("rivers", err)
 		}
 	}
 	if engine.Floods != nil {
 		if layer, err := engine.Floods.Layer(ctx); err == nil {
-			readings = append(readings, FloodForecasts(layer, engine.districtOf(ctx), now), FlashFloods(layer, engine.areaDistricts(ctx), now))
+			readings = append(readings, FloodForecasts(layer, places.DistrictOf, now), FlashFloods(layer, places.AreaDistricts, now))
+			layers.Floods = &layer
 		} else {
 			fail("flood forecasts", err)
 		}
@@ -189,17 +201,35 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 	}
 	if engine.Reservoirs != nil {
 		if layer, err := engine.Reservoirs.Layer(ctx); err == nil {
-			readings = append(readings, Reservoirs(layer, engine.districtNamed(ctx), now))
+			readings = append(readings, Reservoirs(layer, places.DistrictNamed, now))
+			layers.Reservoirs = &layer
 		} else {
 			fail("reservoirs", err)
 		}
 	}
 	if engine.RainGauges != nil {
 		if intensities, err := engine.RainGauges.Intensities(ctx); err == nil {
-			readings = append(readings, HeavyRain(intensities, engine.districtOf(ctx), now))
+			readings = append(readings, HeavyRain(intensities, places.DistrictOf, now))
+			layers.Rain = &intensities
 		} else {
 			fail("rain gauges", err)
 		}
+	}
+	if engine.Weather != nil {
+		if outlook, err := engine.Weather.RainOutlooks(ctx, "district"); err == nil {
+			layers.Outlook = outlook
+		} else {
+			fail("rain forecast", err)
+		}
+	}
+	// The estimate needs the rain gauges at least; without them it would rest
+	// on forecasts alone.
+	if layers.Rain != nil {
+		assessments := map[string]floodrisk.Assessment{}
+		for district, inputs := range floodrisk.Gather(layers, places, now) {
+			assessments[district] = floodrisk.Assess(inputs)
+		}
+		readings = append(readings, FloodRisk(assessments, layers.Complete(), now))
 	}
 	return readings
 }
@@ -299,70 +329,18 @@ func (engine *Engine) apply(ctx context.Context, reading Reading, states map[str
 	return raised, nil
 }
 
-// districtOf finds a point's district, remembering each point: gauges do not move.
-func (engine *Engine) districtOf(ctx context.Context) DistrictOf {
-	queries := store.New(engine.Pool)
-	return func(lon, lat float64) string {
-		key := strconv.FormatFloat(lon, 'f', 5, 64) + "," + strconv.FormatFloat(lat, 'f', 5, 64)
-		engine.mu.Lock()
-		if engine.districts == nil {
-			engine.districts = map[string]string{}
+// places finds districts through the shared locator, reading district names
+// once per run.
+func (engine *Engine) places(ctx context.Context) floodrisk.Places {
+	engine.once.Do(func() {
+		if engine.Locator == nil {
+			engine.Locator = &floodrisk.Locator{Pool: engine.Pool, Logger: engine.Logger}
 		}
-		if district, ok := engine.districts[key]; ok {
-			engine.mu.Unlock()
-			return district
-		}
-		engine.mu.Unlock()
-		found, err := queries.DistrictAt(ctx, store.DistrictAtParams{Lon: lon, Lat: lat})
-		if err != nil {
-			engine.logger().Warn("district of a point failed", "error", err)
-			return ""
-		}
-		district := ""
-		if len(found) > 0 {
-			district = found[0]
-		}
-		engine.mu.Lock()
-		engine.districts[key] = district
-		engine.mu.Unlock()
-		return district
+	})
+	locator := engine.Locator
+	return floodrisk.Places{
+		DistrictOf:    func(lon, lat float64) string { return locator.DistrictOf(ctx, lon, lat) },
+		AreaDistricts: func(id string) []string { return locator.AreaDistricts(ctx, id) },
+		DistrictNamed: locator.Named(ctx),
 	}
-}
-
-// areaDistricts finds the districts a flood area overlaps.
-func (engine *Engine) areaDistricts(ctx context.Context) AreaDistricts {
-	queries := store.New(engine.Pool)
-	return func(id string) []string {
-		engine.mu.Lock()
-		if engine.areas == nil {
-			engine.areas = map[string][]string{}
-		}
-		if districts, ok := engine.areas[id]; ok {
-			engine.mu.Unlock()
-			return districts
-		}
-		engine.mu.Unlock()
-		districts, err := queries.FloodAreaDistricts(ctx, id)
-		if err != nil {
-			engine.logger().Warn("districts of a flood area failed", "error", err)
-			return nil
-		}
-		engine.mu.Lock()
-		engine.areas[id] = districts
-		engine.mu.Unlock()
-		return districts
-	}
-}
-
-// districtNamed matches a district by its English name.
-func (engine *Engine) districtNamed(ctx context.Context) DistrictNamed {
-	byName := map[string]string{}
-	if rows, err := store.New(engine.Pool).ListDistrictNames(ctx); err == nil {
-		for _, row := range rows {
-			byName[normaliseName(row.Name)] = row.ID
-		}
-	} else {
-		engine.logger().Warn("read district names failed", "error", err)
-	}
-	return func(name string) string { return byName[normaliseName(name)] }
 }

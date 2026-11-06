@@ -1,0 +1,45 @@
+/** Messages of the combined flood-risk estimate (ADR 0019). English is the source: it fixes the keys. */
+export const floodRisk = {
+  title: "Flood risk estimate",
+  level: {
+    none: "No combined signal",
+    moderate: "Moderate",
+    high: "High",
+    very_high: "Very high",
+  },
+  none: "No two sources point to flooding here now. That is not a statement that it is safe.",
+  scenario: {
+    flash: "Low-lying roads and areas may flood within hours.",
+    river: "Rivers may overflow onto low ground along their banks.",
+    both: "Low-lying areas may flood from heavy rain and rising rivers.",
+    general: "Low-lying areas may flood.",
+  },
+  signal: {
+    official: "Official bulletin",
+    google_flash: "Google flash-flood forecast",
+    rain_now: "Rain measured",
+    river: "River gauges",
+    google_gauge: "Google river forecast",
+    rain_forecast: "Rain forecast",
+    wet_ground: "Rain already fallen",
+    reservoir: "Reservoirs",
+  },
+  value: {
+    official: { advisory: "advisory", warning: "warning", red: "red warning" },
+    flash: { likely: "likely", highly_likely: "highly likely" },
+    gauge: { warning: "Warning", danger: "Danger", extreme: "Extreme" },
+    river: {
+      alert: "alert level",
+      minor_flood: "minor flood level",
+      major_flood: "major flood level",
+    },
+    rain1h: "at least {mm} mm in an hour",
+    rain3h: "at least {mm} mm in 3 hours",
+    prior: "{mm} mm in the day before",
+    forecast6h: "{mm} mm in the next 6 hours",
+    forecast24h: "{mm} mm in the next 24 hours",
+    reservoir: { one: "{count} spilling", other: "{count} spilling" },
+  },
+  note: "Our estimate, not an official warning. Follow the DMC.",
+  incomplete: "Some sources could not be read, so it may be low.",
+}

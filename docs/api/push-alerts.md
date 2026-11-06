@@ -34,7 +34,7 @@ Without VAPID keys on the server: `{ "data": { "enabled": false } }`.
 ```
 
 - `topics`: any of `official`, `landslide` (levels 2 and 3), `landslide_level1`, `river`,
-  `heavy_rain`, `flood_forecast`, `cyclone`, `earthquake`, `reservoir`; at least one. `landslide_level1` and
+  `heavy_rain`, `flood_risk`, `flood_forecast`, `cyclone`, `earthquake`, `reservoir`; at least one. `landslide_level1` and
   `reservoir` are opt-in and are sent whatever `minSeverity` says.
 - `minSeverity`: `info`, `watch`, `warning` (default) or `danger`.
 - `areas`: `country`, or districts (codes from `/v1/regions?level=district`, at most 25) and/or

@@ -19,6 +19,7 @@ import { weather } from "./weather"
 import { grid } from "./grid"
 import { location } from "./location"
 import { regions } from "./regions"
+import { floodRisk } from "./floodRisk"
 import { search } from "./search"
 import { overview } from "./overview"
 import { stations } from "./stations"
@@ -44,6 +45,7 @@ export const en = {
   grid,
   location,
   regions,
+  floodRisk,
   search,
   overview,
   stations,

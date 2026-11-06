@@ -31,7 +31,7 @@ type Notice struct {
 
 // kindOrder breaks ties between notices of the same severity: official first.
 var kindOrder = []string{messages.KindBulletin, messages.KindLandslide, messages.KindRiver, messages.KindCyclone,
-	messages.KindEarthquake, messages.KindRain, messages.KindFloodForecast, messages.KindFlashFlood, messages.KindReservoir, messages.KindTest}
+	messages.KindEarthquake, messages.KindRain, messages.KindFloodRisk, messages.KindFloodForecast, messages.KindFlashFlood, messages.KindReservoir, messages.KindTest}
 
 // summaryURLs open the list a gathered notice belongs to. Kinds not here use
 // their leading event's link.
@@ -42,6 +42,7 @@ var summaryURLs = map[string]string{
 	messages.KindFloodForecast: "/",
 	messages.KindFlashFlood:    "/",
 	messages.KindRain:          "/",
+	messages.KindFloodRisk:     "/",
 	messages.KindReservoir:     "/?reservoirs=active",
 }
 

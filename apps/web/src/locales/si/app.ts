@@ -43,6 +43,7 @@ export const app: Translation<typeof en> = {
     reservoirs: "ජලාශ දත්ත",
     reservoirAreas: "ජලාශ ප්‍රදේශ",
     riverRisk: "ගංගා අවදානම් ඇස්තමේන්තු",
+    floodRisk: "ගංවතුර අවදානම් ඇස්තමේන්තුව",
     riverDetail: "ගඟේ විස්තර",
     basins: "ගංවතුර ද්‍රෝණි",
     pastFloods: "පසුගිය ගංවතුර",

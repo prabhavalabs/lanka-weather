@@ -106,6 +106,8 @@ type Dependencies struct {
 	Environment Environment
 	// RiverRisk serves the river network, its risk estimate and flood basins.
 	RiverRisk RiverRisk
+	// FloodRisk serves the combined flood-risk estimate by district.
+	FloodRisk FloodRisk
 
 	// Warnings and Hazards serve official warnings and the hazard layers.
 	Warnings Warnings
@@ -163,6 +165,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/weather/wind", api.weatherWind)
 		r.Get("/weather/regions", api.weatherRegions)
 		r.Get("/floods/forecast", api.floodForecast)
+		r.Get("/flood-risk", api.floodRisk)
 		r.Get("/summary", api.summary)
 		r.Get("/overview", api.overview)
 		api.riverRoutes(r)

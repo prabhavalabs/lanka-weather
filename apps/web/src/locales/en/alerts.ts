@@ -82,6 +82,8 @@ export const alerts = {
     landslide_level1Hint: "NBRO: watch. Off by default; sent whatever the level below",
     river: "River flood levels",
     riverHint: "Gauges at alert, minor flood and major flood level",
+    flood_risk: "Flood risk estimates",
+    flood_riskHint: "When rain, forecasts, rivers and warnings point the same way. Our estimate",
     heavy_rain: "Heavy rain measured",
     heavy_rainHint: "Bursts at the live rain gauges that can flood towns. Not official warnings",
     flood_forecast: "Flood forecasts",

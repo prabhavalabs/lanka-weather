@@ -482,6 +482,39 @@ Google's forecast reached us.
 
 `Cache-Control: public, max-age=300`.
 
+## `GET /v1/flood-risk?district=`
+
+The combined flood-risk estimate by district (ADR 0019): our estimate, not an official warning.
+Each district has a `level` (0 none, 1 moderate, 2 high, 3 very high), its `variant`, the
+`scenario` (`flash`, `river`, `both` or `general`), the `signals` it rests on, strongest first,
+and the `inputs` they were read from. `district=LK-11` limits the list to one district; a district
+nothing is known about comes back at level 0 with no signals, which does not mean it is safe.
+`meta.complete` is false when a source could not be read, and `meta.missing` names it.
+
+```json
+{
+  "data": {
+    "districts": [
+      {
+        "district": "LK-11", "level": 2, "variant": "high", "score": 4, "families": 2, "scenario": "flash",
+        "signals": [
+          { "family": "google_flash", "points": 2, "value": 1, "unit": "level" },
+          { "family": "rain_now", "points": 2, "value": 45, "unit": "mm", "window": "1h" }
+        ],
+        "inputs": {
+          "rain": { "rise1hMm": 45, "rise3hMm": 45, "gauge": "Kesbewa Divisional Secretariat", "gaugeId": "argcbo02", "priorMm": 0 },
+          "forecast": null, "flashLevel": 1, "gaugeForecastLevel": 0, "riverLevel": 0, "officialLevel": 0, "spilling": 0
+        }
+      }
+    ],
+    "meta": { "note": "Our estimate from …. Not an official warning.", "generatedAt": "2026-11-06T08:30:12Z", "complete": true, "missing": [] }
+  }
+}
+```
+
+Rain measured is the rise of each gauge's rolling 24-hour total over the window: a lower bound.
+`400 invalid_district` for a code that is not `LK-` and two digits. `Cache-Control: public, max-age=60`.
+
 ## `GET /v1/summary?lat=&lon=`
 
 Everything known about one place, for the search panel after a place is
