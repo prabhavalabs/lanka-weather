@@ -13,20 +13,32 @@ SELECT gauge_id, source, gauge_source, site_name, river, lon, lat, quality_verif
 FROM flood_gauges
 ORDER BY gauge_id;
 
--- name: DeleteFloodAreas :exec
-DELETE FROM flood_areas;
+-- name: DeleteFloodAreasOfKinds :exec
+-- The flash-flood collector replaces only flash-flood areas.
+DELETE FROM flood_areas WHERE kind = ANY(@kinds::text[]);
+
+-- name: DeleteFloodAreasNotOfKinds :exec
+-- The forecast collector replaces every area but the flash floods.
+DELETE FROM flood_areas WHERE kind <> ALL(@kinds::text[]);
+
+-- name: ListFloodAreasSeen :many
+-- When each stored area was first seen, with its shape, so a replacement
+-- keeps the first sighting and need not read an unchanged polygon again.
+SELECT id, first_seen_at, ST_AsGeoJSON(geom, 6)::text AS geojson
+FROM flood_areas
+WHERE kind = ANY(@kinds::text[]);
 
 -- name: InsertFloodArea :exec
 INSERT INTO flood_areas (id, kind, source, gauge_id, severity, issued_at, valid_from, valid_until, properties, geom,
-                         fetched_at)
+                         fetched_at, first_seen_at)
 VALUES (@id, @kind, @source, @gauge_id, @severity, @issued_at, @valid_from, @valid_until, @properties,
         ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(@geojson::text), 4326)), 3)),
-        @fetched_at)
+        @fetched_at, @first_seen_at)
 ON CONFLICT (id) DO NOTHING;
 
 -- name: ListFloodAreas :many
 SELECT id, kind, source, gauge_id, severity, issued_at, valid_from, valid_until, properties,
-       ST_AsGeoJSON(geom, 5)::text AS geojson, fetched_at
+       ST_AsGeoJSON(geom, 5)::text AS geojson, fetched_at, first_seen_at
 FROM flood_areas
 ORDER BY kind, id;
 

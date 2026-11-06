@@ -139,6 +139,10 @@ func TestCollectFollowsEveryPageOfTheWorldwideSearches(t *testing.T) {
 	if _, err := collector.Collect(ctx, now); err != nil {
 		t.Fatal(err)
 	}
+	flash := &googleflood.FlashCollector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: server.URL}
+	if _, err := flash.Collect(ctx, now); err != nil {
+		t.Fatal(err)
+	}
 	rows, err := store.New(pool).ListFloodAreas(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -159,14 +163,79 @@ func TestCollectFollowsEveryPageOfTheWorldwideSearches(t *testing.T) {
 		t.Errorf("requests = %v", fake.requests)
 	}
 
-	// A later run replaces everything: nothing lingers past Google's terms.
-	if _, err := (&googleflood.Collector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey,
-		BaseURL: httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{}`)) })).URL,
-	}).Collect(ctx, now.Add(time.Hour)); err != nil {
+	// Later runs replace everything: nothing lingers past Google's terms.
+	empty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{}`)) }))
+	t.Cleanup(empty.Close)
+	if _, err := (&googleflood.Collector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: empty.URL}).Collect(ctx, now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&googleflood.FlashCollector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: empty.URL}).Collect(ctx, now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if rows, _ := store.New(pool).ListFloodAreas(ctx); len(rows) != 0 {
-		t.Fatalf("a run that found nothing kept %d areas", len(rows))
+		t.Fatalf("runs that found nothing kept %d areas", len(rows))
+	}
+}
+
+func TestFlashFloodsAreReadApartAndKeepTheirFirstSighting(t *testing.T) {
+	pool := dbtest.Open(t, "flood_gauges", "flood_areas", "source_runs")
+	ctx := context.Background()
+	fake := &fakeGoogle{t: t, bodies: map[string][]string{}}
+	server := httptest.NewServer(fake)
+	t.Cleanup(server.Close)
+	now := time.Date(2026, 11, 2, 13, 0, 0, 0, time.UTC)
+	flash := &googleflood.FlashCollector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: server.URL}
+	if stored, err := flash.Collect(ctx, now); err != nil || stored != 2 {
+		t.Fatalf("stored %d, %v", stored, err)
+	}
+	if got := len(fake.bodies["/v1/flashFloods:search"]); got != 1 {
+		t.Fatalf("flash searches = %d", got)
+	}
+	polygons := func() int {
+		count := 0
+		for path, bodies := range fake.bodies {
+			if strings.HasPrefix(path, "/v1/serializedPolygons/") {
+				count += len(bodies)
+			}
+		}
+		return count
+	}
+	if polygons() != 2 {
+		t.Fatalf("polygon reads = %d", polygons())
+	}
+
+	// Ten minutes later the same forecast is read: its polygons are not read
+	// again, and it keeps the time it was first seen.
+	later := now.Add(10 * time.Minute)
+	if _, err := flash.Collect(ctx, later); err != nil {
+		t.Fatal(err)
+	}
+	if polygons() != 2 {
+		t.Fatalf("an unchanged polygon was read again: %d reads", polygons())
+	}
+	// The forecast collector leaves the flash floods alone.
+	if _, err := (&googleflood.Collector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: server.URL}).Collect(ctx, later); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(fake.bodies["/v1/flashFloods:search"]); got != 2 {
+		t.Fatalf("the forecast collector searched flash floods: %d searches", got)
+	}
+	rows, err := store.New(pool).ListFloodAreas(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept := 0
+	for _, row := range rows {
+		if row.Kind != googleflood.KindFlashLikely && row.Kind != googleflood.KindFlashHighly {
+			continue
+		}
+		kept++
+		if !row.FirstSeenAt.Equal(now) || !row.FetchedAt.Equal(later) {
+			t.Errorf("%s first seen %s, fetched %s", row.ID, row.FirstSeenAt, row.FetchedAt)
+		}
+	}
+	if kept != 2 {
+		t.Fatalf("flash areas kept = %d", kept)
 	}
 }
 
@@ -184,10 +253,13 @@ func TestCollectStoresSriLankaForecasts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Two gauges; the severe gauge's notification and high inundation
-	// polygons, two Sri Lankan flash-flood polygons and one event (the low
-	// inundation polygon fails to load).
-	if stored != 2+5 {
+	// polygons and one event (the low inundation polygon fails to load).
+	if stored != 2+3 {
 		t.Fatalf("stored %d", stored)
+	}
+	// And the two Sri Lankan flash-flood polygons.
+	if stored, err := (&googleflood.FlashCollector{Pool: pool, Client: source.NewClient("test"), APIKey: testKey, BaseURL: server.URL}).Collect(ctx, now); err != nil || stored != 2 {
+		t.Fatalf("flash stored %d, %v", stored, err)
 	}
 	statusBodies := fake.bodies["/v1/floodStatus:searchLatestFloodStatusByArea"]
 	if len(statusBodies) != 2 || !strings.Contains(statusBodies[0], `"regionCode":"LK"`) || strings.Contains(statusBodies[0], "includeNonQualityVerified") {

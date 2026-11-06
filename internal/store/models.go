@@ -94,17 +94,18 @@ type Earthquake struct {
 }
 
 type FloodArea struct {
-	ID         string     `json:"id"`
-	Kind       string     `json:"kind"`
-	Source     string     `json:"source"`
-	GaugeID    *string    `json:"gauge_id"`
-	Severity   string     `json:"severity"`
-	IssuedAt   *time.Time `json:"issued_at"`
-	ValidFrom  *time.Time `json:"valid_from"`
-	ValidUntil *time.Time `json:"valid_until"`
-	Properties []byte     `json:"properties"`
-	Geom       []byte     `json:"geom"`
-	FetchedAt  time.Time  `json:"fetched_at"`
+	ID          string     `json:"id"`
+	Kind        string     `json:"kind"`
+	Source      string     `json:"source"`
+	GaugeID     *string    `json:"gauge_id"`
+	Severity    string     `json:"severity"`
+	IssuedAt    *time.Time `json:"issued_at"`
+	ValidFrom   *time.Time `json:"valid_from"`
+	ValidUntil  *time.Time `json:"valid_until"`
+	Properties  []byte     `json:"properties"`
+	Geom        []byte     `json:"geom"`
+	FetchedAt   time.Time  `json:"fetched_at"`
+	FirstSeenAt time.Time  `json:"first_seen_at"`
 }
 
 type FloodGauge struct {

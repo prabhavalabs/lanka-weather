@@ -898,7 +898,7 @@ export function App() {
     basinCounts,
     unverified: basinsUnverified,
     flashAreas: floods.data?.meta.flashAreas ?? 0,
-    checkedAt: floods.data?.meta.fetchedAt,
+    checkedAt: floods.data?.meta.flashFetchedAt ?? floods.data?.meta.fetchedAt,
     lowerConfidenceGauges: floods.data?.meta.lowerConfidenceGauges ?? 0,
   }
   if (floodCounts) details[FLOOD_FORECAST] = <FloodLegend bare {...floodLegendProps} />

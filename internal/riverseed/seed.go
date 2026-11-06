@@ -185,7 +185,7 @@ func Polygons(ctx context.Context, pool *pgxpool.Pool, polygons []Polygon, now t
 			until := now.Add(24 * time.Hour)
 			if err := queries.InsertFloodArea(ctx, store.InsertFloodAreaParams{ID: "seed-" + polygon.ID, Kind: polygon.Kind, Source: Source,
 				Severity: polygon.Severity, IssuedAt: &now, ValidFrom: &now, ValidUntil: &until,
-				Properties: []byte(`{"seed":true,"forecastPeriodHours":24}`), Geojson: string(shape), FetchedAt: now}); err != nil {
+				Properties: []byte(`{"seed":true,"forecastPeriodHours":24}`), Geojson: string(shape), FetchedAt: now, FirstSeenAt: now}); err != nil {
 				return fmt.Errorf("store polygon %s: %w", polygon.ID, err)
 			}
 		}
