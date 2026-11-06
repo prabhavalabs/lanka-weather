@@ -40,7 +40,15 @@ export interface Preferences {
 /** Official warnings, landslide levels 2 and 3, rivers, heavy rain, forecasts, cyclones and earthquakes. */
 export function defaultPreferences(): Preferences {
   return {
-    topics: ["official", "landslide", "river", "heavy_rain", "flood_forecast", "cyclone", "earthquake"],
+    topics: [
+      "official",
+      "landslide",
+      "river",
+      "heavy_rain",
+      "flood_forecast",
+      "cyclone",
+      "earthquake",
+    ],
     minSeverity: "warning",
     areas: { country: true, districts: [], near: null },
   }

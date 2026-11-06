@@ -141,8 +141,8 @@ func Apply(ctx context.Context, pool *pgxpool.Pool, now time.Time) error {
 		}
 		for _, area := range seededAreas {
 			if _, err := tx.Exec(ctx, `INSERT INTO flood_areas (id, kind, source, severity, issued_at, valid_from, valid_until,
-					properties, geom, fetched_at)
-				SELECT 'seed-' || e.id, $1, $2, $3, $4, $4, $5, '{"seed":true}'::jsonb, ST_Transform(e.geom_simple_3857, 4326), $4
+					properties, geom, fetched_at, first_seen_at)
+				SELECT 'seed-' || e.id, $1, $2, $3, $4, $4, $5, '{"seed":true}'::jsonb, ST_Transform(e.geom_simple_3857, 4326), $4, $4
 				FROM past_flood_events e WHERE e.id = $6
 				ON CONFLICT (id) DO NOTHING`, area.kind, Source, area.severity, now, now.Add(48*time.Hour), area.event); err != nil {
 				return err
