@@ -95,7 +95,8 @@ func TestTranslationsKeepTheEnglishPlaceholdersAndKeys(t *testing.T) {
 func TestEveryNoticeRendersCompletelyInEveryLanguage(t *testing.T) {
 	facts := map[string]string{"district": "LK-91", "districts": "LK-91,LK-92", "station": "Ratnapura", "river": "Kalu Ganga",
 		"site": "Putupaula", "name": "MONTHA", "title": "Flood warning for Kalu River", "place": "Sumatra, Indonesia",
-		"magnitude": "6.8", "distance": "1450", "source": "irrigation", "level": "3", "issuedAt": "2026-11-06T14:45:58Z"}
+		"magnitude": "6.8", "distance": "1450", "source": "irrigation", "level": "3", "issuedAt": "2026-11-06T14:45:58Z",
+		"gauge": "DOM HEAD OFFICE", "mm": "67", "window": "1h"}
 	for kind, variants := range Variants {
 		for _, variant := range variants {
 			for _, count := range []int{1, 3} {

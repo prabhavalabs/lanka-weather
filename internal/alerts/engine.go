@@ -13,6 +13,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/push"
+	"github.com/prabhavalabs/lanka-weather/internal/raingauges"
 	"github.com/prabhavalabs/lanka-weather/internal/reservoirs"
 	"github.com/prabhavalabs/lanka-weather/internal/rivers"
 	"github.com/prabhavalabs/lanka-weather/internal/store"
@@ -48,6 +49,9 @@ type (
 	ReservoirsSource interface {
 		Layer(ctx context.Context) (reservoirs.FeatureCollection, error)
 	}
+	RainGaugesSource interface {
+		Intensities(ctx context.Context) (raingauges.Intensities, error)
+	}
 )
 
 // Engine raises events from our own tables and has them sent. It is a
@@ -59,6 +63,7 @@ type Engine struct {
 	Floods     FloodsSource
 	Hazards    HazardsSource
 	Reservoirs ReservoirsSource
+	RainGauges RainGaugesSource
 	Dispatcher *push.Dispatcher
 	Logger     *slog.Logger
 
@@ -187,6 +192,13 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 			readings = append(readings, Reservoirs(layer, engine.districtNamed(ctx), now))
 		} else {
 			fail("reservoirs", err)
+		}
+	}
+	if engine.RainGauges != nil {
+		if intensities, err := engine.RainGauges.Intensities(ctx); err == nil {
+			readings = append(readings, HeavyRain(intensities, engine.districtOf(ctx), now))
+		} else {
+			fail("rain gauges", err)
 		}
 	}
 	return readings

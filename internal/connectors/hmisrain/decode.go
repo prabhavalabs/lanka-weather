@@ -6,7 +6,8 @@
 //
 // Each device gives points of [epoch minute, rolling 24-hour sum in mm]. A rolling
 // sum cannot be turned into shorter totals, so only the 24-hour total and its time
-// are ever shown.
+// are ever shown; its rises are lower bounds on shorter totals, which only the
+// alert engine reads (package raingauges).
 package hmisrain
 
 import (

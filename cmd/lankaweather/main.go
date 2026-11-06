@@ -245,6 +245,7 @@ func alertEngine(pool *pgxpool.Pool, logger *slog.Logger) *alerts.Engine {
 			StaleAfter: staleAfter("flood-forecast")},
 		Hazards:    &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")},
 		Reservoirs: &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")},
+		RainGauges: &raingauges.Service{Pool: pool, StaleAfter: staleAfter("rain-gauges")},
 		Dispatcher: &push.Dispatcher{Pool: pool, Sender: push.NewClient(vapid), Logger: logger},
 		Logger:     logger,
 	}

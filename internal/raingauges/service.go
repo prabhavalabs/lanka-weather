@@ -1,7 +1,9 @@
 // Package raingauges serves the live rain gauges the hmisrain collector stores:
 // about 275 devices run by NBRO, the Department of Meteorology, the Irrigation
 // Department and ACCIMT, each with a rolling 24-hour total. Nothing shorter than
-// 24 hours can be derived from a rolling sum, and none is.
+// 24 hours can be derived from a rolling sum exactly, and none is shown; its
+// rises bound shorter totals from below, which the alert engine reads
+// (intensity.go).
 //
 // A gauge whose newest reading is old is out of date, not dry: its total is left out
 // and only given separately as the last known figure.
@@ -69,6 +71,8 @@ type Service struct {
 	// StaleAfter is the age of the newest reading after which a gauge is out of date.
 	StaleAfter time.Duration
 	Now        func() time.Time
+
+	intensity intensityCache
 }
 
 // FeatureCollection is GET /v1/rain/gauges.

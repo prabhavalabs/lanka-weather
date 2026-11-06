@@ -74,6 +74,7 @@ describe("preferences", () => {
       "official",
       "landslide",
       "river",
+      "heavy_rain",
       "flood_forecast",
       "cyclone",
       "earthquake",

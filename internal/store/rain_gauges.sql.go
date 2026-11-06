@@ -91,6 +91,40 @@ func (q *Queries) ListRainGauges(ctx context.Context) ([]RainGauge, error) {
 	return items, nil
 }
 
+const rainGaugeReadingsAllSince = `-- name: RainGaugeReadingsAllSince :many
+SELECT gauge_id, observed_at, rain_mm
+FROM rain_gauge_readings
+WHERE observed_at >= $1
+ORDER BY gauge_id, observed_at
+`
+
+type RainGaugeReadingsAllSinceRow struct {
+	GaugeID    string    `json:"gauge_id"`
+	ObservedAt time.Time `json:"observed_at"`
+	RainMm     float64   `json:"rain_mm"`
+}
+
+// Every gauge's readings since a time, for the rain the alert engine measures.
+func (q *Queries) RainGaugeReadingsAllSince(ctx context.Context, observedAt time.Time) ([]RainGaugeReadingsAllSinceRow, error) {
+	rows, err := q.db.Query(ctx, rainGaugeReadingsAllSince, observedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RainGaugeReadingsAllSinceRow{}
+	for rows.Next() {
+		var i RainGaugeReadingsAllSinceRow
+		if err := rows.Scan(&i.GaugeID, &i.ObservedAt, &i.RainMm); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const rainGaugeReadingsSince = `-- name: RainGaugeReadingsSince :many
 SELECT observed_at, rain_mm
 FROM rain_gauge_readings
