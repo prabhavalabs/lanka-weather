@@ -48,9 +48,12 @@ type Meta struct {
 	Region      string     `json:"region"`
 	Configured  bool       `json:"configured"`
 	FetchedAt   *time.Time `json:"fetchedAt"`
-	GeneratedAt time.Time  `json:"generatedAt"`
-	Gauges      int        `json:"gauges"`
-	Areas       int        `json:"areas"`
+	// FlashFetchedAt is the last successful read of the flash floods, which
+	// have their own, more frequent collector.
+	FlashFetchedAt *time.Time `json:"flashFetchedAt"`
+	GeneratedAt    time.Time  `json:"generatedAt"`
+	Gauges         int        `json:"gauges"`
+	Areas          int        `json:"areas"`
 	// VerifiedGauges and LowerConfidenceGauges split Gauges by whether Google
 	// has quality-verified the gauge's model (Flood Hub's Extended coverage).
 	VerifiedGauges        int `json:"verifiedGauges"`
@@ -117,6 +120,9 @@ type Area struct {
 	ValidUntil *time.Time      `json:"validUntil"`
 	Details    json.RawMessage `json:"details"`
 	FetchedAt  time.Time       `json:"fetchedAt"`
+	// FirstSeenAt is when we first stored the area. Against IssuedAt it says
+	// how late Google's forecast reached us.
+	FirstSeenAt time.Time `json:"firstSeenAt"`
 	// LowerConfidence marks the area of a gauge Google has not verified, shown
 	// only with Extended coverage.
 	LowerConfidence bool `json:"lowerConfidence"`
@@ -134,6 +140,11 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 		collection.Meta.FetchedAt = run.FinishedAt
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return FeatureCollection{}, fmt.Errorf("read last run: %w", err)
+	}
+	if run, err := queries.LastSuccessfulRun(ctx, googleflood.FlashSourceName); err == nil {
+		collection.Meta.FlashFetchedAt = run.FinishedAt
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return FeatureCollection{}, fmt.Errorf("read last flash-flood run: %w", err)
 	}
 	gauges, err := service.Gauges(ctx)
 	if err != nil {
@@ -166,7 +177,7 @@ func (service *Service) Layer(ctx context.Context) (FeatureCollection, error) {
 			Type: "Feature", ID: area.ID, Geometry: json.RawMessage(area.Geojson),
 			Properties: Area{ID: area.ID, Kind: area.Kind, GaugeID: area.GaugeID, Severity: area.Severity, IssuedAt: area.IssuedAt,
 				ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil, Details: area.Properties, FetchedAt: area.FetchedAt,
-				LowerConfidence: lower},
+				FirstSeenAt: area.FirstSeenAt, LowerConfidence: lower},
 		})
 		collection.Meta.Areas++
 		if area.Kind == googleflood.KindFlashLikely || area.Kind == googleflood.KindFlashHighly {

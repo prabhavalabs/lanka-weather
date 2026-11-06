@@ -9,6 +9,7 @@ export const topics = [
   "landslide",
   "landslide_level1",
   "river",
+  "heavy_rain",
   "flood_forecast",
   "cyclone",
   "earthquake",
@@ -36,10 +37,18 @@ export interface Preferences {
   areas: { country: boolean; districts: string[]; near: Near | null }
 }
 
-/** Official warnings, landslide levels 2 and 3, rivers, forecasts, cyclones and earthquakes. */
+/** Official warnings, landslide levels 2 and 3, rivers, heavy rain, forecasts, cyclones and earthquakes. */
 export function defaultPreferences(): Preferences {
   return {
-    topics: ["official", "landslide", "river", "flood_forecast", "cyclone", "earthquake"],
+    topics: [
+      "official",
+      "landslide",
+      "river",
+      "heavy_rain",
+      "flood_forecast",
+      "cyclone",
+      "earthquake",
+    ],
     minSeverity: "warning",
     areas: { country: true, districts: [], near: null },
   }

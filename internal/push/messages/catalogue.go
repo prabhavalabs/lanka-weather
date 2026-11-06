@@ -44,11 +44,11 @@ var templates = map[string]map[string]Template{
 			"Google forecasts (estimates, not official warnings): {site} and {more} more. Tap for details."},
 
 		"flash_flood.likely": {"Flash flood forecast · {district}",
-			"Google forecasts a flash flood is {likelihood} (an estimate, not an official warning). Tap for details."},
+			"Google forecasts a flash flood is {likelihood} (an estimate, not an official warning). Google issued it at {issued}. Tap for details."},
 		"flash_flood.highly_likely": {"Flash flood forecast · {district}",
-			"Google forecasts a flash flood is {likelihood} (an estimate, not an official warning). Tap for details."},
-		"flash_flood.many": {"Flash flood forecast · {count} areas",
-			"Google forecasts (estimates, not official warnings): {district} and {more} more. Tap for details."},
+			"Google forecasts a flash flood is {likelihood} (an estimate, not an official warning). Google issued it at {issued}. Tap for details."},
+		"flash_flood.many": {"Flash flood forecast · {count} districts",
+			"Google forecasts (estimates, not official warnings): {district} and {more} more, issued at {issued}. Tap for details."},
 
 		"cyclone.track": {"Cyclone {name} · forecast to approach",
 			"GDACS: its forecast track comes within 1,000 km of Sri Lanka. Follow the Department of Meteorology. Tap for details."},
@@ -68,6 +68,15 @@ var templates = map[string]map[string]Template{
 			"{name} reservoir ({district}) is spilling, as reported by waterlevels.lk; not an official warning. Take care downstream."},
 		"reservoir.many": {"{count} reservoirs spilling",
 			"{name} ({district}) and {more} more, as reported by waterlevels.lk; not an official warning. Tap for details."},
+
+		"rain.heavy": {"Heavy rain measured · {district}",
+			"At least {mm} mm {window} at the {gauge} gauge (HMIS); not an official warning. Low-lying roads and areas may flood. Tap for details."},
+		"rain.very_heavy": {"Very heavy rain measured · {district}",
+			"At least {mm} mm {window} at the {gauge} gauge (HMIS); not an official warning. Low-lying roads and areas may flood. Tap for details."},
+		"rain.extreme": {"Extreme rain measured · {district}",
+			"At least {mm} mm {window} at the {gauge} gauge (HMIS); not an official warning. Flooding is likely in low-lying areas. Tap for details."},
+		"rain.many": {"Heavy rain measured · {count} districts",
+			"{district} and {more} more: at least {mm} mm {window} at the {gauge} gauge (HMIS); not an official warning. Tap for details."},
 	},
 
 	"si": {
@@ -108,11 +117,11 @@ var templates = map[string]map[string]Template{
 			"Google පුරෝකථන (ඇස්තමේන්තු, නිල අනතුරු ඇඟවීම් නොවේ): {site} සහ තවත් {more}ක්. විස්තර සඳහා තට්ටු කරන්න."},
 
 		"flash_flood.likely": {"හදිසි ගංවතුර පුරෝකථනය · {district}",
-			"Google අනුව හදිසි ගංවතුරක් {likelihood} (ඇස්තමේන්තුවකි, නිල අනතුරු ඇඟවීමක් නොවේ). විස්තර සඳහා තට්ටු කරන්න."},
+			"Google අනුව හදිසි ගංවතුරක් {likelihood} (ඇස්තමේන්තුවකි, නිල අනතුරු ඇඟවීමක් නොවේ). Google නිකුත් කළේ {issued}. විස්තර සඳහා තට්ටු කරන්න."},
 		"flash_flood.highly_likely": {"හදිසි ගංවතුර පුරෝකථනය · {district}",
-			"Google අනුව හදිසි ගංවතුරක් {likelihood} (ඇස්තමේන්තුවකි, නිල අනතුරු ඇඟවීමක් නොවේ). විස්තර සඳහා තට්ටු කරන්න."},
-		"flash_flood.many": {"හදිසි ගංවතුර පුරෝකථනය · ප්‍රදේශ {count}",
-			"Google පුරෝකථන (ඇස්තමේන්තු, නිල අනතුරු ඇඟවීම් නොවේ): {district} සහ තවත් {more}ක්. විස්තර සඳහා තට්ටු කරන්න."},
+			"Google අනුව හදිසි ගංවතුරක් {likelihood} (ඇස්තමේන්තුවකි, නිල අනතුරු ඇඟවීමක් නොවේ). Google නිකුත් කළේ {issued}. විස්තර සඳහා තට්ටු කරන්න."},
+		"flash_flood.many": {"හදිසි ගංවතුර පුරෝකථනය · දිස්ත්‍රික්ක {count}",
+			"Google පුරෝකථන (ඇස්තමේන්තු, නිල අනතුරු ඇඟවීම් නොවේ): {district} සහ තවත් {more}ක්, නිකුත් කළේ {issued}. විස්තර සඳහා තට්ටු කරන්න."},
 
 		"cyclone.track": {"සුළි කුණාටුව {name} · ළං වන බවට පුරෝකථනය",
 			"GDACS: පුරෝකථන මාර්ගය ශ්‍රී ලංකාවට කි.මී. 1,000ක් ඇතුළත පැමිණේ. කාලගුණ විද්‍යා දෙපාර්තමේන්තුවේ උපදෙස් පිළිපදින්න."},
@@ -132,6 +141,15 @@ var templates = map[string]map[string]Template{
 			"{name} ජලාශය ({district}) වාන් දමන බව waterlevels.lk වාර්තා කරයි; නිල අනතුරු ඇඟවීමක් නොවේ. පහළ ප්‍රදේශවල ප්‍රවේශම් වන්න."},
 		"reservoir.many": {"ජලාශ {count}ක් වාන් දමයි",
 			"{name} ({district}) සහ තවත් {more}ක්, waterlevels.lk වාර්තා අනුව; නිල අනතුරු ඇඟවීමක් නොවේ."},
+
+		"rain.heavy": {"තද වැසි මනින ලදී · {district}",
+			"{gauge} වැසි මාපකයේ {window} අවම වශයෙන් මි.මී. {mm} (HMIS); නිල අනතුරු ඇඟවීමක් නොවේ. පහත් බිම් සහ මාර්ග යට විය හැක. විස්තර සඳහා තට්ටු කරන්න."},
+		"rain.very_heavy": {"ඉතා තද වැසි මනින ලදී · {district}",
+			"{gauge} වැසි මාපකයේ {window} අවම වශයෙන් මි.මී. {mm} (HMIS); නිල අනතුරු ඇඟවීමක් නොවේ. පහත් බිම් සහ මාර්ග යට විය හැක. විස්තර සඳහා තට්ටු කරන්න."},
+		"rain.extreme": {"අතිශය තද වැසි මනින ලදී · {district}",
+			"{gauge} වැසි මාපකයේ {window} අවම වශයෙන් මි.මී. {mm} (HMIS); නිල අනතුරු ඇඟවීමක් නොවේ. පහත් බිම් ගංවතුරට යට වීමට ඉඩ ඇත. විස්තර සඳහා තට්ටු කරන්න."},
+		"rain.many": {"තද වැසි මනින ලදී · දිස්ත්‍රික්ක {count}",
+			"{district} සහ තවත් {more}ක්: {gauge} වැසි මාපකයේ {window} අවම වශයෙන් මි.මී. {mm} (HMIS); නිල අනතුරු ඇඟවීමක් නොවේ. විස්තර සඳහා තට්ටු කරන්න."},
 	},
 
 	"ta": {
@@ -172,11 +190,11 @@ var templates = map[string]map[string]Template{
 			"Google முன்னறிவிப்புகள் (மதிப்பீடுகள், அதிகாரபூர்வ எச்சரிக்கைகள் அல்ல): {site} மற்றும் மேலும் {more}. விவரங்களுக்குத் தொடவும்."},
 
 		"flash_flood.likely": {"திடீர் வெள்ள முன்னறிவிப்பு · {district}",
-			"Google இன் படி திடீர் வெள்ளம் {likelihood} (மதிப்பீடு, அதிகாரபூர்வ எச்சரிக்கை அல்ல). விவரங்களுக்குத் தொடவும்."},
+			"Google இன் படி திடீர் வெள்ளம் {likelihood} (மதிப்பீடு, அதிகாரபூர்வ எச்சரிக்கை அல்ல). Google வெளியிட்டது {issued}. விவரங்களுக்குத் தொடவும்."},
 		"flash_flood.highly_likely": {"திடீர் வெள்ள முன்னறிவிப்பு · {district}",
-			"Google இன் படி திடீர் வெள்ளம் {likelihood} (மதிப்பீடு, அதிகாரபூர்வ எச்சரிக்கை அல்ல). விவரங்களுக்குத் தொடவும்."},
-		"flash_flood.many": {"திடீர் வெள்ள முன்னறிவிப்பு · {count} பகுதிகள்",
-			"Google முன்னறிவிப்புகள் (மதிப்பீடுகள், அதிகாரபூர்வ எச்சரிக்கைகள் அல்ல): {district} மற்றும் மேலும் {more}. விவரங்களுக்குத் தொடவும்."},
+			"Google இன் படி திடீர் வெள்ளம் {likelihood} (மதிப்பீடு, அதிகாரபூர்வ எச்சரிக்கை அல்ல). Google வெளியிட்டது {issued}. விவரங்களுக்குத் தொடவும்."},
+		"flash_flood.many": {"திடீர் வெள்ள முன்னறிவிப்பு · {count} மாவட்டங்கள்",
+			"Google முன்னறிவிப்புகள் (மதிப்பீடுகள், அதிகாரபூர்வ எச்சரிக்கைகள் அல்ல): {district} மற்றும் மேலும் {more}, வெளியிட்டது {issued}. விவரங்களுக்குத் தொடவும்."},
 
 		"cyclone.track": {"சூறாவளி {name} · நெருங்கும் என முன்னறிவிப்பு",
 			"GDACS: முன்னறிவிக்கப்பட்ட பாதை இலங்கையிலிருந்து 1,000 கி.மீ.க்குள் வருகிறது. வளிமண்டலவியல் திணைக்களத்தின் அறிவுறுத்தல்களைப் பின்பற்றுங்கள்."},
@@ -196,6 +214,15 @@ var templates = map[string]map[string]Template{
 			"{name} நீர்த்தேக்கம் ({district}) வான் பாய்வதாக waterlevels.lk தெரிவிக்கிறது; அதிகாரபூர்வ எச்சரிக்கை அல்ல. கீழ்ப்பகுதியில் அவதானமாக இருங்கள்."},
 		"reservoir.many": {"{count} நீர்த்தேக்கங்கள் வான் பாய்கின்றன",
 			"{name} ({district}) மற்றும் மேலும் {more}, waterlevels.lk தகவலின்படி; அதிகாரபூர்வ எச்சரிக்கை அல்ல."},
+
+		"rain.heavy": {"கனமழை அளவிடப்பட்டது · {district}",
+			"{gauge} மழைமானியில் {window} குறைந்தது {mm} மி.மீ (HMIS); அதிகாரபூர்வ எச்சரிக்கை அல்ல. தாழ்வான பகுதிகளும் வீதிகளும் வெள்ளத்தில் மூழ்கலாம். விவரங்களுக்குத் தொடவும்."},
+		"rain.very_heavy": {"மிகக் கனமழை அளவிடப்பட்டது · {district}",
+			"{gauge} மழைமானியில் {window} குறைந்தது {mm} மி.மீ (HMIS); அதிகாரபூர்வ எச்சரிக்கை அல்ல. தாழ்வான பகுதிகளும் வீதிகளும் வெள்ளத்தில் மூழ்கலாம். விவரங்களுக்குத் தொடவும்."},
+		"rain.extreme": {"அதி தீவிர மழை அளவிடப்பட்டது · {district}",
+			"{gauge} மழைமானியில் {window} குறைந்தது {mm} மி.மீ (HMIS); அதிகாரபூர்வ எச்சரிக்கை அல்ல. தாழ்வான பகுதிகளில் வெள்ளம் ஏற்பட வாய்ப்புள்ளது. விவரங்களுக்குத் தொடவும்."},
+		"rain.many": {"கனமழை அளவிடப்பட்டது · {count} மாவட்டங்கள்",
+			"{district} மற்றும் மேலும் {more}: {gauge} மழைமானியில் {window} குறைந்தது {mm} மி.மீ (HMIS); அதிகாரபூர்வ எச்சரிக்கை அல்ல. விவரங்களுக்குத் தொடவும்."},
 	},
 }
 
@@ -227,6 +254,11 @@ var words = map[string]map[string]string{
 		"earthquake.major":          "large earthquake",
 		"reservoir.spill":           "spilling",
 		"test.test":                 "test",
+		"time.yesterday":            "yesterday",
+		"time.unknown":              "an unknown time",
+		"window.1h":                 "in an hour",
+		"window.3h":                 "in 3 hours",
+		"window.24h":                "in 24 hours",
 	},
 	"si": {
 		"country":                   "ශ්‍රී ලංකාව",
@@ -253,6 +285,11 @@ var words = map[string]map[string]string{
 		"earthquake.major":          "විශාල භූ කම්පනය",
 		"reservoir.spill":           "වාන් දමයි",
 		"test.test":                 "පරීක්ෂණය",
+		"time.yesterday":            "ඊයේ",
+		"time.unknown":              "නොදන්නා වේලාවක",
+		"window.1h":                 "පැයක් තුළ",
+		"window.3h":                 "පැය 3ක් තුළ",
+		"window.24h":                "පැය 24ක් තුළ",
 	},
 	"ta": {
 		"country":                   "இலங்கை",
@@ -279,5 +316,10 @@ var words = map[string]map[string]string{
 		"earthquake.major":          "பாரிய நில அதிர்வு",
 		"reservoir.spill":           "வான் பாய்கிறது",
 		"test.test":                 "சோதனை",
+		"time.yesterday":            "நேற்று",
+		"time.unknown":              "தெரியாத நேரத்தில்",
+		"window.1h":                 "ஒரு மணி நேரத்தில்",
+		"window.3h":                 "3 மணி நேரத்தில்",
+		"window.24h":                "24 மணி நேரத்தில்",
 	},
 }

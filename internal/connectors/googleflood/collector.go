@@ -24,10 +24,10 @@ import (
 const DefaultBaseURL = "https://floodforecasting.googleapis.com"
 
 const (
-	// Interval: gauge statuses are reissued about daily and flash floods a
-	// few times a day; hourly picks a new issue up soon. A calm run is about
-	// 13 requests with extended coverage: 2 for statuses, 7 for 320 gauges'
-	// models, and 2 each for the two searches, whose last page is empty.
+	// Interval: gauge statuses are reissued about daily; hourly picks a new
+	// issue up soon. A calm run is about 11 requests with extended coverage: 2
+	// for statuses, 7 for 320 gauges' models and 2 for the events search, whose
+	// last page is empty. Flash floods have their own collector (FlashCollector).
 	Interval = time.Hour
 	// Retention is the longest Google's terms let gauge search results be
 	// kept.
@@ -79,9 +79,9 @@ func (collector *Collector) Name() string { return SourceName }
 // Interval implements source.Collector.
 func (collector *Collector) Interval() time.Duration { return Interval }
 
-// Collect reads the latest statuses, thresholds, flash floods, significant
-// events and polygons for Sri Lanka and replaces what is stored. It returns
-// the number of gauges and areas stored.
+// Collect reads the latest statuses, thresholds, significant events and
+// polygons for Sri Lanka and replaces what is stored, except the flash floods,
+// which FlashCollector keeps. It returns the number of gauges and areas stored.
 func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, error) {
 	if strings.TrimSpace(collector.APIKey) == "" {
 		return 0, errors.New("LANKAWEATHER_GOOGLE_API_KEY is not set")
@@ -94,10 +94,6 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 	if err != nil {
 		return 0, fmt.Errorf("gauge models: %w", err)
 	}
-	flash, err := collector.search(ctx, "/v1/flashFloods:search", []string{RegionCode}, DecodeFlashFloods)
-	if err != nil {
-		return 0, fmt.Errorf("flash floods: %w", err)
-	}
 	events, err := collector.search(ctx, "/v1/significantEvents:search", nil, DecodeSignificantEvents)
 	if err != nil {
 		return 0, fmt.Errorf("significant events: %w", err)
@@ -106,8 +102,8 @@ func (collector *Collector) Collect(ctx context.Context, now time.Time) (int, er
 	for _, status := range statuses {
 		areas = append(areas, GaugeAreas(status)...)
 	}
-	areas = append(append(areas, flash...), events...)
-	shapes := collector.polygons(ctx, PrioritiseAreas(areas, statuses))
+	areas = append(areas, events...)
+	shapes := collector.polygons(ctx, PrioritiseAreas(areas, statuses), nil)
 	if err := collector.save(ctx, statuses, models, areas, shapes, now); err != nil {
 		return 0, err
 	}
@@ -278,9 +274,10 @@ func PrioritiseAreas(areas []Area, statuses []Status) []Area {
 	return ordered
 }
 
-// polygons reads each area's polygon, up to maxPolygons. An area whose
+// polygons reads each area's polygon, up to maxPolygons. A polygon in known is
+// used as it is: Google's serialized polygon IDs name one shape. An area whose
 // polygon cannot be read is left out and logged; the gauges still count.
-func (collector *Collector) polygons(ctx context.Context, areas []Area) map[string][]byte {
+func (collector *Collector) polygons(ctx context.Context, areas []Area, known map[string][]byte) map[string][]byte {
 	shapes := map[string][]byte{}
 	skipped := 0
 	for _, area := range areas {
@@ -289,6 +286,10 @@ func (collector *Collector) polygons(ctx context.Context, areas []Area) map[stri
 		}
 		if len(shapes) == maxPolygons {
 			skipped++
+			continue
+		}
+		if shape := known[area.PolygonID]; shape != nil {
+			shapes[area.PolygonID] = shape
 			continue
 		}
 		payload, err := collector.get(ctx, "/v1/serializedPolygons/"+url.PathEscape(area.PolygonID))
@@ -328,32 +329,75 @@ func (collector *Collector) save(ctx context.Context, statuses []Status, models 
 				return fmt.Errorf("store gauge %s: %w", status.GaugeID, err)
 			}
 		}
-		if err := queries.DeleteFloodAreas(ctx); err != nil {
+		seen, err := firstSeen(ctx, queries, otherKinds)
+		if err != nil {
 			return err
 		}
-		for _, area := range areas {
-			shape := shapes[area.PolygonID]
-			if shape == nil {
-				continue
-			}
-			properties, err := json.Marshal(area.Properties)
-			if err != nil || area.Properties == nil {
-				properties = []byte("{}")
-			}
-			var gauge *string
-			if area.GaugeID != "" {
-				gauge = &area.GaugeID
-			}
-			if err := queries.InsertFloodArea(ctx, store.InsertFloodAreaParams{
-				ID: area.PolygonID, Kind: area.Kind, Source: SourceName, GaugeID: gauge, Severity: area.Severity,
-				IssuedAt: area.IssuedAt, ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil,
-				Properties: properties, Geojson: string(shape), FetchedAt: now,
-			}); err != nil {
-				return fmt.Errorf("store %s area: %w", area.Kind, err)
-			}
+		if err := queries.DeleteFloodAreasNotOfKinds(ctx, FlashKinds); err != nil {
+			return err
 		}
-		return nil
+		_, err = insertAreas(ctx, queries, areas, shapes, seen, now)
+		return err
 	})
+}
+
+// FlashKinds are the area kinds FlashCollector keeps.
+var FlashKinds = []string{KindFlashLikely, KindFlashHighly}
+
+// otherKinds are the kinds Collector keeps: every kind but the flash floods.
+var otherKinds = []string{KindNotification, "inundation_high", "inundation_medium", "inundation_low", KindSignificantEvent}
+
+// sighting is a stored area's first sighting and shape.
+type sighting struct {
+	at    time.Time
+	shape []byte
+}
+
+// firstSeen reads when the stored areas of some kinds were first seen.
+func firstSeen(ctx context.Context, queries *store.Queries, kinds []string) (map[string]sighting, error) {
+	rows, err := queries.ListFloodAreasSeen(ctx, kinds)
+	if err != nil {
+		return nil, fmt.Errorf("read stored areas: %w", err)
+	}
+	seen := make(map[string]sighting, len(rows))
+	for _, row := range rows {
+		seen[row.ID] = sighting{at: row.FirstSeenAt, shape: []byte(row.Geojson)}
+	}
+	return seen, nil
+}
+
+// insertAreas stores the areas that have a shape, keeping an area's first
+// sighting. It returns the areas seen for the first time.
+func insertAreas(ctx context.Context, queries *store.Queries, areas []Area, shapes map[string][]byte, seen map[string]sighting, now time.Time) ([]Area, error) {
+	var fresh []Area
+	for _, area := range areas {
+		shape := shapes[area.PolygonID]
+		if shape == nil {
+			continue
+		}
+		properties, err := json.Marshal(area.Properties)
+		if err != nil || area.Properties == nil {
+			properties = []byte("{}")
+		}
+		var gauge *string
+		if area.GaugeID != "" {
+			gauge = &area.GaugeID
+		}
+		first := now
+		if earlier, ok := seen[area.PolygonID]; ok {
+			first = earlier.at
+		} else {
+			fresh = append(fresh, area)
+		}
+		if err := queries.InsertFloodArea(ctx, store.InsertFloodAreaParams{
+			ID: area.PolygonID, Kind: area.Kind, Source: SourceName, GaugeID: gauge, Severity: area.Severity,
+			IssuedAt: area.IssuedAt, ValidFrom: area.ValidFrom, ValidUntil: area.ValidUntil,
+			Properties: properties, Geojson: string(shape), FetchedAt: now, FirstSeenAt: first,
+		}); err != nil {
+			return nil, fmt.Errorf("store %s area: %w", area.Kind, err)
+		}
+	}
+	return fresh, nil
 }
 
 // Prune implements source.Pruner: nothing fetched more than a day ago is

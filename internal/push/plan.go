@@ -31,7 +31,7 @@ type Notice struct {
 
 // kindOrder breaks ties between notices of the same severity: official first.
 var kindOrder = []string{messages.KindBulletin, messages.KindLandslide, messages.KindRiver, messages.KindCyclone,
-	messages.KindEarthquake, messages.KindFloodForecast, messages.KindFlashFlood, messages.KindReservoir, messages.KindTest}
+	messages.KindEarthquake, messages.KindRain, messages.KindFloodForecast, messages.KindFlashFlood, messages.KindReservoir, messages.KindTest}
 
 // summaryURLs open the list a gathered notice belongs to. Kinds not here use
 // their leading event's link.
@@ -41,6 +41,7 @@ var summaryURLs = map[string]string{
 	messages.KindRiver:         "/",
 	messages.KindFloodForecast: "/",
 	messages.KindFlashFlood:    "/",
+	messages.KindRain:          "/",
 	messages.KindReservoir:     "/?reservoirs=active",
 }
 
@@ -138,7 +139,7 @@ func urgencyFor(severity Severity) string {
 // headers it is sent with.
 func (notice Notice) Message(subscriber Subscriber, names messages.Names, now time.Time) (Payload, webpush.Message) {
 	title, body := messages.Render(subscriber.Locale, messages.Input{Kind: notice.Kind, Variant: notice.Variant,
-		Count: notice.Count, Facts: notice.Facts}, names)
+		Count: notice.Count, Facts: notice.Facts, Now: now}, names)
 	payload := Payload{Title: title, Body: body, URL: notice.URL, Tag: notice.Tag, Severity: notice.Severity,
 		SentAt: now.UTC(), RequireInteraction: notice.Severity == SeverityDanger, Lang: subscriber.Locale}
 	return payload, webpush.Message{Endpoint: subscriber.Endpoint, P256dh: subscriber.P256dh, Auth: subscriber.Auth,

@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -36,6 +37,7 @@ const (
 	KindCyclone       = "cyclone"
 	KindEarthquake    = "earthquake"
 	KindReservoir     = "reservoir"
+	KindRain          = "rain"
 )
 
 // Variants lists each kind's variants. A notice for one event uses the
@@ -52,6 +54,7 @@ var Variants = map[string][]string{
 	KindCyclone:       {"track", "near", "close"},
 	KindEarthquake:    {"plain", "major"},
 	KindReservoir:     {"spill"},
+	KindRain:          {"heavy", "very_heavy", "extreme"},
 }
 
 // Single reports whether a kind is never gathered (a test is one notice).
@@ -76,8 +79,33 @@ type Input struct {
 	Count int
 	// Facts are the leading event's values: district (a code), districts
 	// (codes, comma separated), station, river, site, name, title, place,
-	// magnitude, distance and source.
+	// magnitude, distance, source, issuedAt (RFC 3339), and for rain the
+	// gauge, mm and window (1h, 3h or 24h).
 	Facts map[string]string
+	// Now is when the notice is written, for times relative to it: an issue
+	// time today is written as the hour, yesterday's says so.
+	Now time.Time
+}
+
+// localZone is Sri Lanka's time, which has no daylight saving.
+var localZone = time.FixedZone("Asia/Colombo", 5*3600+30*60)
+
+// clock writes a time in Sri Lanka as "20:15", "20:15 yesterday" or, if older,
+// "6/11 20:15" (day and month).
+func clock(locale string, at, now time.Time, word func(string) string) string {
+	local := at.In(localZone)
+	text := local.Format("15:04")
+	if now.IsZero() {
+		return text
+	}
+	today := now.In(localZone)
+	switch day := func(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, localZone) }; {
+	case day(local).Equal(day(today)):
+		return text
+	case day(local).Equal(day(today).AddDate(0, 0, -1)):
+		return text + " " + word("time.yesterday")
+	}
+	return fmt.Sprintf("%d/%d %s", local.Day(), int(local.Month()), text)
 }
 
 const (
@@ -160,6 +188,13 @@ func values(locale string, input Input, names Names) map[string]string {
 	out["more"] = strconv.Itoa(count - 1)
 	if distance, err := strconv.Atoi(facts["distance"]); err == nil {
 		out["distance"] = grouped(distance)
+	}
+	if facts["window"] != "" {
+		out["window"] = word("window." + facts["window"])
+	}
+	out["issued"] = word("time.unknown")
+	if issued, err := time.Parse(time.RFC3339, facts["issuedAt"]); err == nil {
+		out["issued"] = clock(locale, issued, input.Now, word)
 	}
 	return out
 }

@@ -41,6 +41,8 @@ export interface FloodAreaProperties {
   validUntil?: string
   details?: Record<string, unknown>
   fetchedAt?: string
+  /** When we first stored the area; against issuedAt, how late it reached us. */
+  firstSeenAt?: string
   /** The area of a gauge Google has not verified; shown only with Extended coverage. */
   lowerConfidence?: boolean
 }
@@ -70,6 +72,8 @@ export interface FloodForecastCollection {
     seeded?: boolean
     configured: boolean
     fetchedAt: string | null
+    /** Flash floods are read on their own, every 10 minutes. */
+    flashFetchedAt?: string | null
     generatedAt: string
     gauges: number
     areas: number

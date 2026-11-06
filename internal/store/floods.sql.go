@@ -10,21 +10,32 @@ import (
 	"time"
 )
 
-const deleteFloodAreas = `-- name: DeleteFloodAreas :exec
-DELETE FROM flood_areas
-`
-
-func (q *Queries) DeleteFloodAreas(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteFloodAreas)
-	return err
-}
-
 const deleteFloodAreasFetchedBefore = `-- name: DeleteFloodAreasFetchedBefore :exec
 DELETE FROM flood_areas WHERE fetched_at < $1
 `
 
 func (q *Queries) DeleteFloodAreasFetchedBefore(ctx context.Context, fetchedAt time.Time) error {
 	_, err := q.db.Exec(ctx, deleteFloodAreasFetchedBefore, fetchedAt)
+	return err
+}
+
+const deleteFloodAreasNotOfKinds = `-- name: DeleteFloodAreasNotOfKinds :exec
+DELETE FROM flood_areas WHERE kind <> ALL($1::text[])
+`
+
+// The forecast collector replaces every area but the flash floods.
+func (q *Queries) DeleteFloodAreasNotOfKinds(ctx context.Context, kinds []string) error {
+	_, err := q.db.Exec(ctx, deleteFloodAreasNotOfKinds, kinds)
+	return err
+}
+
+const deleteFloodAreasOfKinds = `-- name: DeleteFloodAreasOfKinds :exec
+DELETE FROM flood_areas WHERE kind = ANY($1::text[])
+`
+
+// The flash-flood collector replaces only flash-flood areas.
+func (q *Queries) DeleteFloodAreasOfKinds(ctx context.Context, kinds []string) error {
+	_, err := q.db.Exec(ctx, deleteFloodAreasOfKinds, kinds)
 	return err
 }
 
@@ -102,25 +113,26 @@ func (q *Queries) FloodAreasAt(ctx context.Context, arg FloodAreasAtParams) ([]F
 
 const insertFloodArea = `-- name: InsertFloodArea :exec
 INSERT INTO flood_areas (id, kind, source, gauge_id, severity, issued_at, valid_from, valid_until, properties, geom,
-                         fetched_at)
+                         fetched_at, first_seen_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
         ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON($10::text), 4326)), 3)),
-        $11)
+        $11, $12)
 ON CONFLICT (id) DO NOTHING
 `
 
 type InsertFloodAreaParams struct {
-	ID         string     `json:"id"`
-	Kind       string     `json:"kind"`
-	Source     string     `json:"source"`
-	GaugeID    *string    `json:"gauge_id"`
-	Severity   string     `json:"severity"`
-	IssuedAt   *time.Time `json:"issued_at"`
-	ValidFrom  *time.Time `json:"valid_from"`
-	ValidUntil *time.Time `json:"valid_until"`
-	Properties []byte     `json:"properties"`
-	Geojson    string     `json:"geojson"`
-	FetchedAt  time.Time  `json:"fetched_at"`
+	ID          string     `json:"id"`
+	Kind        string     `json:"kind"`
+	Source      string     `json:"source"`
+	GaugeID     *string    `json:"gauge_id"`
+	Severity    string     `json:"severity"`
+	IssuedAt    *time.Time `json:"issued_at"`
+	ValidFrom   *time.Time `json:"valid_from"`
+	ValidUntil  *time.Time `json:"valid_until"`
+	Properties  []byte     `json:"properties"`
+	Geojson     string     `json:"geojson"`
+	FetchedAt   time.Time  `json:"fetched_at"`
+	FirstSeenAt time.Time  `json:"first_seen_at"`
 }
 
 func (q *Queries) InsertFloodArea(ctx context.Context, arg InsertFloodAreaParams) error {
@@ -136,6 +148,7 @@ func (q *Queries) InsertFloodArea(ctx context.Context, arg InsertFloodAreaParams
 		arg.Properties,
 		arg.Geojson,
 		arg.FetchedAt,
+		arg.FirstSeenAt,
 	)
 	return err
 }
@@ -194,23 +207,24 @@ func (q *Queries) InsertFloodGauge(ctx context.Context, arg InsertFloodGaugePara
 
 const listFloodAreas = `-- name: ListFloodAreas :many
 SELECT id, kind, source, gauge_id, severity, issued_at, valid_from, valid_until, properties,
-       ST_AsGeoJSON(geom, 5)::text AS geojson, fetched_at
+       ST_AsGeoJSON(geom, 5)::text AS geojson, fetched_at, first_seen_at
 FROM flood_areas
 ORDER BY kind, id
 `
 
 type ListFloodAreasRow struct {
-	ID         string     `json:"id"`
-	Kind       string     `json:"kind"`
-	Source     string     `json:"source"`
-	GaugeID    *string    `json:"gauge_id"`
-	Severity   string     `json:"severity"`
-	IssuedAt   *time.Time `json:"issued_at"`
-	ValidFrom  *time.Time `json:"valid_from"`
-	ValidUntil *time.Time `json:"valid_until"`
-	Properties []byte     `json:"properties"`
-	Geojson    string     `json:"geojson"`
-	FetchedAt  time.Time  `json:"fetched_at"`
+	ID          string     `json:"id"`
+	Kind        string     `json:"kind"`
+	Source      string     `json:"source"`
+	GaugeID     *string    `json:"gauge_id"`
+	Severity    string     `json:"severity"`
+	IssuedAt    *time.Time `json:"issued_at"`
+	ValidFrom   *time.Time `json:"valid_from"`
+	ValidUntil  *time.Time `json:"valid_until"`
+	Properties  []byte     `json:"properties"`
+	Geojson     string     `json:"geojson"`
+	FetchedAt   time.Time  `json:"fetched_at"`
+	FirstSeenAt time.Time  `json:"first_seen_at"`
 }
 
 func (q *Queries) ListFloodAreas(ctx context.Context) ([]ListFloodAreasRow, error) {
@@ -234,7 +248,42 @@ func (q *Queries) ListFloodAreas(ctx context.Context) ([]ListFloodAreasRow, erro
 			&i.Properties,
 			&i.Geojson,
 			&i.FetchedAt,
+			&i.FirstSeenAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFloodAreasSeen = `-- name: ListFloodAreasSeen :many
+SELECT id, first_seen_at, ST_AsGeoJSON(geom, 6)::text AS geojson
+FROM flood_areas
+WHERE kind = ANY($1::text[])
+`
+
+type ListFloodAreasSeenRow struct {
+	ID          string    `json:"id"`
+	FirstSeenAt time.Time `json:"first_seen_at"`
+	Geojson     string    `json:"geojson"`
+}
+
+// When each stored area was first seen, with its shape, so a replacement
+// keeps the first sighting and need not read an unchanged polygon again.
+func (q *Queries) ListFloodAreasSeen(ctx context.Context, kinds []string) ([]ListFloodAreasSeenRow, error) {
+	rows, err := q.db.Query(ctx, listFloodAreasSeen, kinds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFloodAreasSeenRow{}
+	for rows.Next() {
+		var i ListFloodAreasSeenRow
+		if err := rows.Scan(&i.ID, &i.FirstSeenAt, &i.Geojson); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

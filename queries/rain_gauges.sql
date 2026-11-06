@@ -46,3 +46,10 @@ DELETE FROM rain_gauge_readings WHERE observed_at < $1;
 
 -- name: DeleteRainGaugesFetchedBefore :exec
 DELETE FROM rain_gauges WHERE fetched_at < $1;
+
+-- name: RainGaugeReadingsAllSince :many
+-- Every gauge's readings since a time, for the rain the alert engine measures.
+SELECT gauge_id, observed_at, rain_mm
+FROM rain_gauge_readings
+WHERE observed_at >= $1
+ORDER BY gauge_id, observed_at;

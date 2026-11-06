@@ -2,6 +2,8 @@ package alerts
 
 import (
 	"encoding/json"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -263,8 +265,99 @@ func TestFloodForecastsAreVerifiedEstimates(t *testing.T) {
 		t.Fatalf("extreme %+v", extreme)
 	}
 	flash := FlashFloods(collection, func(string) []string { return []string{"LK-91", "LK-92"} }, start)
-	if len(flash.Observations) != 1 || flash.Observations[0].Level != 2 || flash.Observations[0].Event.Facts["districts"] != "LK-91,LK-92" {
+	if len(flash.Observations) != 2 || flash.Observations[0].Level != 2 || flash.Observations[0].Subject != "flash:district:LK-91" ||
+		flash.Observations[1].Event.Districts[0] != "LK-92" {
 		t.Fatalf("flash %+v", flash)
+	}
+	if flash.Complete {
+		t.Fatal("a reading with no flash-flood run cannot be complete")
+	}
+}
+
+// flashRun is one read of Google's flash floods: the areas in force and the
+// districts each overlaps.
+type flashRun struct {
+	at    time.Time
+	areas map[string][]string
+	kinds map[string]string
+}
+
+// replayFlash feeds runs through the engine and returns the districts alerted
+// at each run.
+func replayFlash(t *testing.T, runs []flashRun) [][]string {
+	t.Helper()
+	states := map[string]State{}
+	alerted := [][]string{}
+	for _, run := range runs {
+		fetched := run.at
+		collection := floods.FeatureCollection{Meta: floods.Meta{Configured: true, FetchedAt: &fetched, FlashFetchedAt: &fetched}}
+		for id := range run.areas {
+			kind := run.kinds[id]
+			if kind == "" {
+				kind = "flash_likely"
+			}
+			issued := run.at.Add(-time.Hour)
+			collection.Features = append(collection.Features, floods.Feature{ID: id, Properties: floods.Area{ID: id, Kind: kind, IssuedAt: &issued}})
+		}
+		reading := FlashFloods(collection, func(id string) []string { return run.areas[id] }, run.at)
+		districts := []string{}
+		for _, transition := range Apply(reading, states, run.at) {
+			if transition.State.Idle() {
+				delete(states, transition.State.Subject)
+			} else {
+				states[transition.State.Subject] = transition.State
+			}
+			if transition.Event != nil {
+				districts = append(districts, transition.Event.Districts...)
+			}
+		}
+		sort.Strings(districts)
+		alerted = append(alerted, districts)
+	}
+	return alerted
+}
+
+func TestFlashFloodsAlertADistrictOnceAcrossGooglesReissues(t *testing.T) {
+	hour := func(h int) time.Time { return start.Add(time.Duration(h) * time.Hour) }
+	colombo := []string{"LK-11", "LK-12"}
+	wider := []string{"LK-11", "LK-12", "LK-13"}
+	got := replayFlash(t, []flashRun{
+		{at: hour(0), areas: map[string][]string{"area-1": colombo}},
+		// Reissued under a new ID: no new notice for Colombo or Gampaha,
+		// one for Kalutara, which the new area adds.
+		{at: hour(6), areas: map[string][]string{"area-2": wider}},
+		{at: hour(11), areas: map[string][]string{"area-3": wider}},
+		// Withdrawn: nothing is sent.
+		{at: hour(12), areas: map[string][]string{}},
+		// Back within the hold: still the same episode.
+		{at: hour(16), areas: map[string][]string{"area-4": wider}},
+		// Raised to highly likely: an escalation always alerts.
+		{at: hour(17), areas: map[string][]string{"area-5": {"LK-11"}}, kinds: map[string]string{"area-5": "flash_highly_likely"}},
+	})
+	want := [][]string{{"LK-11", "LK-12"}, {"LK-13"}, {}, {}, {}, {"LK-11"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("alerted %v, want %v", got, want)
+	}
+}
+
+func TestAFlashFloodGoneLongerThanTheHoldAlertsAgain(t *testing.T) {
+	hour := func(h int) time.Time { return start.Add(time.Duration(h) * time.Hour) }
+	runs := []flashRun{{at: hour(0), areas: map[string][]string{"area-1": {"LK-11"}}}}
+	for h := 1; h <= 8; h++ {
+		runs = append(runs, flashRun{at: hour(h), areas: map[string][]string{}})
+	}
+	runs = append(runs, flashRun{at: hour(9), areas: map[string][]string{"area-2": {"LK-11"}}})
+	got := replayFlash(t, runs)
+	if len(got[0]) != 1 || len(got[9]) != 1 {
+		t.Fatalf("alerted %v", got)
+	}
+}
+
+func TestAStaleFlashReadCannotEndAForecast(t *testing.T) {
+	old := start.Add(-time.Hour)
+	collection := floods.FeatureCollection{Meta: floods.Meta{Configured: true, FetchedAt: &start, FlashFetchedAt: &old}}
+	if FlashFloods(collection, func(string) []string { return nil }, start).Complete {
+		t.Fatal("an hour-old flash read must not lower anything")
 	}
 }
 

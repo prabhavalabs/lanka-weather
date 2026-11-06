@@ -63,8 +63,9 @@ raises an event.
 | DMC warnings and advisories newly in force (not landslide reports) | One warning, its Tamil edition and numbered updates included | advisory 1; warning or amber advisory 2; red 3 | watch, warning, danger |
 | NBRO landslide levels | A district: the highest level of its DS divisions in the report in force | 1, 2, 3 | watch (opt-in topic), warning, danger |
 | River gauges, Irrigation Department and waterlevels.lk | A gauge, mapped to the district containing it or nearest within about 5 km | alert 1, minor flood 2, major flood 3 | watch, warning, danger |
+| Heavy rain measured at the HMIS live gauges (topic `heavy_rain`) | A district, at its wettest current gauge | at least 30 mm in an hour, 50 in 3 hours or 100 in 24: 1; 50, 100 or 150: 2; 75, 150 or 250: 3 | watch, warning, warning |
 | Google flood forecasts, verified gauges only | A gauge | Warning 1, Danger 2, Extreme 3 | warning, warning, danger |
-| Google flash floods | An area, with the districts it overlaps | likely 1, highly likely 2 | warning |
+| Google flash floods, read every 10 minutes | A district: the highest of the areas over it (Google reissues an area under a new ID every few hours, which had alerted again each time) | likely 1, highly likely 2 | warning |
 | GDACS cyclones | A system | forecast track within 1,000 km 1; centre within 1,000 km 2; within 300 km 3 | watch, warning, danger |
 | USGS earthquakes of the last 6 hours | An event | see below | watch, warning |
 | Reservoirs spilling, current readings only | A reservoir with a known district | spilling 1 | watch (opt-in topic) |
@@ -74,6 +75,19 @@ about (15° S to 25° N, 60 to 105° E), or M4 within 300 km, which may be felt 
 within 1,500 km, M7 anywhere in the region, or USGS's tsunami flag with M6. A level 2 notice says it
 is **not a tsunami warning** and refers people to the DMC and the Department of Meteorology. We
 never issue a tsunami warning.
+
+Heavy rain is measured, not forecast, and reaches people before any river rises or forecast
+arrives: on 6 November 2026 Colombo's head-office gauge measured at least 67.5 mm in the hour to
+18:20, six hours before Google's flash-flood forecast reached us. The gauges report a rolling
+24-hour total, so the rain of the last hour or three is its rise, a lower bound: a notice can
+understate rain, never invent it. A gauge with an impossible rise (over 200 mm an hour) is left
+out, and so is one whose newest reading is over 90 minutes old. The notice names the gauge and
+says it is not an official warning; it stays at warning, as what the rain means for a place is
+our reading of it. Migration 00014 adds the topic to subscriptions that chose flood forecasts.
+
+A flash-flood notice says when Google issued the forecast ("Google issued it at 20:15"), so a
+forecast that reached us late cannot pass for an early warning. A forecast that lapses sends
+nothing: an "all clear" from a forecast says nothing about the rain to come.
 
 Forecasts reach danger only at Google's Extreme: they are estimates, and danger passes the hourly
 cap. Their text says "an estimate, not an official warning". Spills and Level 1 landslides are

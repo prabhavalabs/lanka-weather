@@ -449,6 +449,7 @@ at `no_flooding`, and no areas; one gauge is shown here.
     "region": "LK",
     "configured": true,
     "fetchedAt": "2026-11-02T14:50:47.299015Z",
+    "flashFetchedAt": "2026-11-02T14:50:12.104733Z",
     "generatedAt": "2026-11-02T14:51:01.897245Z",
     "gauges": 310,
     "areas": 0,
@@ -469,10 +470,15 @@ A flood area feature, for illustration:
   "properties": {
     "kind": "notification", "gaugeId": "hybas_4121156400", "severity": "severe",
     "issuedAt": "2026-11-02T12:22:59Z", "validFrom": "2026-11-03T00:00:00Z", "validUntil": "2026-11-04T00:00:00Z",
-    "details": {}, "fetchedAt": "2026-11-02T13:00:00Z"
+    "details": {}, "fetchedAt": "2026-11-02T13:00:00Z", "firstSeenAt": "2026-11-02T13:00:00Z"
   }
 }
 ```
+
+`fetchedAt` is the meta's last read of gauges and events (hourly);
+`flashFetchedAt` the last read of flash floods (every 10 minutes). An area's
+`firstSeenAt` is when we first stored it: against `issuedAt` it shows how late
+Google's forecast reached us.
 
 `Cache-Control: public, max-age=300`.
 

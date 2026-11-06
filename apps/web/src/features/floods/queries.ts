@@ -14,7 +14,7 @@ export function useFloodForecast(layer: Layer | undefined, enabled: boolean) {
         "application/geo+json",
       ),
     enabled: enabled && Boolean(layer),
-    ...layerQueryOptions(layer ?? { refreshSeconds: 3600 }),
+    ...layerQueryOptions(layer ?? { refreshSeconds: 600 }),
     meta: { label: "app.data.floods" },
   })
 }
