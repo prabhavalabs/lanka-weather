@@ -47,6 +47,7 @@ import (
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/usgs"
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/waterlevels"
 	"github.com/prabhavalabs/lanka-weather/internal/environment"
+	"github.com/prabhavalabs/lanka-weather/internal/floodrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/grid"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
@@ -246,6 +247,10 @@ func alertEngine(pool *pgxpool.Pool, logger *slog.Logger) *alerts.Engine {
 		Hazards:    &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")},
 		Reservoirs: &reservoirs.Service{Pool: pool, StaleAfter: staleAfter("reservoirs")},
 		RainGauges: &raingauges.Service{Pool: pool, StaleAfter: staleAfter("rain-gauges")},
+		// Forecast rain ahead, for the combined flood-risk estimate.
+		Weather: &weather.Service{Pool: pool, Regions: regionSource(pool, logger),
+			CurrentStaleAfter: staleAfter("temperature"), ForecastStaleAfter: 12 * time.Hour},
+		Locator:    &floodrisk.Locator{Pool: pool, Logger: logger},
 		Dispatcher: &push.Dispatcher{Pool: pool, Sender: push.NewClient(vapid), Logger: logger},
 		Logger:     logger,
 	}
@@ -304,6 +309,9 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	environmentService := &environment.Service{Pool: pool, AirStaleAfter: staleAfter("air-quality"), SeaStaleAfter: staleAfter("sea-conditions")}
 	rainGaugeService := &raingauges.Service{Pool: pool, StaleAfter: staleAfter("rain-gauges")}
 	canalService := &canals.Service{Pool: pool}
+	floodRiskService := &floodrisk.Service{Rain: rainGaugeService, Floods: floodService, Rivers: riverService,
+		Warnings: warningService, Reservoirs: reservoirService, Weather: weatherService,
+		Locator: &floodrisk.Locator{Pool: pool, Logger: logger}, Logger: logger}
 	hazardService := &hazards.Service{Pool: pool, EarthquakesStaleAfter: staleAfter("earthquakes"), CyclonesStaleAfter: staleAfter("cyclones")}
 	// Always present, so a subscription can be deleted even with push off.
 	pushService := &push.Service{Pool: pool}
@@ -324,6 +332,7 @@ func serve(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 				Stations: stationService, Environment: environmentService, Reservoirs: reservoirService,
 				RainGauges: rainGaugeService, Canals: canalService, Logger: logger},
 			RiverRisk: riverRiskService,
+			FloodRisk: floodRiskService,
 			Warnings:  warningService,
 			Overview: &overview.Service{Warnings: warningService, Risk: riverRiskService, Gauges: riverService,
 				Reservoirs: reservoirService, Hazards: hazardService, Weather: weatherService, Rain: stationService, RainGauges: rainGaugeService,

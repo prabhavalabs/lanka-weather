@@ -575,14 +575,3 @@ func Reservoirs(collection reservoirs.FeatureCollection, districtNamed DistrictN
 	}
 	return reading
 }
-
-// normaliseName compares district names whatever their spacing and case.
-func normaliseName(name string) string {
-	var out strings.Builder
-	for _, r := range strings.ToLower(name) {
-		if r >= 'a' && r <= 'z' {
-			out.WriteRune(r)
-		}
-	}
-	return out.String()
-}

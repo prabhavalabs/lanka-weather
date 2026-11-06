@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prabhavalabs/lanka-weather/internal/connectors/irrigation"
+	"github.com/prabhavalabs/lanka-weather/internal/floodrisk"
 	"github.com/prabhavalabs/lanka-weather/internal/floods"
 	"github.com/prabhavalabs/lanka-weather/internal/hazards"
 	"github.com/prabhavalabs/lanka-weather/internal/push"
@@ -433,7 +434,7 @@ func TestReservoirsSpillingOnCurrentReadings(t *testing.T) {
 		{Properties: reservoirs.Properties{ID: "holding", Name: "Holding", District: district("Nuwara-Eliya"), Status: "holding"}},
 	}}
 	named := func(name string) string {
-		return map[string]string{normaliseName("Anuradhapura"): "LK-71", normaliseName("Nuwara Eliya"): "LK-23"}[normaliseName(name)]
+		return map[string]string{floodrisk.NormaliseName("Anuradhapura"): "LK-71", floodrisk.NormaliseName("Nuwara Eliya"): "LK-23"}[floodrisk.NormaliseName(name)]
 	}
 	reading := Reservoirs(collection, named, start)
 	if len(reading.Observations) != 3 {

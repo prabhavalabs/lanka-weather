@@ -55,17 +55,20 @@ const (
 	TopicReservoir       Topic = "reservoir"
 	// TopicHeavyRain is rain measured at the live gauges.
 	TopicHeavyRain Topic = "heavy_rain"
+	// TopicFloodRisk is the combined flood-risk estimate (package floodrisk).
+	TopicFloodRisk Topic = "flood_risk"
 )
 
 // Topics are every topic, in the order the settings list them.
-var Topics = []Topic{TopicOfficial, TopicLandslide, TopicLandslideLevel1, TopicRiver, TopicHeavyRain, TopicFloodForecast,
-	TopicCyclone, TopicEarthquake, TopicReservoir}
+var Topics = []Topic{TopicOfficial, TopicLandslide, TopicLandslideLevel1, TopicRiver, TopicHeavyRain, TopicFloodRisk,
+	TopicFloodForecast, TopicCyclone, TopicEarthquake, TopicReservoir}
 
 // DefaultTopics are on for a new subscription: official warnings, landslide
-// levels 2 and 3, river flood levels, heavy rain measured, flood forecasts,
-// cyclones and large earthquakes. Level 1 landslides and reservoir spills are
-// opt-in.
-var DefaultTopics = []Topic{TopicOfficial, TopicLandslide, TopicRiver, TopicHeavyRain, TopicFloodForecast, TopicCyclone, TopicEarthquake}
+// levels 2 and 3, river flood levels, heavy rain measured, the flood-risk
+// estimate, flood forecasts, cyclones and large earthquakes. Level 1 landslides
+// and reservoir spills are opt-in.
+var DefaultTopics = []Topic{TopicOfficial, TopicLandslide, TopicRiver, TopicHeavyRain, TopicFloodRisk, TopicFloodForecast,
+	TopicCyclone, TopicEarthquake}
 
 // DefaultMinSeverity is a new subscription's threshold.
 const DefaultMinSeverity = SeverityWarning

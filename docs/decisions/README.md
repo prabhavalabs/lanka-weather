@@ -25,3 +25,4 @@ supersedes the old one, not by editing an accepted record.
 | [0016](0016-languages.md)                              | The interface in Sinhala, Tamil and English                                    | Accepted                                                    |
 | [0017](0017-pwa-offline-and-install.md)                | Installable, offline-capable app, and an install guide                         | Accepted                                                    |
 | [0018](0018-push-alerts.md)                            | Push alerts                                                                    | Accepted                                                    |
+| [0019](0019-combined-flood-risk.md)                     | A combined flood-risk estimate by district                                     | Accepted                                                    |

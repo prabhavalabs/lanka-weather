@@ -96,7 +96,7 @@ func TestEveryNoticeRendersCompletelyInEveryLanguage(t *testing.T) {
 	facts := map[string]string{"district": "LK-91", "districts": "LK-91,LK-92", "station": "Ratnapura", "river": "Kalu Ganga",
 		"site": "Putupaula", "name": "MONTHA", "title": "Flood warning for Kalu River", "place": "Sumatra, Indonesia",
 		"magnitude": "6.8", "distance": "1450", "source": "irrigation", "level": "3", "issuedAt": "2026-11-06T14:45:58Z",
-		"gauge": "DOM HEAD OFFICE", "mm": "67", "window": "1h"}
+		"gauge": "DOM HEAD OFFICE", "mm": "67", "window": "1h", "signals": "google_flash,rain_now,wet_ground", "scenario": "flash"}
 	for kind, variants := range Variants {
 		for _, variant := range variants {
 			for _, count := range []int{1, 3} {
@@ -188,6 +188,26 @@ func TestFlashFloodsSayWhenGoogleIssuedThem(t *testing.T) {
 	for _, locale := range []string{"si", "ta"} {
 		if _, body := Render(locale, Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now}, testNames); !strings.Contains(body, "20:15") {
 			t.Errorf("%s body %q", locale, body)
+		}
+	}
+}
+
+func TestFloodRiskSaysWhatItRestsOnAndWhatCouldHappen(t *testing.T) {
+	facts := map[string]string{"district": "LK-91", "signals": "google_flash,rain_now,wet_ground", "scenario": "flash"}
+	title, body := Render("en", Input{Kind: KindFloodRisk, Variant: "high", Count: 1, Facts: facts}, testNames)
+	if title != "Flood risk: High · Ratnapura" ||
+		body != "Our estimate from Google's flash-flood forecast, heavy rain now and ground already soaked; not an official warning. "+
+			"Low-lying roads and areas may flood within hours. Follow the DMC. Tap for details." {
+		t.Fatalf("%q / %q", title, body)
+	}
+	// The longest names and scenario still fit whole in every language.
+	long := map[string]string{"district": "LK-91", "signals": "google_flash,google_gauge,rain_forecast", "scenario": "both"}
+	for _, locale := range Locales {
+		for _, variant := range Variants[KindFloodRisk] {
+			_, body := Render(locale, Input{Kind: KindFloodRisk, Variant: variant, Count: 1, Facts: long}, testNames)
+			if strings.HasSuffix(body, "…") {
+				t.Errorf("%s %s is cut: %q (%d)", locale, variant, body, utf8.RuneCountInString(body))
+			}
 		}
 	}
 }

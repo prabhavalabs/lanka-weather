@@ -64,6 +64,7 @@ raises an event.
 | NBRO landslide levels | A district: the highest level of its DS divisions in the report in force | 1, 2, 3 | watch (opt-in topic), warning, danger |
 | River gauges, Irrigation Department and waterlevels.lk | A gauge, mapped to the district containing it or nearest within about 5 km | alert 1, minor flood 2, major flood 3 | watch, warning, danger |
 | Heavy rain measured at the HMIS live gauges (topic `heavy_rain`) | A district, at its wettest current gauge | at least 30 mm in an hour, 50 in 3 hours or 100 in 24: 1; 50, 100 or 150: 2; 75, 150 or 250: 3 | watch, warning, warning |
+| The combined flood-risk estimate (topic `flood_risk`, ADR 0019) | A district | moderate 1, high 2, very high 3 | watch, warning, warning |
 | Google flood forecasts, verified gauges only | A gauge | Warning 1, Danger 2, Extreme 3 | warning, warning, danger |
 | Google flash floods, read every 10 minutes | A district: the highest of the areas over it (Google reissues an area under a new ID every few hours, which had alerted again each time) | likely 1, highly likely 2 | warning |
 | GDACS cyclones | A system | forecast track within 1,000 km 1; centre within 1,000 km 2; within 300 km 3 | watch, warning, danger |
