@@ -28,6 +28,10 @@ import { flowShort, reservoirStatusLabels } from "../reservoirs/present"
 import { formatLevel, statusLabels, trendArrows } from "../rivers/present"
 import { useRegionAggregate, useRegionDetail } from "../regions/queries"
 import { RegionAggregate } from "../regions/RegionAggregate"
+import { regionLevelOf } from "../regions/present"
+import { FloodRiskCard } from "../floodrisk/FloodRiskCard"
+import { districtRisk } from "../floodrisk/present"
+import { useFloodRisk } from "../floodrisk/queries"
 import { officialSlot } from "../warnings/present"
 import {
   currentFrom,
@@ -102,6 +106,9 @@ export default function LocationPanel({
   const regionId = selection.kind === "region" ? selection.id : null
   const region = useRegionDetail(regionId)
   const aggregate = useRegionAggregate(regionId)
+  const districtId = regionId && regionLevelOf(regionId) === "district" ? regionId : null
+  const floodRisk = useFloodRisk(districtId !== null)
+  const risk = districtId ? districtRisk(floodRisk.data, districtId) : null
   const location = useSelectionLocation(selection)
   const summary = useSummary(location)
   const point = usePointForecast(location)
@@ -355,6 +362,13 @@ export default function LocationPanel({
       unavailableText={unavailableText(point.error, summary.data?.weather === null && !point.error)}
       highlight={
         <>
+          {risk && floodRisk.data && (
+            <FloodRiskCard
+              risk={risk}
+              generatedAt={floodRisk.data.meta.generatedAt}
+              complete={floodRisk.data.meta.complete}
+            />
+          )}
           {aggregate.region && aggregate.level && (
             <RegionAggregate region={aggregate.region} level={aggregate.level} />
           )}

@@ -43,6 +43,7 @@ export const app: Translation<typeof en> = {
     reservoirs: "நீர்த்தேக்கத் தரவு",
     reservoirAreas: "நீர்த்தேக்கப் பரப்புகள்",
     riverRisk: "ஆற்று அபாய மதிப்பீடுகள்",
+    floodRisk: "வெள்ள அபாய மதிப்பீடு",
     riverDetail: "ஆற்றின் விவரங்கள்",
     basins: "வெள்ள வடிநிலங்கள்",
     pastFloods: "கடந்த கால வெள்ளங்கள்",

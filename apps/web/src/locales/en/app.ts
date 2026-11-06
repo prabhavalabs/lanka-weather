@@ -42,6 +42,7 @@ export const app = {
     reservoirs: "reservoirs",
     reservoirAreas: "reservoir areas",
     riverRisk: "river risk",
+    floodRisk: "the flood-risk estimate",
     riverDetail: "river details",
     basins: "flood basins",
     pastFloods: "past floods",
