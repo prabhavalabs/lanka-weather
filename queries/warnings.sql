@@ -141,3 +141,8 @@ SELECT r.id, r.name, r.name_si, r.district_id, d.name AS district_name,
 FROM regions r
 LEFT JOIN regions d ON d.id = r.district_id
 WHERE r.id = @id;
+
+-- name: GetBulletin :one
+SELECT *
+FROM official_bulletins
+WHERE doc_id = @doc_id;

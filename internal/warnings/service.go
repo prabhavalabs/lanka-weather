@@ -409,6 +409,20 @@ func (service *Service) Overview(ctx context.Context, filter Filter) (*Overview,
 	} else {
 		overview.Meta.Stale = true
 	}
+	// The DMC's own lists, read directly, are as current as the index or more.
+	if version, err := queries.GetSourceVersion(ctx, dmcbulletins.SiteSourceName); err == nil {
+		if fetched := version.FetchedAt; now.Sub(fetched) <= service.BulletinStaleAfter {
+			overview.Meta.Stale = false
+			if overview.Meta.FetchedAt == nil || fetched.After(*overview.Meta.FetchedAt) {
+				overview.Meta.FetchedAt = &fetched
+			}
+			if overview.Meta.UpstreamAt == nil || fetched.After(*overview.Meta.UpstreamAt) {
+				overview.Meta.UpstreamAt = &fetched
+			}
+		}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("read bulletin site version: %w", err)
+	}
 	overview.ActiveCount = len(inForce)
 	if state.show && len(state.divisions) > 0 {
 		overview.ActiveCount++
@@ -416,6 +430,20 @@ func (service *Service) Overview(ctx context.Context, filter Filter) (*Overview,
 	overview.Banner = banner(state, inForce)
 	overview.Districts = highlights(state, inForce)
 	return overview, nil
+}
+
+// LandslideWarning is NBRO's latest landslide early-warning report as the DMC
+// posted it, with the districts its table names, or nil when there is none.
+func (service *Service) LandslideWarning(ctx context.Context) (*Bulletin, error) {
+	row, err := store.New(service.Pool).LatestLandslideBulletin(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read latest landslide bulletin: %w", err)
+	}
+	bulletins := toBulletins([]store.OfficialBulletin{row}, service.now())
+	return &bulletins[0], nil
 }
 
 func (service *Service) inForce(ctx context.Context, queries *store.Queries, now time.Time, notices []Notice) ([]Bulletin, error) {

@@ -46,8 +46,9 @@ type Collector struct {
 func (collector *Collector) Name() string { return SourceName }
 
 // Interval implements source.Collector. The upstream rebuilds its indexes
-// about hourly, and warnings are the reason to look.
-func (collector *Collector) Interval() time.Duration { return time.Hour }
+// about every two hours; SiteCollector finds new bulletins on the DMC's own
+// site first, and this fills the text of those it could not read.
+func (collector *Collector) Interval() time.Duration { return 30 * time.Minute }
 
 // Collect reads every index, then the text of bulletins that have none yet.
 // A failing index does not lose the others; the run still reports the error.
