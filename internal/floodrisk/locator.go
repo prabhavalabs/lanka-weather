@@ -3,6 +3,7 @@ package floodrisk
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/prabhavalabs/lanka-weather/internal/store"
+	"github.com/prabhavalabs/lanka-weather/internal/warnings"
 )
 
 // Locator finds districts from the regions table, remembering points and areas:
@@ -22,6 +24,7 @@ type Locator struct {
 	mu     sync.Mutex
 	points map[string]string
 	areas  map[string][]string
+	basins *basinDistricts
 }
 
 func (locator *Locator) logger() *slog.Logger {
@@ -103,4 +106,65 @@ func NormaliseName(name string) string {
 		}
 	}
 	return out.String()
+}
+
+// basinShareMin is the least share of a basin a district must hold to be
+// named for a warning on that basin.
+const basinShareMin = 0.05
+
+// basinDistricts are each basin's districts, by basin key, read once.
+type basinDistricts struct {
+	once   sync.Once
+	keys   []string
+	byKey  map[string][]string
+	failed bool
+}
+
+// BasinDistricts are the districts of the basins a flood warning's title
+// names, in code order: "Flood Warning for Gin River Basin" is Galle and
+// Matara. Nil when the title names no basin we know.
+func (locator *Locator) BasinDistricts(ctx context.Context, title string) []string {
+	locator.mu.Lock()
+	if locator.basins == nil || locator.basins.failed {
+		locator.basins = &basinDistricts{}
+	}
+	basins := locator.basins
+	locator.mu.Unlock()
+	basins.once.Do(func() {
+		rows, err := store.New(locator.Pool).BasinDistrictShares(ctx)
+		if err != nil {
+			locator.logger().Warn("districts of basins failed", "error", err)
+			basins.failed = true
+			return
+		}
+		basins.byKey = map[string][]string{}
+		for _, row := range rows {
+			key := warnings.BasinKey(row.Basin)
+			if key == "" || row.Share < basinShareMin {
+				continue
+			}
+			if _, ok := basins.byKey[key]; !ok {
+				basins.keys = append(basins.keys, key)
+			}
+			if !slices.Contains(basins.byKey[key], row.District) {
+				basins.byKey[key] = append(basins.byKey[key], row.District)
+			}
+		}
+	})
+	if basins.failed {
+		return nil
+	}
+	found := []string{}
+	for _, key := range warnings.NamedBasins(title, basins.keys) {
+		for _, district := range basins.byKey[key] {
+			if !slices.Contains(found, district) {
+				found = append(found, district)
+			}
+		}
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	slices.Sort(found)
+	return found
 }

@@ -248,7 +248,7 @@ func (dispatcher *Dispatcher) deliver(ctx context.Context, item job, names Distr
 			return outcomeSkipped
 		}
 	}
-	payload, message := item.notice.Message(item.subscriber, names, now)
+	payload, message := item.notice.Message(item.subscriber, names, now, noticeID)
 	if message.Payload, err = json.Marshal(payload); err != nil {
 		release()
 		return outcomeFailed

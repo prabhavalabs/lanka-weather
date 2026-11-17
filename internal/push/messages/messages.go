@@ -9,14 +9,16 @@
 // the issuer's own English words. Names of places come from the regions
 // table in each language; names of gauges and rivers are English only.
 //
-// A title stays short ("Landslide Level 3 · Ratnapura"); a body says what to
-// do and who said so. A test checks that every kind and variant has text in
-// all three languages with the same placeholders.
+// A title says what and where ("Landslide Level 3 · Ratnapura", "Flood
+// warning · Galle, Matara"); a body says where in full, when the issuer issued
+// or measured it, who said so and what to do. A test checks that every kind
+// and variant has text in all three languages with the same placeholders.
 package messages
 
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,7 +50,7 @@ const (
 var Variants = map[string][]string{
 	KindTest:          {"test"},
 	KindBulletin:      {"advisory", "warning", "red"},
-	KindLandslide:     {"1", "2", "3"},
+	KindLandslide:     {"issued", "1", "2", "3"},
 	KindRiver:         {"alert", "minor_flood", "major_flood"},
 	KindFloodForecast: {"warning", "danger", "extreme"},
 	KindFlashFlood:    {"likely", "highly_likely"},
@@ -81,10 +83,18 @@ type Input struct {
 	Count int
 	// Facts are the leading event's values: district (a code), districts
 	// (codes, comma separated), station, river, site, name, title, place,
-	// magnitude, distance, source, issuedAt (RFC 3339), for rain the gauge,
-	// mm and window (1h, 3h or 24h), and for the flood-risk estimate signals
-	// (family codes, strongest first) and scenario.
+	// magnitude, distance, source, issuedAt (RFC 3339, when the issuer issued
+	// or measured it), for bulletins type and areaFrom, for landslides
+	// divisions and divisionNames, for gauges waterLevel, threshold and unit,
+	// for cyclones direction and nearDistrict, for rain the gauge, mm and
+	// window (1h, 3h or 24h), and for the flood-risk estimate signals (family
+	// codes, strongest first) and scenario.
 	Facts map[string]string
+	// Districts are every district the notice is about, in the order to name
+	// them; empty takes them from the facts.
+	Districts []string
+	// Subjects name what a gathered notice gathers: gauges, reservoirs, sites.
+	Subjects []string
 	// Now is when the notice is written, for times relative to it: an issue
 	// time today is written as the hour, yesterday's says so.
 	Now time.Time
@@ -113,7 +123,12 @@ func clock(locale string, at, now time.Time, word func(string) string) string {
 
 const (
 	maxTitle = 70
-	maxBody  = 240
+	maxBody  = 300
+	// maxWhere is how long a title's list of places may grow before the rest
+	// are counted ("Galle, Matara +3").
+	maxWhere = 34
+	// maxSubjects are the gauges or reservoirs a gathered notice names.
+	maxSubjects = 3
 )
 
 var placeholder = regexp.MustCompile(`\{(\w+)\}`)
@@ -169,20 +184,33 @@ func values(locale string, input Input, names Names) map[string]string {
 		}
 		return names.District(id, locale)
 	}
-	out["district"] = district(facts["district"])
-	if facts["district"] == "" {
-		out["district"] = word("country")
+	codes := input.Districts
+	if len(codes) == 0 {
+		codes = splitCodes(facts["districts"])
 	}
-	place := word("country")
-	if codes := splitCodes(facts["districts"]); len(codes) > 0 {
-		place = district(codes[0])
-		if len(codes) > 1 {
-			place += " +" + strconv.Itoa(len(codes)-1)
+	if len(codes) == 0 && facts["district"] != "" {
+		codes = []string{facts["district"]}
+	}
+	places := make([]string, 0, len(codes))
+	for _, code := range codes {
+		if name := district(code); name != "" && !slices.Contains(places, name) {
+			places = append(places, name)
 		}
 	}
-	out["place"] = place
+	out["district"] = word("country")
+	switch {
+	case facts["district"] != "":
+		out["district"] = district(facts["district"])
+	case len(places) > 0:
+		out["district"] = places[0]
+	}
+	out["where"] = shortList(places, word("country"))
+	out["places"] = word("country")
+	if len(places) > 0 {
+		out["places"] = joinList(places, word("list.and"))
+	}
+	out["subjects"] = subjectList(input.Subjects, facts)
 	out["levelWord"] = word(input.Kind + "." + input.Variant)
-	out["severityWord"] = word(input.Kind + "." + input.Variant)
 	out["source"] = word("source." + facts["source"])
 	out["likelihood"] = word(input.Kind + "." + input.Variant)
 	out["level"] = facts["level"]
@@ -196,20 +224,160 @@ func values(locale string, input Input, names Names) map[string]string {
 		out["window"] = word("window." + facts["window"])
 	}
 	if codes := splitCodes(facts["signals"]); len(codes) > 0 {
-		names := make([]string, 0, len(codes))
+		signals := make([]string, 0, len(codes))
 		for _, code := range codes {
-			names = append(names, word("signal."+code))
+			signals = append(signals, word("signal."+code))
 		}
-		out["signals"] = joinList(names, word("list.and"))
+		out["signals"] = joinList(signals, word("list.and"))
 	}
 	if facts["scenario"] != "" {
 		out["scenario"] = word("scenario." + facts["scenario"])
 	}
 	out["issued"] = word("time.unknown")
-	if issued, err := time.Parse(time.RFC3339, facts["issuedAt"]); err == nil {
+	issuedAt := facts["issuedAt"]
+	if issuedAt == "" {
+		issuedAt = facts["observedAt"]
+	}
+	out["whenIssued"], out["whenRead"] = "", ""
+	if issued, err := time.Parse(time.RFC3339, issuedAt); err == nil {
 		out["issued"] = clock(locale, issued, input.Now, word)
+		out["whenIssued"] = fill(word("when.issued"), map[string]string{"time": out["issued"]})
+		out["whenRead"] = fill(word("when.read"), map[string]string{"time": out["issued"]})
+	}
+
+	// Composite lines, empty when their facts are missing.
+	out["bulletinKind"] = word("kind.bulletin." + input.Variant)
+	if kind, ok := words[locale]["kind.bulletin."+facts["type"]+"."+input.Variant]; ok {
+		out["bulletinKind"] = kind
+	}
+	switch {
+	case len(places) == 0:
+		out["areaLine"] = word("area.unstated")
+	case facts["areaFrom"] == "basin":
+		out["areaLine"] = fill(word("area.basin"), map[string]string{"places": out["places"]})
+	default:
+		out["areaLine"] = fill(word("area.districts"), map[string]string{"places": out["places"]})
+	}
+	out["divisionsLine"] = ""
+	if facts["divisions"] != "" {
+		key := "divisions.count"
+		if facts["divisionNames"] != "" {
+			key = "divisions.named"
+		}
+		out["divisionsLine"] = fill(word(key), map[string]string{"count": facts["divisions"], "names": facts["divisionNames"]})
+	}
+	out["readingLine"] = ""
+	if facts["waterLevel"] != "" && facts["threshold"] != "" {
+		unit := facts["unit"]
+		if unit == "" {
+			unit = "m"
+		}
+		out["readingLine"] = fill(word("reading.line"), map[string]string{"level": trimNumber(facts["waterLevel"]),
+			"threshold": trimNumber(facts["threshold"]), "unit": unit})
+	}
+	station := facts["station"]
+	if station == "" {
+		station = facts["site"]
+	}
+	switch {
+	case station != "" && facts["river"] != "" && !strings.EqualFold(station, facts["river"]):
+		out["stationPlace"] = fill(word("station.place"), map[string]string{"river": facts["river"], "station": station})
+	case station != "":
+		out["stationPlace"] = station
+	default:
+		out["stationPlace"] = facts["river"]
+	}
+	out["directionPlace"] = word("direction.none")
+	if direction, ok := words[locale]["direction."+facts["direction"]]; ok && facts["direction"] != "" {
+		out["directionPlace"] = direction
+	}
+	out["nearLine"] = ""
+	if facts["nearDistrict"] != "" {
+		out["nearLine"] = fill(word("near.line"), map[string]string{"district": district(facts["nearDistrict"])})
 	}
 	return out
+}
+
+// fill writes values into a text's {placeholders}; unknown ones are dropped.
+func fill(text string, values map[string]string) string {
+	return placeholder.ReplaceAllStringFunc(text, func(match string) string {
+		return values[match[1:len(match)-1]]
+	})
+}
+
+// trimNumber writes a reading without trailing zeros: 7.50 is 7.5, 7.00 is 7.
+func trimNumber(value string) string {
+	if !strings.Contains(value, ".") {
+		return value
+	}
+	return strings.TrimSuffix(strings.TrimRight(value, "0"), ".")
+}
+
+// shortList names places for a title: as many as fit, then a count of the
+// rest ("Galle, Matara +3"), or the fallback when there are none.
+func shortList(places []string, fallback string) string {
+	if len(places) == 0 {
+		return fallback
+	}
+	text, shown := places[0], 1
+	for shown < len(places) {
+		next := text + ", " + places[shown]
+		if utf8.RuneCountInString(next) > maxWhere {
+			break
+		}
+		text, shown = next, shown+1
+	}
+	if shown < len(places) {
+		text += " +" + strconv.Itoa(len(places)-shown)
+	}
+	return text
+}
+
+// subjectList names what a gathered notice gathers, at most three and a count
+// of the rest, or the lead's own name.
+func subjectList(subjects []string, facts map[string]string) string {
+	if len(subjects) == 0 {
+		for _, key := range []string{"station", "site", "name", "gauge"} {
+			if facts[key] != "" {
+				return facts[key]
+			}
+		}
+		return ""
+	}
+	shown := subjects[:min(len(subjects), maxSubjects)]
+	text := strings.Join(shown, ", ")
+	if rest := len(subjects) - len(shown); rest > 0 {
+		text += " +" + strconv.Itoa(rest)
+	}
+	return text
+}
+
+// Issuer names who a notice's information comes from, in a language.
+func Issuer(locale, kind string, facts map[string]string) string {
+	key := "issuer." + kind
+	if kind == KindRiver && facts["source"] == "community" {
+		key = "issuer.river.community"
+	}
+	if text, ok := words[locale][key]; ok {
+		return text
+	}
+	if text, ok := words["en"][key]; ok {
+		return text
+	}
+	return words[locale]["issuer.test"]
+}
+
+// Official reports whether a notice passes on a Sri Lankan authority's own
+// warning or reading (DMC, NBRO, the Irrigation Department), rather than a
+// forecast, an estimate or community data.
+func Official(kind string, facts map[string]string) bool {
+	switch kind {
+	case KindBulletin, KindLandslide:
+		return true
+	case KindRiver:
+		return facts["source"] == "irrigation"
+	}
+	return false
 }
 
 // joinList writes "a, b and c".

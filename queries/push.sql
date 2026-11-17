@@ -156,3 +156,24 @@ SELECT r.id FROM regions r
 JOIN flood_areas a ON ST_Intersects(r.geom, a.geom)
 WHERE a.id = @area_id AND r.level = 'district'
 ORDER BY r.id;
+
+-- name: BasinDistrictShares :many
+-- The share of each named river basin in each district it crosses, so a flood
+-- warning that names a basin can name the districts it covers.
+SELECT b.name::text AS basin, r.id::text AS district,
+       (ST_Area(ST_Intersection(b.geom, r.geom_simple)::geography)
+        / NULLIF(ST_Area(b.geom::geography), 0))::float8 AS share
+FROM official_basins b
+JOIN regions r ON r.level = 'district' AND ST_Intersects(b.geom, r.geom_simple)
+WHERE b.named
+ORDER BY b.name, share DESC;
+
+-- name: PushInbox :many
+-- What was sent to one subscription since a time, newest notice first: every
+-- event of each notice, for the in-app list of notices.
+SELECT d.notice_id, d.sent_at, d.severity AS notice_severity, e.*
+FROM push_deliveries d
+JOIN push_events e ON e.dedupe_key = d.event_key
+WHERE d.subscription_id = @subscription_id AND d.sent_at >= @since
+ORDER BY d.sent_at DESC, d.notice_id DESC, e.detected_at DESC
+LIMIT @max_rows;

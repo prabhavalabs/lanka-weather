@@ -2,6 +2,7 @@ package push
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,8 +24,12 @@ type Notice struct {
 	Severity Severity
 	Count    int
 	Facts    map[string]string
-	URL      string
-	Tag      string
+	// Districts are every district its events are about, the lead's first;
+	// Subjects name the gauges, sites or reservoirs it gathers.
+	Districts []string
+	Subjects  []string
+	URL       string
+	Tag       string
 	// ExpiresAt is when the last of its events stops being relevant.
 	ExpiresAt time.Time
 }
@@ -107,6 +112,14 @@ func gather(kind string, events []Event) Notice {
 		if event.ExpiresAt.After(notice.ExpiresAt) {
 			notice.ExpiresAt = event.ExpiresAt
 		}
+		for _, district := range event.Districts {
+			if !slices.Contains(notice.Districts, district) {
+				notice.Districts = append(notice.Districts, district)
+			}
+		}
+		if subject := subjectOf(event); subject != "" && !slices.Contains(notice.Subjects, subject) {
+			notice.Subjects = append(notice.Subjects, subject)
+		}
 	}
 	if len(sorted) > 1 {
 		notice.Tag = kind + ":summary"
@@ -115,6 +128,17 @@ func gather(kind string, events []Event) Notice {
 		}
 	}
 	return notice
+}
+
+// subjectOf names what an event is about when it is one place among many: a
+// gauge, a forecast site, a reservoir or a rain gauge.
+func subjectOf(event Event) string {
+	for _, key := range []string{"station", "site", "name", "gauge"} {
+		if value := event.Facts[key]; value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // ttlFor is how long a push service may hold a notice for an offline device:
@@ -136,15 +160,42 @@ func urgencyFor(severity Severity) string {
 	return webpush.UrgencyNormal
 }
 
+// Render writes a notice's title and body in a language.
+func (notice Notice) Render(locale string, names messages.Names, now time.Time) (title, body string) {
+	return messages.Render(locale, messages.Input{Kind: notice.Kind, Variant: notice.Variant, Count: notice.Count,
+		Facts: notice.Facts, Districts: notice.Districts, Subjects: notice.Subjects, Now: now}, names)
+}
+
+// NoticeURL is a notice's link with its id, so the app opens the notice's
+// details over the map it points at.
+func NoticeURL(url string, id int64) string {
+	if id <= 0 {
+		return url
+	}
+	separator := "?"
+	if strings.Contains(url, "?") {
+		separator = "&"
+	}
+	return url + separator + "notice=" + strconv.FormatInt(id, 10)
+}
+
 // Message builds a notice's payload in a subscriber's language and the
-// headers it is sent with.
-func (notice Notice) Message(subscriber Subscriber, names messages.Names, now time.Time) (Payload, webpush.Message) {
-	title, body := messages.Render(subscriber.Locale, messages.Input{Kind: notice.Kind, Variant: notice.Variant,
-		Count: notice.Count, Facts: notice.Facts, Now: now}, names)
-	payload := Payload{Title: title, Body: body, URL: notice.URL, Tag: notice.Tag, Severity: notice.Severity,
-		SentAt: now.UTC(), RequireInteraction: notice.Severity == SeverityDanger, Lang: subscriber.Locale}
+// headers it is sent with. id is the notice's id; 0 for a test notice.
+func (notice Notice) Message(subscriber Subscriber, names messages.Names, now time.Time, id int64) (Payload, webpush.Message) {
+	title, body := notice.Render(subscriber.Locale, names, now)
+	tag := notice.Tag
+	if notice.Count > 1 && id > 0 {
+		// A gathered notice keeps its own place in the tray: it must not
+		// replace the last one, whose places may differ.
+		tag += ":" + strconv.FormatInt(id, 10)
+	}
+	payload := Payload{Title: title, Body: body, URL: NoticeURL(notice.URL, id), Tag: tag, Severity: notice.Severity,
+		SentAt: now.UTC(), RequireInteraction: notice.Severity == SeverityDanger, Lang: subscriber.Locale, Kind: notice.Kind}
+	if id > 0 {
+		payload.ID = strconv.FormatInt(id, 10)
+	}
 	return payload, webpush.Message{Endpoint: subscriber.Endpoint, P256dh: subscriber.P256dh, Auth: subscriber.Auth,
-		TTL: ttlFor(notice.Severity, notice.ExpiresAt, now), Urgency: urgencyFor(notice.Severity), Topic: webpush.TopicFor(notice.Tag)}
+		TTL: ttlFor(notice.Severity, notice.ExpiresAt, now), Urgency: urgencyFor(notice.Severity), Topic: webpush.TopicFor(tag)}
 }
 
 // TestNotice is the notice sent from the settings, to check delivery.

@@ -26,3 +26,32 @@ func CoastDistanceKm(lon, lat float64) float64 {
 	}
 	return best
 }
+
+// NearestCoast is the point of Sri Lanka's coastline nearest a point at sea and
+// its distance; for a point on land, the point itself and 0.
+func NearestCoast(lon, lat float64) (coastLon, coastLat, km float64) {
+	if OnLand(lon, lat) {
+		return lon, lat, 0
+	}
+	km = math.Inf(1)
+	for _, ring := range coastline {
+		for _, vertex := range ring {
+			if distance := DistanceKm(lon, lat, vertex[0], vertex[1]); distance < km {
+				coastLon, coastLat, km = vertex[0], vertex[1], distance
+			}
+		}
+	}
+	return coastLon, coastLat, km
+}
+
+// Compass is the eight-point direction from one point to another: N, NE, E,
+// SE, S, SW, W or NW.
+func Compass(fromLon, fromLat, toLon, toLat float64) string {
+	toRadians := math.Pi / 180
+	phi1, phi2 := fromLat*toRadians, toLat*toRadians
+	dLon := (toLon - fromLon) * toRadians
+	y := math.Sin(dLon) * math.Cos(phi2)
+	x := math.Cos(phi1)*math.Sin(phi2) - math.Sin(phi1)*math.Cos(phi2)*math.Cos(dLon)
+	bearing := math.Mod(math.Atan2(y, x)/toRadians+360, 360)
+	return [...]string{"N", "NE", "E", "SE", "S", "SW", "W", "NW"}[int(math.Round(bearing/45))%8]
+}

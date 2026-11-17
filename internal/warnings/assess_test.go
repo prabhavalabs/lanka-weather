@@ -1,6 +1,7 @@
 package warnings
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -243,5 +244,25 @@ func TestAWithdrawnWarningLeavesTheListInForce(t *testing.T) {
 		[]Notice{{NoticeRef: NoticeRef{ID: "n", IssuedAt: issued.Add(time.Hour)}, Basins: []string{"Gin Ganga"}}})
 	if got := InForce(bulletins); len(got) != 0 {
 		t.Fatalf("in force = %+v", got)
+	}
+}
+
+func TestNamedBasins(t *testing.T) {
+	keys := []string{"kalu", "gin", "attanagalu", "maha", "mahaweli", "ma", "kelani"}
+	for title, want := range map[string][]string{
+		"Flood Warning for Kuda Ganga SubBasin Of Kalu River - NO 01 (2026.11.11)": {"kalu"},
+		"Flood Warning for Gin River Basin - NO 02 (2026.11.11)_Extended":          {"gin"},
+		"Flood Warning for Aththanagalu Oya Basin":                                 {"attanagalu"},
+		"Flood warning for Kelani River and Maha Oya":                              {"maha", "kelani"},
+		"Flood warning for Mahaweli Ganga":                                         {"mahaweli"},
+		"Advisory for Thunderstorm":                                                {},
+		"Warning for strong winds and rough seas":                                  {},
+	} {
+		if got := NamedBasins(title, keys); !slices.Equal(got, want) {
+			t.Errorf("%q: %v, want %v", title, got, want)
+		}
+	}
+	if BasinKey("Attanagalu Oya") != "attanagalu" || BasinKey("Kalu Ganga") != "kalu" {
+		t.Error("basin keys")
 	}
 }

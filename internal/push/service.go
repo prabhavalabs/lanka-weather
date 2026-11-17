@@ -338,7 +338,7 @@ func (service *Service) Test(ctx context.Context, endpoint, auth string) error {
 	if claimed == 0 {
 		return ErrTooSoon
 	}
-	payload, message := TestNotice(now).Message(SubscriberFrom(row), nil, now)
+	payload, message := TestNotice(now).Message(SubscriberFrom(row), nil, now, 0)
 	if message.Payload, err = json.Marshal(payload); err != nil {
 		return err
 	}

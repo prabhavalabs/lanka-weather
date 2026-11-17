@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +39,7 @@ type (
 	WarningsSource interface {
 		Overview(ctx context.Context, filter warnings.Filter) (*warnings.Overview, error)
 		Landslides(ctx context.Context) (warnings.LandslideLayer, error)
+		LandslideWarning(ctx context.Context) (*warnings.Bulletin, error)
 	}
 	RiversSource interface {
 		Layer(ctx context.Context) (rivers.FeatureCollection, error)
@@ -160,7 +164,7 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 	places := engine.places(ctx)
 	if engine.Warnings != nil {
 		if overview, err := engine.Warnings.Overview(ctx, warnings.Filter{Limit: 1}); err == nil {
-			readings = append(readings, Bulletins(overview, now))
+			readings = append(readings, WithBasinDistricts(Bulletins(overview, now), places.BasinDistricts))
 			layers.Bulletins = overview
 		} else {
 			fail("bulletins", err)
@@ -169,6 +173,11 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 			readings = append(readings, Landslides(layer, now))
 		} else {
 			fail("landslides", err)
+		}
+		if bulletin, err := engine.Warnings.LandslideWarning(ctx); err == nil {
+			readings = append(readings, LandslideIssued(bulletin, now))
+		} else {
+			fail("landslide warning", err)
 		}
 	}
 	if engine.Rivers != nil {
@@ -189,7 +198,7 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 	}
 	if engine.Hazards != nil {
 		if layer, err := engine.Hazards.Cyclones(ctx); err == nil {
-			readings = append(readings, Cyclones(layer, now))
+			readings = append(readings, WithNearestDistrict(Cyclones(layer, now), places.DistrictOf))
 		} else {
 			fail("cyclones", err)
 		}
@@ -226,7 +235,7 @@ func (engine *Engine) read(ctx context.Context, now time.Time) []Reading {
 	// on forecasts alone.
 	if layers.Rain != nil {
 		assessments := map[string]floodrisk.Assessment{}
-		for district, inputs := range floodrisk.Gather(layers, places, now) {
+		for district, inputs := range floodrisk.Gather(layers, places.Places, now) {
 			assessments[district] = floodrisk.Assess(inputs)
 		}
 		readings = append(readings, FloodRisk(assessments, layers.Complete(), now))
@@ -331,16 +340,77 @@ func (engine *Engine) apply(ctx context.Context, reading Reading, states map[str
 
 // places finds districts through the shared locator, reading district names
 // once per run.
-func (engine *Engine) places(ctx context.Context) floodrisk.Places {
+func (engine *Engine) places(ctx context.Context) places {
 	engine.once.Do(func() {
 		if engine.Locator == nil {
 			engine.Locator = &floodrisk.Locator{Pool: engine.Pool, Logger: engine.Logger}
 		}
 	})
 	locator := engine.Locator
-	return floodrisk.Places{
-		DistrictOf:    func(lon, lat float64) string { return locator.DistrictOf(ctx, lon, lat) },
-		AreaDistricts: func(id string) []string { return locator.AreaDistricts(ctx, id) },
-		DistrictNamed: locator.Named(ctx),
+	return places{
+		Places: floodrisk.Places{
+			DistrictOf:    func(lon, lat float64) string { return locator.DistrictOf(ctx, lon, lat) },
+			AreaDistricts: func(id string) []string { return locator.AreaDistricts(ctx, id) },
+			DistrictNamed: locator.Named(ctx),
+		},
+		BasinDistricts: func(title string) []string { return locator.BasinDistricts(ctx, title) },
 	}
+}
+
+// places are the estimate's lookups and the basins of flood warnings.
+type places struct {
+	floodrisk.Places
+	BasinDistricts func(title string) []string
+}
+
+// WithBasinDistricts places a flood warning that names no district in the
+// districts of the basin its title names, "Flood Warning for Gin River Basin"
+// in Galle and Matara: the bulletin's text often names only rivers and
+// reservoirs, and such a warning had gone to the whole country as "Sri
+// Lanka" (November 2026). One with no basin we know stays national.
+func WithBasinDistricts(reading Reading, basinDistricts func(title string) []string) Reading {
+	if basinDistricts == nil {
+		return reading
+	}
+	for index := range reading.Observations {
+		event := &reading.Observations[index].Event
+		if len(event.Districts) > 0 || event.Facts["type"] != "water_level" {
+			continue
+		}
+		districts := basinDistricts(event.Facts["title"])
+		if len(districts) == 0 {
+			continue
+		}
+		facts := maps.Clone(event.Facts)
+		facts["districts"] = strings.Join(districts, ",")
+		facts["areaFrom"] = "basin"
+		event.Facts, event.Districts, event.National = facts, districts, false
+		if len(districts) == 1 {
+			event.URL += "&district=" + districts[0]
+		}
+	}
+	return reading
+}
+
+// WithNearestDistrict names the district of the coast nearest each cyclone.
+func WithNearestDistrict(reading Reading, districtOf DistrictOf) Reading {
+	if districtOf == nil {
+		return reading
+	}
+	for index := range reading.Observations {
+		event := &reading.Observations[index].Event
+		lon, errLon := strconv.ParseFloat(event.Facts["coastLon"], 64)
+		lat, errLat := strconv.ParseFloat(event.Facts["coastLat"], 64)
+		if errLon != nil || errLat != nil {
+			continue
+		}
+		facts := maps.Clone(event.Facts)
+		delete(facts, "coastLon")
+		delete(facts, "coastLat")
+		if district := districtOf(lon, lat); district != "" {
+			facts["nearDistrict"] = district
+		}
+		event.Facts = facts
+	}
+	return reading
 }

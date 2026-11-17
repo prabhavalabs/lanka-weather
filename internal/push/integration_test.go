@@ -318,7 +318,10 @@ func TestDispatcherGathersAndCaps(t *testing.T) {
 	if stats, err := dispatcher.Run(ctx); err != nil || stats.Notices != 1 || stats.Sent != 1 {
 		t.Fatalf("three landslide events make one notice: %+v %v", stats, err)
 	}
-	if got := fake.received("/ok/everything"); len(got) != 1 || got[0].Header.Get("Topic") != webpush.TopicFor("landslide:summary") {
+	// A gathered notice has a tag of its own ("landslide:summary:<id>"), so it
+	// does not replace the last gathered notice, whose places may differ.
+	if got := fake.received("/ok/everything"); len(got) != 1 || got[0].Header.Get("Topic") == "" ||
+		got[0].Header.Get("Topic") == webpush.TopicFor("landslide:summary") {
 		t.Fatalf("gathered %v", got)
 	}
 	// The cap is reached: a warning waits, a danger does not.
