@@ -116,6 +116,54 @@ Sends a test notice (severity `info`) to the subscription, at most once a minute
 
 Answers 202 `{ "data": { "sent": true } }` once the push service accepts it.
 
+## `POST /api/push/inbox`
+
+The notices sent to the subscription in the last 30 days, newest first (at most 100), written in
+`locale`, for the app's list of notices (ADR 0020). POST because the body carries the auth key.
+
+```json
+{ "endpoint": "https://fcm.googleapis.com/fcm/send/…", "auth": "Q2…", "locale": "en" }
+```
+
+```json
+{
+  "data": {
+    "notices": [
+      {
+        "id": "43",
+        "sentAt": "2026-11-12T15:23:06Z",
+        "kind": "bulletin",
+        "severity": "warning",
+        "title": "Flood warning · Matara",
+        "body": "DMC, issued 18:30: “Flood warning for Nilwala River Basin”. Districts: Matara. Follow official instructions.",
+        "url": "/?warnings=water_level&district=LK-32",
+        "official": true,
+        "source": "Disaster Management Centre",
+        "national": false,
+        "areas": [{ "id": "LK-32", "name": "Matara" }],
+        "events": [
+          {
+            "key": "bulletin:b5332fc4308c:2:1794496986",
+            "kind": "bulletin",
+            "severity": "warning",
+            "title": "Flood warning · Matara",
+            "body": "…",
+            "url": "/?warnings=water_level&district=LK-32",
+            "detectedAt": "2026-11-12T15:23:06Z",
+            "issuedAt": "2026-11-12T13:00:00Z",
+            "areas": [{ "id": "LK-32", "name": "Matara" }]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`official` is true for the DMC's bulletins, NBRO's landslide levels and the Irrigation Department's
+gauges; forecasts, estimates and community data are false. `issuedAt` is when the issuer issued or
+measured it, when known.
+
 ## Errors
 
 | Status | Code | When |
@@ -136,22 +184,28 @@ What the service worker receives, decrypted (the contract with `apps/web/src/sw.
 ```json
 {
   "title": "Landslide Level 3 · Ratnapura",
-  "body": "NBRO: evacuate if you are in an affected area. Tap for details.",
-  "url": "/?warnings=landslide&district=LK-91",
+  "body": "NBRO, issued 16:00: Level 3 (Red) in Ratnapura district, 4 divisions including Ayagama, Elapatha. Evacuate now if you are in these areas.",
+  "url": "/?warnings=landslide&district=LK-91&notice=42",
   "tag": "landslide:district:LK-91",
   "severity": "danger",
   "sentAt": "2026-11-03T08:39:02Z",
   "requireInteraction": true,
-  "lang": "en"
+  "lang": "en",
+  "id": "42",
+  "kind": "landslide"
 }
 ```
 
 - `url` is a path the app opens a panel for: `/?warnings=<type>[&district=]`,
   `/?warnings=landslide&district=`, `/?station=`, `/?gauge=`, `/?area=`, `/?cyclone=`, `/?quake=`,
-  `/?reservoir=`, `/?reservoirs=active`, or `/`.
+  `/?reservoir=`, `/?reservoirs=active`, or `/`, followed by `notice=<id>`, which opens the
+  notice's details over that map.
+- `id` is the notice's id, as `POST /api/push/inbox` lists it; absent for a test notice. `kind` is
+  the kind of notice.
 - `tag` groups notices so a newer one replaces an older one: `bulletin:<hash>`,
   `landslide:district:<code>`, `river:station:<id>`, `forecast:gauge:<id>`, `flash:area:<id>`,
-  `cyclone:<id>`, `quake:<id>`, `reservoir:<id>`, `<kind>:summary` for a gathered notice, `test`.
+  `cyclone:<id>`, `quake:<id>`, `reservoir:<id>`, `<kind>:summary:<id>` for a gathered notice (its
+  own, so it never replaces another gathered notice), `test`.
 - `requireInteraction` is present, and true, only for danger.
 - Request headers: `TTL` in seconds (hours, never days), `Urgency: high` for warning and danger and
   `normal` otherwise, `Topic` a 32-character hash of the tag.

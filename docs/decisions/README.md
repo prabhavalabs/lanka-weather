@@ -26,3 +26,4 @@ supersedes the old one, not by editing an accepted record.
 | [0017](0017-pwa-offline-and-install.md)                | Installable, offline-capable app, and an install guide                         | Accepted                                                    |
 | [0018](0018-push-alerts.md)                            | Push alerts                                                                    | Accepted                                                    |
 | [0019](0019-combined-flood-risk.md)                     | A combined flood-risk estimate by district                                     | Accepted                                                    |
+| [0020](0020-timely-placed-push-notices.md)              | Timely official warnings, notices that say where, and a list of notices       | Accepted                                                    |
