@@ -13,6 +13,8 @@ export const format: Translation<typeof en> = {
   today: "අද",
   yesterday: "ඊයේ",
   tomorrow: "හෙට",
+  todayAt: "අද {time}",
+  yesterdayAt: "ඊයේ {time}",
   minutesAgo: "මිනිත්තු {count}කට පෙර",
   hoursAgo: "පැය {count}කට පෙර",
   daysAgo: "දින {count}කට පෙර",

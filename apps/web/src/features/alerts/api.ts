@@ -86,3 +86,16 @@ export function sendTest(subscription: PushSubscriptionJSON) {
     auth: subscription.keys?.auth,
   })
 }
+
+/**
+ * The notices sent to this subscription in the last 30 days, newest first,
+ * written in `locale`. POST because the body carries the subscription's
+ * auth secret. The answer is checked by features/notifications/present.ts.
+ */
+export function getInbox(subscription: PushSubscriptionJSON, locale: Locale) {
+  return send<{ notices: unknown }>("POST", "/api/push/inbox", {
+    endpoint: subscription.endpoint,
+    auth: subscription.keys?.auth,
+    locale,
+  })
+}

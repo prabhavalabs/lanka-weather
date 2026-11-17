@@ -20,9 +20,11 @@ import {
   keyBytes,
   type Preferences,
   problem,
-  readPreferences,
+  readStoredAlerts,
   sameKey,
   statusOf,
+  type StoredAlerts,
+  topics,
 } from "./present"
 
 const storageKey = "lanka-weather:alerts"
@@ -42,18 +44,28 @@ export interface AlertsState {
   preferences: Preferences
 }
 
-interface Stored {
-  preferences: Preferences
-  enabled: boolean
+type Stored = StoredAlerts
+
+function fresh(): Stored {
+  return { preferences: defaultPreferences(), enabled: false, known: [...topics] }
 }
 
+/**
+ * The stored settings. Default topics added since they were saved are turned
+ * on and the list of known topics brought up to date, then written back: the
+ * server's copy is replaced with these on every start, so they must not drop
+ * a topic the person never saw.
+ */
 function readStored(): Stored {
+  let raw: unknown
   try {
-    const raw = JSON.parse(localStorage.getItem(storageKey) ?? "null") as Partial<Stored> | null
-    return { preferences: readPreferences(raw?.preferences), enabled: raw?.enabled === true }
+    raw = JSON.parse(localStorage.getItem(storageKey) ?? "null")
   } catch {
-    return { preferences: defaultPreferences(), enabled: false }
+    return fresh()
   }
+  const read = readStoredAlerts(raw)
+  if (raw !== null) writeStored(read)
+  return read
 }
 
 function writeStored(stored: Stored) {
@@ -64,10 +76,7 @@ function writeStored(stored: Stored) {
   }
 }
 
-let stored =
-  typeof window === "undefined"
-    ? { preferences: defaultPreferences(), enabled: false }
-    : readStored()
+let stored: Stored = typeof window === "undefined" ? fresh() : readStored()
 let state: AlertsState = {
   status: "checking",
   busy: false,
@@ -123,6 +132,12 @@ async function worker(wait: boolean): Promise<ServiceWorkerRegistration | null> 
 async function currentSubscription(): Promise<PushSubscription | null> {
   const registration = await worker(false)
   return (await registration?.pushManager.getSubscription().catch(() => null)) ?? null
+}
+
+/** This device's push subscription, or null when it has none. */
+export async function subscriptionJSON(): Promise<PushSubscriptionJSON | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null
+  return (await currentSubscription())?.toJSON() ?? null
 }
 
 /** Puts the server's copy in step, subscribing again if it has forgotten us. */

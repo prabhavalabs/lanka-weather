@@ -6,7 +6,9 @@
  *   app opens with no connection, and answers navigations with it.
  * - Caches map tiles and API data at runtime, with bounded storage
  *   (features/pwa/routes.ts).
- * - Shows push alerts and opens the app at the alert when one is tapped.
+ * - Shows push alerts, keeps a copy of each for the in-app inbox
+ *   (features/notifications), and opens the app at the alert when one is
+ *   tapped.
  *
  * Updates wait: a new worker is installed in the background and takes over
  * only when the page asks (the "Reload" toast posts SKIP_WAITING), so the
@@ -23,7 +25,10 @@ import {
 } from "workbox-precaching"
 import { NavigationRoute, registerRoute } from "workbox-routing"
 import { CacheFirst, NetworkFirst, StaleWhileRevalidate, type Strategy } from "workbox-strategies"
+import { localNoticeFrom, saveLocalNotice } from "./features/notifications/db"
 import {
+  inboxMessage,
+  type Notice,
   noticeFromPush,
   noticeUrl,
   pickLocale,
@@ -121,9 +126,24 @@ function pushText(event: PushEvent): string | null {
   }
 }
 
+/** Keeps a copy for the in-app inbox and tells open windows. Never throws. */
+async function keep(notice: Notice) {
+  try {
+    const nonce = Math.random().toString(36).slice(2, 10)
+    await saveLocalNotice(localNoticeFrom(notice, new Date(), nonce))
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true })
+    for (const client of windows) client.postMessage({ type: inboxMessage })
+  } catch {
+    // Storage may be full or unavailable; the notification is shown all the same.
+  }
+}
+
 self.addEventListener("push", (event) => {
   const notice = noticeFromPush(pushText(event), deviceLocale())
-  event.waitUntil(self.registration.showNotification(notice.title, notice.options))
+  // The notification does not wait for storage, and a storage failure cannot stop it.
+  event.waitUntil(
+    Promise.all([self.registration.showNotification(notice.title, notice.options), keep(notice)]),
+  )
 })
 
 self.addEventListener("notificationclick", (event) => {

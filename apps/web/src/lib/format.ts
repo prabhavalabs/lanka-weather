@@ -95,6 +95,25 @@ export function formatDayTime(iso: string, locale: Locale = getLocale()): string
   })
 }
 
+/**
+ * A recent moment, by its day in Sri Lanka: "Today 18:10", "Yesterday 18:10",
+ * else "Mon 3 Nov · 18:10".
+ */
+export function formatRecent(
+  iso: string,
+  now: Date = new Date(),
+  locale: Locale = getLocale(),
+): string {
+  const time = formatClock(iso)
+  const then = colomboParts(new Date(iso))
+  const dayNumber = (parts: { year: number; month: number; day: number }) =>
+    Date.UTC(parts.year, parts.month - 1, parts.day) / 86_400_000
+  const days = dayNumber(colomboParts(now)) - dayNumber(then)
+  if (days === 0) return translateIn(locale, "format.todayAt", { time })
+  if (days === 1) return translateIn(locale, "format.yesterdayAt", { time })
+  return formatDayTime(iso, locale)
+}
+
 /** "3 Nov, 14:00": a date and time without the weekday. */
 export function formatDateTime(iso: string, locale: Locale = getLocale()): string {
   const { day, month } = colomboParts(new Date(iso))
