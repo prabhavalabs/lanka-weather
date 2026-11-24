@@ -134,12 +134,25 @@ const (
 	maxHistoryHours     = 30 * 24
 )
 
+// trustedProxies are the networks the API's reverse proxies connect from: the
+// web container on the Compose network, or a proxy on the same host. Only a
+// request from one of them may name its client in X-Real-IP.
+var trustedProxies = []string{
+	"127.0.0.0/8", "::1/128",
+	"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7",
+}
+
 // NewRouter returns the API's HTTP handler.
 func NewRouter(deps Dependencies) http.Handler {
 	api := &api{deps: deps}
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// The client's address, for rate limits, is X-Real-IP, which the host's
+	// nginx overwrites with the connecting address on every request, and
+	// only when the request comes from a trusted proxy. RealIP is not used:
+	// it believes True-Client-IP and X-Forwarded-For, which any client can
+	// set, so each request could claim a fresh address.
+	r.Use(middleware.ClientIPFromHeader("X-Real-IP", trustedProxies...))
 	r.Use(requestLogger(deps.Logger))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))

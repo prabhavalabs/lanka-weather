@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/prabhavalabs/lanka-weather/internal/push"
 )
@@ -262,9 +263,12 @@ func (api *api) pushInbox(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Envelope{Data: inboxResponse{Notices: notices}})
 }
 
-// clientKey identifies a client for rate limiting: its address as RealIP
-// leaves it, without the port.
+// clientKey identifies a client for rate limiting: the address from a trusted
+// proxy's X-Real-IP, or else the connection's own address without the port.
 func clientKey(r *http.Request) string {
+	if ip := middleware.GetClientIP(r.Context()); ip != "" {
+		return ip
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

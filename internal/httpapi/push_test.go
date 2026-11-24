@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -189,6 +190,41 @@ func TestPushTestsAreRateLimitedPerClient(t *testing.T) {
 	response, envelope := send(t, server, http.MethodPost, "/api/push/test", `{"endpoint":"e","auth":"a"}`)
 	if response.StatusCode != http.StatusTooManyRequests || envelope.Error.Code != "rate_limited" || response.Header.Get("Retry-After") == "" {
 		t.Fatalf("over the limit %d %+v", response.StatusCode, envelope.Error)
+	}
+}
+
+// A client cannot reset its allowance by naming itself in headers a proxy
+// passes through; only X-Real-IP from a trusted proxy (here the loopback
+// test client) names a different client.
+func TestPushRateLimitIgnoresSpoofableHeaders(t *testing.T) {
+	server := pushServer(t, &fakePush{enabled: true})
+	post := func(index int, header string) int {
+		t.Helper()
+		request, err := http.NewRequest(http.MethodPost, server.URL+"/api/push/test", strings.NewReader(`{"endpoint":"e","auth":"a"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set("X-Real-IP", "203.0.113.7")
+		address := fmt.Sprintf("198.51.100.%d", index+1)
+		request.Header.Set(header, address)
+		response, err := server.Client().Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		return response.StatusCode
+	}
+	for index := range pushTestsPerTenMinutes {
+		header := []string{"True-Client-IP", "X-Forwarded-For"}[index%2]
+		if status := post(index, header); status != http.StatusAccepted {
+			t.Fatalf("test %d: %d", index, status)
+		}
+	}
+	if status := post(pushTestsPerTenMinutes, "True-Client-IP"); status != http.StatusTooManyRequests {
+		t.Fatalf("a spoofed True-Client-IP reset the limit: %d", status)
+	}
+	if status := post(0, "X-Real-IP"); status != http.StatusAccepted {
+		t.Fatalf("another client behind the proxy was limited: %d", status)
 	}
 }
 
