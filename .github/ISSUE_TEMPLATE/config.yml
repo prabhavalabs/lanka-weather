@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: In an emergency, call 117 (Disaster Management Centre)
+    url: https://www.dmc.gov.lk
+    about: This tracker is not watched for emergencies. Official warnings come from the DMC and the Department of Meteorology.
+  - name: Department of Meteorology warnings
+    url: https://www.meteo.gov.lk
+    about: Official weather forecasts and warnings for Sri Lanka.
+  - name: Report a security vulnerability
+    url: https://github.com/prabhavalabs/lanka-weather/security/advisories/new
+    about: Please report security problems privately, not as an issue.

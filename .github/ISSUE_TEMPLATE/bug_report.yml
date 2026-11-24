@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in the app or the API does not work as it should.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For wrong, late or missing data, use the "Wrong, stale or missing data" form instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Link
+      description: The page address, including the selection, for example `/?region=LK-21` or `/?at=7.2931,80.6350`.
+  - type: input
+    id: layers
+    attributes:
+      label: Layers switched on
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options: [English, Sinhala, Tamil]
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      description: For example "Android 15, Chrome 142, installed as an app" or "macOS, Safari 19".
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs

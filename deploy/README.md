@@ -1,7 +1,12 @@
 # Deploying weather.prabhavalabs.com
 
-The site runs on the shared Ubuntu host as one Docker Compose project,
-`lanka-weather`, behind the host's nginx.
+This is how the maintainers deploy their instance. To run your own, adapt
+the host name, paths and database set-up to your server.
+
+The site runs on an Ubuntu host as one Docker Compose project,
+`lanka-weather`, behind the host's nginx. The database is a PostgreSQL
+container shared by other apps on that host, reached on its `platform`
+Docker network.
 
 ```
 browser ─TLS─▶ host nginx :443 ─▶ 127.0.0.1:18750 web (nginx, built app)
@@ -44,7 +49,7 @@ Leave `LANKAWEATHER_ADDR` out: the image sets `:8080`.
 From a clean checkout of the revision to ship:
 
 ```bash
-DEPLOY_HOST=root@178.104.111.17 deploy/deploy.sh
+DEPLOY_HOST=deploy@your-server deploy/deploy.sh
 ```
 
 The script archives `HEAD` and copies it to the server. It then builds

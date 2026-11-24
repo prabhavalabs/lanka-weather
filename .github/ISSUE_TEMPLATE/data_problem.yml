@@ -1,0 +1,36 @@
+name: Wrong, stale or missing data
+description: A reading, forecast or warning on the map looks wrong, old or absent.
+labels: ["data", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lanka Weather is not an official source. If a life-safety decision depends on it, follow the DMC and the Department of Meteorology, and call 117 in an emergency.
+  - type: input
+    id: layer
+    attributes:
+      label: Layer and source
+      description: The layer, and the source shown in the panel (for example "River levels, Irrigation Department").
+    validations:
+      required: true
+  - type: input
+    id: place
+    attributes:
+      label: Station, gauge, reservoir or region
+      description: Its name or id, or the page link.
+    validations:
+      required: true
+  - type: input
+    id: when
+    attributes:
+      label: When you saw it
+      description: Date and time (Sri Lanka time), and the data age the panel showed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the correct value is, and where it comes from
+      description: Link to the official figure if there is one, such as a DMC bulletin or the Irrigation Department dashboard.
+    validations:
+      required: true

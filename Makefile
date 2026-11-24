@@ -1,4 +1,4 @@
-.PHONY: bootstrap db-up db-down migrate dev-api dev-worker dev-web collect generate generate-check lint test test-integration build ci
+.PHONY: bootstrap db-up db-down db-test migrate dev-api dev-worker dev-web collect generate generate-check lint test test-integration build ci
 
 # Local settings (copy .env.example to .env). Optional: CI sets variables directly.
 -include .env
@@ -17,6 +17,11 @@ db-up:
 
 db-down:
 	docker compose down
+
+# Creates the disposable database the integration tests use; see the
+# LANKAWEATHER_TEST_DATABASE_URL line in .env.example.
+db-test: db-up
+	docker compose exec -T postgres psql -U lankaweather -d lankaweather -tAc "SELECT 1 FROM pg_database WHERE datname = 'lankaweather_test'" | grep -q 1 || docker compose exec -T postgres createdb -U lankaweather lankaweather_test
 
 migrate:
 	go run ./cmd/lankaweather migrate

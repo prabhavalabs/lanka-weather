@@ -7,7 +7,7 @@ supersedes the old one, not by editing an accepted record.
 
 | ADR                                                    | Title                                                                          | Status                                                      |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| [0001](0001-go-modular-monolith.md)                    | Go modular monolith with PostgreSQL and PostGIS                                | Accepted                                                    |
+| [0001](0001-go-modular-monolith.md)                    | Go modular monolith with PostgreSQL and PostGIS                                | Accepted; reuse and OpenAPI notes superseded by 0021        |
 | [0002](0002-web-stack.md)                              | React, Vite, TanStack Query with a persisted cache, and MapLibre               | Accepted                                                    |
 | [0003](0003-repository-tooling.md)                     | Single repository with a pnpm workspace and a Makefile                         | Accepted                                                    |
 | [0004](0004-river-levels.md)                           | River levels from the Irrigation Department gauge service                      | Accepted                                                    |
@@ -27,3 +27,4 @@ supersedes the old one, not by editing an accepted record.
 | [0018](0018-push-alerts.md)                            | Push alerts                                                                    | Accepted                                                    |
 | [0019](0019-combined-flood-risk.md)                     | A combined flood-risk estimate by district                                     | Accepted                                                    |
 | [0020](0020-timely-placed-push-notices.md)              | Timely official warnings, notices that say where, and a list of notices       | Accepted                                                    |
+| [0021](0021-open-source-licence.md)                     | Apache-2.0 licence and reuse of TerraGuard code                                | Accepted                                                    |

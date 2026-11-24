@@ -1,0 +1,39 @@
+name: New data source
+description: Suggest a source of weather, water or hazard data for Sri Lanka.
+labels: ["data-source", "needs-triage"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Source and owner
+      description: For example "Department of Meteorology, three-hourly observations".
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Link
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: What data it has
+      description: What is measured or forecast, where, and how often it is updated.
+    validations:
+      required: true
+  - type: textarea
+    id: access
+    attributes:
+      label: How it can be read
+      description: API, file download, web page or PDF; whether a key or login is needed; any rate limits.
+  - type: textarea
+    id: terms
+    attributes:
+      label: Licence and terms
+      description: The licence or terms of use, and the attribution the owner asks for. "Unknown" is a fine answer.
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample
+      description: A short sample of the data, if you have one.
