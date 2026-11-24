@@ -15,7 +15,7 @@ COPY internal ./internal
 COPY migrations ./migrations
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/lankaweather ./cmd/lankaweather
 
-FROM node:24-alpine AS web-build
+FROM node:26-alpine AS web-build
 WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./
