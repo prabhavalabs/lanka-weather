@@ -1,0 +1,33 @@
+Lanka Weather
+Copyright 2026 Prabhava Labs
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Portions of this product are derived from TerraGuard, Copyright 2026
+Perfectus Technology Limited, licensed under the Apache License, Version 2.0,
+and are used with the copyright holder's permission. They were modified for
+this product. The derived files are:
+
+  internal/grib2/                      GRIB2 decoder
+  internal/connectors/gfs/             GFS byte-range download and decoding
+  internal/connectors/googleflood/     Google Flood Forecasting connector
+  apps/web/src/features/wind/field.ts      wind field format and sampling
+  apps/web/src/features/wind/forecast.ts   wind forecast steps
+  apps/web/src/features/wind/renderer.ts   wind particle renderer
+
+apps/web/src/components/ui/ contains components generated from shadcn/ui
+(https://ui.shadcn.com), MIT licence.
+
+The coastline in internal/grid/ is derived from Natural Earth
+(https://www.naturalearthdata.com), which is in the public domain.
+
+Test fixtures under internal/**/testdata/ are short excerpts or edited samples
+of public data from the sources listed in docs/data-sources.md, kept only to
+test decoders.
+
+This licence covers the source code. It does not cover the data a running
+instance collects and serves: each dataset keeps its own licence and
+attribution terms, listed in docs/data-sources.md.
+
+The "Lanka Weather" name and the artwork in brand/ identify this project and
+are not licensed for use as trademarks (Apache License 2.0, section 6).
