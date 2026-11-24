@@ -120,6 +120,7 @@ import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsL
 import { StationPanel } from "./features/rivers/StationPanel"
 import { MetStationPanel } from "./features/stations/MetStationPanel"
 import { AlertsButton } from "./features/alerts/AlertsButton"
+import { linkTarget } from "./features/notifications/present"
 import { OverviewButton } from "./features/overview/OverviewButton"
 import { OverviewPanel } from "./features/overview/OverviewPanel"
 import { overviewAction } from "./features/overview/present"
@@ -778,6 +779,18 @@ export function App() {
       }
     },
     [enable, pendingCamera, reveal, setLevel, setRegionFill, setSelection],
+  )
+  // "Show on map" in a notice: its link read the way the address is read on load.
+  const openLink = useCallback(
+    (url: string) => {
+      const target = linkTarget(url)
+      setOverviewOpen(false)
+      target.enable.forEach(enable)
+      if (!target.selection) return
+      pendingCamera(target.selection, "fit")
+      setSelection(target.selection)
+    },
+    [enable, pendingCamera, setSelection],
   )
   const openOverview = useCallback(() => {
     setSelection(null)
@@ -1544,7 +1557,7 @@ export function App() {
                 <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
                 <OverviewButton compact onClick={openOverview} />
                 {hazards.button(true)}
-                <AlertsButton compact />
+                <AlertsButton compact onShowOnMap={openLink} />
               </>
             }
           />
@@ -1561,7 +1574,7 @@ export function App() {
             />
             <OverviewButton onClick={openOverview} className={toolbarPill} />
             {hazards.button(false)}
-            <AlertsButton className={toolbarPill} />
+            <AlertsButton className={toolbarPill} onShowOnMap={openLink} />
             {regionsOn && (
               <div className="pointer-events-auto hidden h-10 shrink-0 items-center rounded-full border border-border bg-card/95 px-[3px] shadow-panel backdrop-blur-md @3xl:flex">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />

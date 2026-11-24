@@ -159,6 +159,40 @@ func (q *Queries) DivisionNames(ctx context.Context, id string) (DivisionNamesRo
 	return i, err
 }
 
+const getBulletin = `-- name: GetBulletin :one
+SELECT doc_id, bulletin_type, title, severity, colour, message_id, issued_at, valid_from, valid_until, pdf_url, source_page_url, lang, body, text_status, districts, source, source_time, fetched_at, text_fetched_at, withdrawn_basins
+FROM official_bulletins
+WHERE doc_id = $1
+`
+
+func (q *Queries) GetBulletin(ctx context.Context, docID string) (OfficialBulletin, error) {
+	row := q.db.QueryRow(ctx, getBulletin, docID)
+	var i OfficialBulletin
+	err := row.Scan(
+		&i.DocID,
+		&i.BulletinType,
+		&i.Title,
+		&i.Severity,
+		&i.Colour,
+		&i.MessageID,
+		&i.IssuedAt,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.PdfUrl,
+		&i.SourcePageUrl,
+		&i.Lang,
+		&i.Body,
+		&i.TextStatus,
+		&i.Districts,
+		&i.Source,
+		&i.SourceTime,
+		&i.FetchedAt,
+		&i.TextFetchedAt,
+		&i.WithdrawnBasins,
+	)
+	return i, err
+}
+
 type InsertLandslideLevelsParams struct {
 	ReportDate pgtype.Date `json:"report_date"`
 	DsID       string      `json:"ds_id"`

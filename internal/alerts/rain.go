@@ -126,7 +126,8 @@ func HeavyRain(intensities raingauges.Intensities, districtOf DistrictOf, now ti
 		event := push.Event{Kind: messages.KindRain, Variant: measure.Variant, Topic: push.TopicHeavyRain, Severity: rainSeverity(measure.Level),
 			Districts: []string{district},
 			Facts: map[string]string{"district": district, "gauge": entry.gauge.Name, "window": measure.Window,
-				"mm": strconv.Itoa(int(measure.Mm)), "observedAt": entry.gauge.ObservedAt.UTC().Format(time.RFC3339)},
+				"mm": strconv.Itoa(int(measure.Mm)), "observedAt": entry.gauge.ObservedAt.UTC().Format(time.RFC3339),
+				"issuedAt": entry.gauge.ObservedAt.UTC().Format(time.RFC3339)},
 			URL: "/?raingauge=" + entry.gauge.ID, Tag: "rain:district:" + district, ExpiresAt: now.Add(6 * time.Hour)}
 		event.Lon, event.Lat = point(entry.gauge.Lon, entry.gauge.Lat)
 		reading.Observations = append(reading.Observations, Observation{Subject: subject, Level: measure.Level, Event: event})

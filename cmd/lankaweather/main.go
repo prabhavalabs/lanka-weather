@@ -191,6 +191,7 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 		&irrigationgis.PastFloodsCollector{Pool: pool, Fetcher: client, Logger: logger},
 		&hydrobasins.Collector{Pool: pool, Client: client, Logger: logger},
 		&dmcbulletins.Collector{Pool: pool, Fetcher: client},
+		dmcSite(pool, client, logger),
 		&landslides.Collector{Pool: pool, Fetcher: client},
 		&usgs.Collector{Pool: pool, Fetcher: client},
 		&gdacs.Collector{Pool: pool, Fetcher: client},
@@ -209,6 +210,18 @@ func collectors(pool *pgxpool.Pool, logger *slog.Logger) []source.Collector {
 	}
 	// Derived from the collectors above, so it runs last.
 	return append(list, &rivernet.Collector{Pool: pool, Logger: logger})
+}
+
+// dmcSite reads the DMC's report lists directly, and new warnings' PDFs when
+// pdftotext is installed.
+func dmcSite(pool *pgxpool.Pool, client source.Fetcher, logger *slog.Logger) *dmcbulletins.SiteCollector {
+	collector := &dmcbulletins.SiteCollector{Pool: pool, Fetcher: client, Logger: logger}
+	if extractor := dmcbulletins.NewPDFToText(); extractor != nil {
+		collector.Text = extractor
+	} else {
+		logger.Info("pdftotext is not installed; DMC bulletin text waits for the index")
+	}
+	return collector
 }
 
 // pushIdentity reads the VAPID keys. Without them push alerts are off: the API

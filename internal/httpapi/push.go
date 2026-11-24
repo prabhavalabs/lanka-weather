@@ -24,6 +24,7 @@ type Push interface {
 	Delete(ctx context.Context, endpoint, auth string) error
 	Renew(ctx context.Context, oldEndpoint *string, subscription push.SubscriptionJSON) (push.View, error)
 	Test(ctx context.Context, endpoint, auth string) error
+	Inbox(ctx context.Context, endpoint, auth, locale string) ([]push.InboxNotice, error)
 }
 
 const (
@@ -57,6 +58,8 @@ func (api *api) pushRoutes(r chi.Router) {
 		r.Put("/subscriptions", api.pushUpdate)
 		r.Delete("/subscriptions", api.pushDelete)
 		r.Post("/subscriptions/renew", api.pushRenew)
+		// POST, as the auth secret must not be in a URL.
+		r.Post("/inbox", api.pushInbox)
 		r.With(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if ok, wait := tests.allow(clientKey(r)); !ok {
@@ -233,6 +236,30 @@ func (api *api) pushTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, Envelope{Data: map[string]bool{"sent": true}})
+}
+
+// inboxResponse is the notices sent to a subscription.
+type inboxResponse struct {
+	Notices []push.InboxNotice `json:"notices"`
+}
+
+// pushInbox lists the notices sent to a subscription, for the app's list of
+// notices. It answers when push is switched off too: what was sent stays
+// readable.
+func (api *api) pushInbox(w http.ResponseWriter, r *http.Request) {
+	if !api.pushAvailable(w) {
+		return
+	}
+	var request ownedRequest
+	if !readBody(w, r, &request) {
+		return
+	}
+	notices, err := api.deps.Push.Inbox(r.Context(), request.Endpoint, request.Auth, request.Locale)
+	if err != nil {
+		api.pushError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, Envelope{Data: inboxResponse{Notices: notices}})
 }
 
 // clientKey identifies a client for rate limiting: its address as RealIP

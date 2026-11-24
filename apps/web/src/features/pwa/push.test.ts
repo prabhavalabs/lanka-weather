@@ -11,16 +11,19 @@ import {
   pickLocale,
   renewBody,
   safePath,
+  withoutNotice,
 } from "./push"
 
 const full = {
   title: "Flood warning: Kelani Ganga",
   body: "Major flood level at Hanwella. Move to higher ground.",
-  url: "/?warning=123",
+  url: "/?station=hanwella&notice=123",
   tag: "warning-123",
   severity: "danger",
   sentAt: "2026-11-03T04:30:00Z",
   lang: "en",
+  id: "123",
+  kind: "river",
 }
 
 describe("parsePushPayload", () => {
@@ -28,6 +31,30 @@ describe("parsePushPayload", () => {
     const text = parsePushPayload(JSON.stringify(full))
     expect(text).toEqual(full)
     expect(parsePushPayload(full)).toEqual(full)
+  })
+
+  it("reads the notice id and kind, and drops malformed ones", () => {
+    expect(
+      parsePushPayload({ title: "A", id: "98765432109876543210", kind: "flash_flood" }),
+    ).toMatchObject({
+      id: "98765432109876543210",
+      kind: "flash_flood",
+    })
+    for (const id of ["", "12a", "-1", "1".repeat(21), 123, null, " 12"]) {
+      expect(parsePushPayload({ title: "A", id }), String(id)).not.toHaveProperty("id")
+    }
+    for (const kind of ["", "River", "flood-risk", "x".repeat(40), 7, "rain fall", "_rain"]) {
+      expect(parsePushPayload({ title: "A", kind }), String(kind)).not.toHaveProperty("kind")
+    }
+  })
+
+  it("reads a payload without id or kind, as older servers send", () => {
+    const old: Record<string, unknown> = { ...full }
+    delete old.id
+    delete old.kind
+    const payload = parsePushPayload(old)
+    expect(payload).toEqual(old)
+    expect(noticeFromPush(old).options.data).toMatchObject({ id: null, kind: null })
   })
 
   it("refuses what is not a JSON object or has no title or body", () => {
@@ -94,7 +121,15 @@ describe("noticeFromPush", () => {
       requireInteraction: true,
       lang: "en-GB",
       timestamp: Date.parse(full.sentAt),
-      data: { url: "/?warning=123", severity: "danger", sentAt: full.sentAt, parsed: true },
+      data: {
+        url: "/?station=hanwella&notice=123",
+        severity: "danger",
+        sentAt: full.sentAt,
+        parsed: true,
+        id: "123",
+        kind: "river",
+        lang: "en",
+      },
     })
     expect(notice.options.vibrate).toBeDefined()
   })
@@ -118,6 +153,9 @@ describe("noticeFromPush", () => {
         severity: "info",
         sentAt: null,
         parsed: false,
+        id: null,
+        kind: null,
+        lang: "en",
       })
     }
   })
@@ -141,8 +179,22 @@ describe("noticeUrl", () => {
   const origin = "https://lankaweather.example"
   it("opens the notice's path on this site, else the map", () => {
     expect(noticeUrl({ url: "/?warning=9" }, origin)).toBe(`${origin}/?warning=9`)
+    // The tapped notice opens its detail on top of the map state.
+    expect(noticeUrl({ url: "/?station=panadugama&notice=123" }, origin)).toBe(
+      `${origin}/?station=panadugama&notice=123`,
+    )
     expect(noticeUrl({ url: "https://evil.example" }, origin)).toBe(`${origin}/`)
     expect(noticeUrl(null, origin)).toBe(`${origin}/`)
+  })
+})
+
+describe("withoutNotice", () => {
+  it("keeps the map state and drops the notice", () => {
+    expect(withoutNotice("/?station=panadugama&notice=123")).toBe("/?station=panadugama")
+    expect(withoutNotice("/?notice=124&warnings=water_level")).toBe("/?warnings=water_level")
+    expect(withoutNotice("/?notice=1")).toBe("/")
+    expect(withoutNotice("/?at=7.2931,80.6350")).toBe("/?at=7.2931,80.6350")
+    expect(withoutNotice("https://evil.example/?notice=1")).toBe("/")
   })
 })
 

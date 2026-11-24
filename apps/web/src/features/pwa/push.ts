@@ -7,14 +7,23 @@
  *
  *   {
  *     "title": string,
- *     "body": string,
- *     "url": string,          // a same-origin path to open, e.g. "/?warning=123"
+ *     "body": string,         // up to about 300 characters
+ *     "url": string,          // a same-origin path to open, with the map state and
+ *                             // the notice, e.g. "/?station=panadugama&notice=123"
  *     "tag": string,          // replaces an earlier notice with the same tag
  *     "severity": "info" | "watch" | "warning" | "danger",
  *     "sentAt": ISO-8601 string,
  *     "requireInteraction"?: boolean,
- *     "lang"?: "en" | "si" | "ta"
+ *     "lang"?: "en" | "si" | "ta",
+ *     "id"?: string,          // the notice's id, digits, e.g. "123": unique per notice
+ *                             // per device; the in-app inbox (/api/push/inbox) uses it
+ *     "kind"?: string         // what it is about: bulletin, landslide, river,
+ *                             // flood_forecast, flash_flood, cyclone, earthquake,
+ *                             // reservoir, rain, flood_risk or test
  *   }
+ *
+ * The service worker also keeps a copy of every notice it shows in
+ * IndexedDB (features/notifications/db.ts), for the in-app inbox.
  *
  * A malformed or empty message still shows a generic notice: browsers
  * penalise push messages that show nothing, and a warning service should
@@ -37,6 +46,10 @@ export interface PushPayload {
   sentAt: string
   requireInteraction?: boolean
   lang?: Locale
+  /** The notice's id on the server, digits only. */
+  id?: string
+  /** What the notice is about, e.g. "river" or "flash_flood". */
+  kind?: string
 }
 
 /** What the service worker hands to `registration.showNotification`. */
@@ -64,6 +77,11 @@ export interface NoticeData {
   sentAt: string | null
   /** False when the message could not be read and this is the generic notice. */
   parsed: boolean
+  /** The notice's id on the server; null for an old payload or the generic notice. */
+  id: string | null
+  kind: string | null
+  /** The language the notice is written in. */
+  lang: Locale
 }
 
 export const noticeIcon = "/icon-192.png"
@@ -100,6 +118,18 @@ export function safePath(value: unknown): string {
   return path.slice(0, 2000)
 }
 
+const idPattern = /^[0-9]{1,20}$/
+const kindPattern = /^[a-z][a-z_]{0,31}$/
+
+/** A notice id: 1 to 20 digits. */
+export function isNoticeId(value: unknown): value is string {
+  return typeof value === "string" && idPattern.test(value)
+}
+
+function isKind(value: unknown): value is string {
+  return typeof value === "string" && kindPattern.test(value)
+}
+
 function isSeverity(value: unknown): value is Severity {
   return typeof value === "string" && (severities as readonly string[]).includes(value)
 }
@@ -132,6 +162,8 @@ export function parsePushPayload(data: unknown): PushPayload | null {
       ? { requireInteraction: raw.requireInteraction }
       : {}),
     ...(isLocale(raw.lang) ? { lang: raw.lang } : {}),
+    ...(isNoticeId(raw.id) ? { id: raw.id } : {}),
+    ...(isKind(raw.kind) ? { kind: raw.kind } : {}),
   }
 }
 
@@ -163,7 +195,15 @@ export function noticeFromPush(data: unknown, fallbackLocale: Locale = "en"): No
         renotify: true,
         requireInteraction: false,
         lang: locales[locale].tag,
-        data: { url: "/", severity: "info", sentAt: null, parsed: false },
+        data: {
+          url: "/",
+          severity: "info",
+          sentAt: null,
+          parsed: false,
+          id: null,
+          kind: null,
+          lang: locale,
+        },
       },
     }
   }
@@ -187,6 +227,9 @@ export function noticeFromPush(data: unknown, fallbackLocale: Locale = "en"): No
         severity: payload.severity,
         sentAt: payload.sentAt || null,
         parsed: true,
+        id: payload.id ?? null,
+        kind: payload.kind ?? null,
+        lang: locale,
       },
     },
   }
@@ -198,6 +241,17 @@ export function noticeUrl(data: unknown, origin: string): string {
     typeof data === "object" && data !== null ? safePath((data as { url?: unknown }).url) : "/"
   return new URL(path, origin).href
 }
+
+/** A same-origin path without its `notice` parameter: the map state alone. */
+export function withoutNotice(path: string): string {
+  const url = new URL(safePath(path), "https://lanka-weather.invalid")
+  if (!url.searchParams.has("notice")) return safePath(path)
+  url.searchParams.delete("notice")
+  return `${url.pathname}${url.search.replace(/%2C/g, ",")}${url.hash}`
+}
+
+/** The message the service worker posts to open windows when a notice arrives. */
+export const inboxMessage = "lanka-weather:inbox"
 
 /** Where the service worker reports a renewed subscription (the push alerts API). */
 export const renewSubscriptionPath = "/api/push/subscriptions/renew"

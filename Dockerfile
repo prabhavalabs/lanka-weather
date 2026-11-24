@@ -25,7 +25,7 @@ COPY apps/web apps/web
 RUN pnpm --filter @lanka-weather/web build
 
 FROM alpine:3.22 AS api
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata poppler-utils \
   && adduser -D -H -u 10001 lankaweather
 COPY --from=go-build /out/lankaweather /usr/local/bin/lankaweather
 USER lankaweather

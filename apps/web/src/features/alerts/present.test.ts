@@ -5,11 +5,14 @@ import {
   defaultPreferences,
   isIOS,
   keyBytes,
+  originalTopics,
   problem,
   readPreferences,
+  readStoredAlerts,
   sameKey,
   shortDistrictName,
   statusOf,
+  topics,
 } from "./present"
 
 const device: Capabilities = { push: true, ios: false, installed: false, permission: "default" }
@@ -116,6 +119,76 @@ describe("preferences", () => {
     expect(
       problem({ ...preferences, areas: { country: false, districts: ["LK-11"], near: null } }),
     ).toBeNull()
+  })
+})
+
+describe("readStoredAlerts", () => {
+  const before = {
+    preferences: {
+      topics: ["official", "landslide", "river", "flood_forecast", "cyclone", "earthquake"],
+      minSeverity: "warning",
+      areas: { country: true, districts: [], near: null },
+    },
+    enabled: true,
+  }
+
+  it("turns on default topics added since settings without a known list were saved", () => {
+    const read = readStoredAlerts(before)
+    expect(read.preferences.topics).toEqual([
+      "official",
+      "landslide",
+      "river",
+      "heavy_rain",
+      "flood_risk",
+      "flood_forecast",
+      "cyclone",
+      "earthquake",
+    ])
+    expect(read.enabled).toBe(true)
+    expect(read.known).toEqual([...topics])
+  })
+
+  it("leaves off an original topic the person turned off", () => {
+    const read = readStoredAlerts({
+      ...before,
+      preferences: { ...before.preferences, topics: ["official"] },
+    })
+    expect(read.preferences.topics).toEqual(["official", "heavy_rain", "flood_risk"])
+    // Opt-in topics are never added.
+    expect(read.preferences.topics).not.toContain("reservoir")
+    expect(read.preferences.topics).not.toContain("landslide_level1")
+  })
+
+  it("keeps a new topic off once the person has seen it and turned it off", () => {
+    const repaired = readStoredAlerts(before)
+    const chosen = {
+      ...repaired,
+      preferences: {
+        ...repaired.preferences,
+        topics: repaired.preferences.topics.filter((topic) => topic !== "heavy_rain"),
+      },
+    }
+    const again = readStoredAlerts(JSON.parse(JSON.stringify(chosen)))
+    expect(again.preferences.topics).not.toContain("heavy_rain")
+    expect(again.preferences.topics).toContain("flood_risk")
+  })
+
+  it("adds only the topics missing from a known list", () => {
+    const read = readStoredAlerts({
+      ...before,
+      known: [...originalTopics, "heavy_rain"],
+    })
+    expect(read.preferences.topics).toContain("flood_risk")
+    expect(read.preferences.topics).not.toContain("heavy_rain")
+  })
+
+  it("starts with the defaults when nothing is stored", () => {
+    for (const value of [null, undefined, "x", 3]) {
+      const read = readStoredAlerts(value)
+      expect(read.preferences).toEqual(defaultPreferences())
+      expect(read.enabled).toBe(false)
+      expect(read.known).toEqual([...topics])
+    }
   })
 })
 

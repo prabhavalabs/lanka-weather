@@ -48,6 +48,15 @@ func (fake *fakePush) Renew(_ context.Context, oldEndpoint *string, subscription
 	return push.View{}, fake.err
 }
 
+func (fake *fakePush) Inbox(_ context.Context, endpoint, auth, locale string) ([]push.InboxNotice, error) {
+	fake.endpoint, fake.auth, fake.locale = endpoint, auth, locale
+	if fake.err != nil {
+		return nil, fake.err
+	}
+	return []push.InboxNotice{{ID: "7", Kind: "river", Severity: push.SeverityWarning, Title: "Minor flood · Kalu Ganga at Ratnapura",
+		Areas: []push.Area{{ID: "LK-91", Name: "Ratnapura"}}, Events: []push.InboxEvent{}}}, nil
+}
+
 func (fake *fakePush) Test(_ context.Context, endpoint, auth string) error {
 	fake.endpoint, fake.auth = endpoint, auth
 	return fake.err
@@ -200,5 +209,23 @@ func TestLimiterWindows(t *testing.T) {
 	clock = clock.Add(time.Minute)
 	if ok, _ := limit.allow("a"); !ok {
 		t.Fatal("a new window")
+	}
+}
+
+func TestPushInboxReadsTheCallersNotices(t *testing.T) {
+	fake := &fakePush{enabled: true}
+	server := pushServer(t, fake)
+	response, envelope := send(t, server, http.MethodPost, "/api/push/inbox", `{"endpoint":"https://fcm.googleapis.com/fcm/send/x","auth":"AU","locale":"si"}`)
+	data, _ := json.Marshal(envelope.Data)
+	if response.StatusCode != http.StatusOK || response.Header.Get("Cache-Control") != "no-store" ||
+		!strings.Contains(string(data), `"id":"7"`) || !strings.Contains(string(data), `"name":"Ratnapura"`) {
+		t.Fatalf("%d %s", response.StatusCode, data)
+	}
+	if fake.endpoint != "https://fcm.googleapis.com/fcm/send/x" || fake.auth != "AU" || fake.locale != "si" {
+		t.Fatalf("passed %q %q %q", fake.endpoint, fake.auth, fake.locale)
+	}
+	fake.err = push.ErrNotOwner
+	if response, _ := send(t, server, http.MethodPost, "/api/push/inbox", `{"endpoint":"e","auth":"wrong","locale":"en"}`); response.StatusCode != http.StatusForbidden {
+		t.Fatalf("a wrong secret is refused: %d", response.StatusCode)
 	}
 }

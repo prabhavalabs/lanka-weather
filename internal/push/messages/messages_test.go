@@ -118,15 +118,16 @@ func TestEveryNoticeRendersCompletelyInEveryLanguage(t *testing.T) {
 
 func TestRenderUsesTheSubscribersLanguageAndOfficialWords(t *testing.T) {
 	title, body := Render("en", Input{Kind: KindLandslide, Variant: "3", Count: 1, Facts: map[string]string{"district": "LK-91", "level": "3"}}, testNames)
-	if title != "Landslide Level 3 · Ratnapura" || !strings.HasPrefix(body, "NBRO: evacuate") {
+	if title != "Landslide Level 3 · Ratnapura" || body != "NBRO: Level 3 (Red) in Ratnapura district. Evacuate now if you are in these areas." {
 		t.Fatalf("en: %q / %q", title, body)
 	}
 	title, _ = Render("si", Input{Kind: KindLandslide, Variant: "3", Count: 1, Facts: map[string]string{"district": "LK-91"}}, testNames)
 	if !strings.Contains(title, "රත්නපුර") {
 		t.Fatalf("si title %q", title)
 	}
-	title, _ = Render("ta", Input{Kind: KindLandslide, Variant: "2", Count: 3, Facts: map[string]string{"district": "LK-92"}}, testNames)
-	if title != "மண்சரிவு நிலை 2 · 3 மாவட்டங்கள்" {
+	title, _ = Render("ta", Input{Kind: KindLandslide, Variant: "2", Count: 2, Facts: map[string]string{"district": "LK-92"},
+		Districts: []string{"LK-92", "LK-91"}}, testNames)
+	if title != "மண்சரிவு நிலை 2 · கேகாலை, இரத்தினபுரி" {
 		t.Fatalf("ta title %q", title)
 	}
 	_, body = Render("xx", Input{Kind: KindRiver, Variant: "major_flood", Count: 1, Facts: map[string]string{"district": "LK-91", "station": "Ratnapura", "source": "community"}}, testNames)
@@ -174,15 +175,15 @@ func TestFlashFloodsSayWhenGoogleIssuedThem(t *testing.T) {
 	now := time.Date(2026, 11, 6, 18, 45, 0, 0, time.UTC)
 	facts := map[string]string{"district": "LK-91", "districts": "LK-91", "issuedAt": "2026-11-06T14:45:58Z"}
 	_, body := Render("en", Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now}, testNames)
-	if !strings.Contains(body, "Google issued it at 20:15 yesterday.") {
+	if !strings.Contains(body, "in Ratnapura (an estimate, not an official warning), issued 20:15 yesterday.") {
 		t.Fatalf("body %q", body)
 	}
 	_, body = Render("en", Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now.Add(-3 * time.Hour)}, testNames)
-	if !strings.Contains(body, "issued it at 20:15.") {
+	if !strings.Contains(body, "issued 20:15.") {
 		t.Fatalf("same day %q", body)
 	}
 	_, body = Render("en", Input{Kind: KindFlashFlood, Variant: "likely", Count: 1, Facts: facts, Now: now.Add(48 * time.Hour)}, testNames)
-	if !strings.Contains(body, "issued it at 6/11 20:15.") {
+	if !strings.Contains(body, "issued 6/11 20:15.") {
 		t.Fatalf("older %q", body)
 	}
 	for _, locale := range []string{"si", "ta"} {
@@ -196,8 +197,8 @@ func TestFloodRiskSaysWhatItRestsOnAndWhatCouldHappen(t *testing.T) {
 	facts := map[string]string{"district": "LK-91", "signals": "google_flash,rain_now,wet_ground", "scenario": "flash"}
 	title, body := Render("en", Input{Kind: KindFloodRisk, Variant: "high", Count: 1, Facts: facts}, testNames)
 	if title != "Flood risk: High · Ratnapura" ||
-		body != "Our estimate from Google's flash-flood forecast, heavy rain now and ground already soaked; not an official warning. "+
-			"Low-lying roads and areas may flood within hours. Follow the DMC. Tap for details." {
+		body != "Our estimate for Ratnapura district from Google's flash-flood forecast, heavy rain now and ground already soaked; "+
+			"not an official warning. Low-lying roads and areas may flood within hours. Follow the DMC." {
 		t.Fatalf("%q / %q", title, body)
 	}
 	// The longest names and scenario still fit whole in every language.
@@ -207,6 +208,85 @@ func TestFloodRiskSaysWhatItRestsOnAndWhatCouldHappen(t *testing.T) {
 			_, body := Render(locale, Input{Kind: KindFloodRisk, Variant: variant, Count: 1, Facts: long}, testNames)
 			if strings.HasSuffix(body, "…") {
 				t.Errorf("%s %s is cut: %q (%d)", locale, variant, body, utf8.RuneCountInString(body))
+			}
+		}
+	}
+}
+
+// Every notice must say where: a gathered notice names its districts, not
+// "Kandy and 4 more" (November 2026).
+func TestGatheredNoticesNameEveryPlace(t *testing.T) {
+	five := names{"LK-21": {"Kandy", "මහනුවර", "கண்டி"}, "LK-23": {"Nuwara Eliya", "නුවරඑළිය", "நுவரெலியா"},
+		"LK-81": {"Badulla", "බදුල්ල", "பதுளை"}, "LK-91": {"Ratnapura", "රත්නපුර", "இரத்தினபுரி"}, "LK-92": {"Kegalle", "කෑගල්ල", "கேகாலை"}}
+	districts := []string{"LK-21", "LK-23", "LK-81", "LK-91", "LK-92"}
+	title, body := Render("en", Input{Kind: KindLandslide, Variant: "issued", Count: 5, Districts: districts,
+		Facts: map[string]string{"district": "LK-21", "issuedAt": "2026-11-14T10:30:00Z"}, Now: time.Date(2026, 11, 14, 10, 40, 0, 0, time.UTC)}, five)
+	if title != "Landslide warning · Kandy, Nuwara Eliya, Badulla +2" {
+		t.Errorf("title %q", title)
+	}
+	if !strings.HasPrefix(body, "NBRO, issued 16:00: landslide early warning for Kandy, Nuwara Eliya, Badulla, Ratnapura and Kegalle.") {
+		t.Errorf("body %q", body)
+	}
+	for _, locale := range []string{"si", "ta"} {
+		_, body := Render(locale, Input{Kind: KindLandslide, Variant: "2", Count: 5, Districts: districts, Facts: map[string]string{"district": "LK-21"}}, five)
+		for _, id := range districts {
+			if !strings.Contains(body, five.District(id, locale)) {
+				t.Errorf("%s body lacks %s: %q", locale, id, body)
+			}
+		}
+	}
+}
+
+func TestBulletinsSayWhatAndWhere(t *testing.T) {
+	facts := map[string]string{"title": "Flood Warning for Gin River Basin", "type": "water_level", "districts": "LK-91,LK-92",
+		"areaFrom": "basin", "issuedAt": "2026-11-09T14:30:00Z"}
+	now := time.Date(2026, 11, 9, 14, 40, 0, 0, time.UTC)
+	title, body := Render("en", Input{Kind: KindBulletin, Variant: "warning", Count: 1, Facts: facts, Now: now}, testNames)
+	if title != "Flood warning · Ratnapura, Kegalle" ||
+		body != "DMC, issued 20:00: “Flood Warning for Gin River Basin”. Districts in the basin: Ratnapura and Kegalle. Follow official instructions." {
+		t.Fatalf("%q / %q", title, body)
+	}
+	unplaced := map[string]string{"title": "Advisory for Thunderstorm", "type": "weather", "issuedAt": "2026-11-09T14:30:00Z"}
+	title, body = Render("en", Input{Kind: KindBulletin, Variant: "advisory", Count: 1, Facts: unplaced, Now: now}, testNames)
+	if title != "Weather advisory · Sri Lanka" || !strings.Contains(body, "names no districts") {
+		t.Fatalf("%q / %q", title, body)
+	}
+	title, _ = Render("si", Input{Kind: KindBulletin, Variant: "warning", Count: 1, Facts: facts, Now: now}, testNames)
+	if title != "ගංවතුර අනතුරු ඇඟවීම · රත්නපුර, කෑගල්ල" {
+		t.Errorf("si title %q", title)
+	}
+}
+
+func TestRiversAndCyclonesSayWhere(t *testing.T) {
+	river := map[string]string{"station": "Panadugama", "river": "Nilwala Ganga", "district": "LK-91", "source": "irrigation",
+		"waterLevel": "7.50", "threshold": "7.00", "unit": "m", "issuedAt": "2026-11-12T11:45:00Z"}
+	title, body := Render("en", Input{Kind: KindRiver, Variant: "minor_flood", Count: 1, Facts: river,
+		Now: time.Date(2026, 11, 12, 11, 50, 0, 0, time.UTC)}, testNames)
+	if title != "Minor flood · Nilwala Ganga at Panadugama" || body != "Irrigation Department, reading at 17:15: Nilwala Ganga at Panadugama in "+
+		"Ratnapura district is at minor flood level. Water level 7.5 m; threshold 7 m. Low-lying areas may flood." {
+		t.Fatalf("%q / %q", title, body)
+	}
+	cyclone := map[string]string{"name": "AKVAN-26", "distance": "663", "direction": "E", "nearDistrict": "LK-92"}
+	title, body = Render("en", Input{Kind: KindCyclone, Variant: "near", Count: 1, Facts: cyclone}, testNames)
+	if title != "Cyclone AKVAN-26 · 663 km east of Sri Lanka" ||
+		body != "GDACS: the storm centre is 663 km east of Sri Lanka. The nearest coast is in Kegalle district. Follow the Department of Meteorology." {
+		t.Fatalf("%q / %q", title, body)
+	}
+	title, _ = Render("ta", Input{Kind: KindCyclone, Variant: "near", Count: 1, Facts: map[string]string{"name": "X", "distance": "663"}}, testNames)
+	if title != "சூறாவளி X · இலங்கையிலிருந்து 663 கி.மீ." {
+		t.Errorf("ta title %q", title)
+	}
+}
+
+func TestIssuerAndOfficial(t *testing.T) {
+	if Issuer("en", KindRiver, map[string]string{"source": "community"}) != "waterlevels.lk (community data)" ||
+		!Official(KindRiver, map[string]string{"source": "irrigation"}) || Official(KindFlashFlood, nil) {
+		t.Fatal("issuer or official wrong")
+	}
+	for kind := range Variants {
+		for _, locale := range Locales {
+			if Issuer(locale, kind, map[string]string{}) == "" {
+				t.Errorf("%s %s has no issuer", locale, kind)
 			}
 		}
 	}

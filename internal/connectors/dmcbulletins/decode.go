@@ -225,13 +225,16 @@ const minimumBody = 60
 
 // ExtractText reads a bulletin's doc.txt. Landslide reports keep no body: their
 // lines lose the level columns they belong to, so "Yatinuwara" alone says
-// nothing; their levels come from the structured feed instead.
+// nothing; their levels come from the structured feed instead. Their table of
+// locations still names its districts, which is enough to say where NBRO has
+// warned hours before the levels arrive.
 func ExtractText(raw string, kind Type, issuedAt time.Time) Extract {
 	extract := Extract{Status: TextUnusable}
 	extract.MessageID = messageID(raw)
 	extract.Colour = statedColour(raw)
 	extract.ValidFrom, extract.ValidUntil = validity(raw, issuedAt)
 	if kind == TypeLandslide {
+		extract.Districts = LandslideDistricts(raw)
 		return extract
 	}
 	if kind == TypeWaterLevel {
@@ -498,6 +501,30 @@ func NamedDistricts(text string) []string {
 		}
 	}
 	return found
+}
+
+var (
+	// landslideTable starts the report's table of locations at risk.
+	landslideTable = regexp.MustCompile(`(?i)Locations\s+for\s+Potential\s+Risk`)
+	// landslideTableEnd is what follows the table: its legend, or the notes.
+	landslideTableEnd = regexp.MustCompile(`(?i)\bNote\s*:|shifted\s+one\s+level|Areas\s+and\s+places\s+which\s+need`)
+)
+
+// LandslideDistricts lists the districts a landslide early-warning report's
+// table of locations names, in code order; nil when the table is not found.
+func LandslideDistricts(raw string) []string {
+	start := landslideTable.FindStringIndex(raw)
+	if start == nil {
+		return nil
+	}
+	table := raw[start[1]:]
+	if end := landslideTableEnd.FindStringIndex(table); end != nil {
+		table = table[:end[0]]
+	}
+	if found := NamedDistricts(table); len(found) > 0 {
+		return found
+	}
+	return nil
 }
 
 // DistrictName returns a district's name as our regions write it.

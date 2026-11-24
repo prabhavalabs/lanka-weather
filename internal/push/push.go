@@ -87,6 +87,11 @@ type Payload struct {
 	SentAt             time.Time `json:"sentAt"`
 	RequireInteraction bool      `json:"requireInteraction,omitempty"`
 	Lang               string    `json:"lang,omitempty"`
+	// ID is the notice's id, which the app's list of notices and its link
+	// (?notice=) use; empty for a test notice.
+	ID string `json:"id,omitempty"`
+	// Kind is the kind of notice: bulletin, landslide, river and so on.
+	Kind string `json:"kind,omitempty"`
 }
 
 // Near is a "near me" area: a point rounded to about a kilometre and a radius.

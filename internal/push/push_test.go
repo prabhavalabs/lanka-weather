@@ -145,7 +145,8 @@ func TestWantsMatchesTopicSeverityAndArea(t *testing.T) {
 
 func event(kind, key string, severity Severity, detected time.Time) Event {
 	return Event{Key: key, Kind: kind, Variant: "2", Topic: TopicLandslide, Severity: severity, Facts: map[string]string{"district": key},
-		URL: "/?warnings=landslide&district=" + key, Tag: "landslide:district:" + key, DetectedAt: detected, ExpiresAt: detected.Add(12 * time.Hour)}
+		Districts: []string{key},
+		URL:       "/?warnings=landslide&district=" + key, Tag: "landslide:district:" + key, DetectedAt: detected, ExpiresAt: detected.Add(12 * time.Hour)}
 }
 
 func TestPlanGathersOneNoticePerKind(t *testing.T) {
@@ -166,8 +167,8 @@ func TestPlanGathersOneNoticePerKind(t *testing.T) {
 	if landslides.Facts["district"] != "LK-92" {
 		t.Fatalf("the newest of equal severity leads: %v", landslides.Facts)
 	}
-	title, _ := messages.Render("en", messages.Input{Kind: landslides.Kind, Variant: landslides.Variant, Count: landslides.Count, Facts: landslides.Facts}, nil)
-	if title != "Landslide Level 2 · 3 districts" {
+	title, _ := landslides.Render("en", nil, now)
+	if title != "Landslide Level 2 · LK-92, LK-21, LK-91" {
 		t.Fatalf("title %q", title)
 	}
 	if send[1].Kind != messages.KindEarthquake || send[1].Count != 1 || send[1].Tag != "quake:x" {
@@ -200,7 +201,7 @@ func TestMessageHeadersFollowSeverity(t *testing.T) {
 		Facts: map[string]string{"district": "LK-91"}, URL: "/?warnings=landslide&district=LK-91", Tag: "landslide:district:LK-91",
 		ExpiresAt: now.Add(12 * time.Hour)}
 	names := DistrictNames{"LK-91": {"Ratnapura", "රත්නපුර", "இரத்தினபுரி"}}
-	payload, message := danger.Message(user, names, now)
+	payload, message := danger.Message(user, names, now, 42)
 	if message.Urgency != webpush.UrgencyHigh || message.TTL != 6*time.Hour || message.Topic != webpush.TopicFor("landslide:district:LK-91") {
 		t.Fatalf("danger message %+v", message)
 	}
@@ -210,20 +211,47 @@ func TestMessageHeadersFollowSeverity(t *testing.T) {
 	encoded, _ := json.Marshal(payload)
 	var wire map[string]any
 	_ = json.Unmarshal(encoded, &wire)
-	for _, key := range []string{"title", "body", "url", "tag", "severity", "sentAt", "requireInteraction", "lang"} {
+	if payload.ID != "42" || payload.Kind != messages.KindLandslide || payload.URL != "/?warnings=landslide&district=LK-91&notice=42" {
+		t.Fatalf("payload id, kind or link %+v", payload)
+	}
+	for _, key := range []string{"title", "body", "url", "tag", "severity", "sentAt", "requireInteraction", "lang", "id", "kind"} {
 		if _, ok := wire[key]; !ok {
 			t.Errorf("payload lacks %s: %s", key, encoded)
 		}
 	}
 	watch := danger
 	watch.Severity, watch.ExpiresAt = SeverityWatch, now.Add(30*time.Minute)
-	payload, message = watch.Message(user, names, now)
+	payload, message = watch.Message(user, names, now, 0)
 	if message.Urgency != webpush.UrgencyNormal || message.TTL != 30*time.Minute || payload.RequireInteraction {
 		t.Fatalf("watch message %+v %+v", message, payload)
 	}
 	encoded, _ = json.Marshal(payload)
-	if strings.Contains(string(encoded), "requireInteraction") {
-		t.Fatalf("requireInteraction is omitted when false: %s", encoded)
+	if strings.Contains(string(encoded), "requireInteraction") || strings.Contains(string(encoded), `"id"`) {
+		t.Fatalf("requireInteraction and a missing id are omitted: %s", encoded)
+	}
+}
+
+func TestGatheredNoticesKeepEveryPlaceAndTheirOwnTag(t *testing.T) {
+	event := func(key, district, station string) Event {
+		return Event{Key: key, Kind: messages.KindRiver, Variant: "minor_flood", Severity: SeverityWarning, Districts: []string{district},
+			Facts: map[string]string{"district": district, "station": station}, URL: "/?station=" + station, Tag: "river:station:" + station,
+			DetectedAt: now, ExpiresAt: now.Add(time.Hour)}
+	}
+	send, _ := Plan([]Event{event("a", "LK-91", "Ratnapura"), event("b", "LK-92", "Kitulgala"), event("c", "LK-91", "Ellagawa")}, 0, HourlyCap)
+	if len(send) != 1 {
+		t.Fatalf("one notice per kind: %+v", send)
+	}
+	notice := send[0]
+	if !slices.Equal(notice.Districts, []string{"LK-91", "LK-92"}) || len(notice.Subjects) != 3 {
+		t.Fatalf("districts %v subjects %v", notice.Districts, notice.Subjects)
+	}
+	names := DistrictNames{"LK-91": {"Ratnapura", "", ""}, "LK-92": {"Kegalle", "", ""}}
+	payload, message := notice.Message(Subscriber{Locale: "en"}, names, now, 7)
+	if payload.Tag != "river:summary:7" || message.Topic != webpush.TopicFor("river:summary:7") || payload.URL != "/?notice=7" {
+		t.Fatalf("tag %q url %q", payload.Tag, payload.URL)
+	}
+	if !strings.Contains(payload.Title, "Ratnapura, Kegalle") || !strings.Contains(payload.Body, "Ratnapura and Kegalle") {
+		t.Fatalf("places missing: %q / %q", payload.Title, payload.Body)
 	}
 }
 

@@ -25,6 +25,7 @@ import { rain } from "./rain"
 import { environment } from "./environment"
 import { install } from "./install"
 import { pwa } from "./pwa"
+import { notifications } from "./notifications"
 
 export const ta: Translation<typeof en> = {
   common,
@@ -52,4 +53,5 @@ export const ta: Translation<typeof en> = {
   install,
   pwa,
   alerts,
+  notifications,
 }

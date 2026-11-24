@@ -16,6 +16,8 @@ export const format = {
   today: "today",
   yesterday: "yesterday",
   tomorrow: "tomorrow",
+  todayAt: "Today {time}",
+  yesterdayAt: "Yesterday {time}",
   minutesAgo: { one: "{count} min ago", other: "{count} min ago" },
   hoursAgo: { one: "{count} h ago", other: "{count} h ago" },
   daysAgo: { one: "{count} day ago", other: "{count} days ago" },

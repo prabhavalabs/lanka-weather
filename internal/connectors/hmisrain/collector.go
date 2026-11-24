@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	// Interval matches how often the copy is refreshed. An unchanged file costs
-	// one conditional request.
-	Interval = 30 * time.Minute
+	// Interval is a third of how often the copy is refreshed, so a new reading
+	// is seen within ten minutes rather than up to half an hour later (heavy-rain
+	// alerts came 30 to 50 minutes after the reading, November 2026). An
+	// unchanged file costs one conditional request.
+	Interval = 10 * time.Minute
 	// retention is how long readings are kept for a gauge's chart; a gauge the
 	// feed has dropped goes after gaugeRetention.
 	retention      = 7 * 24 * time.Hour

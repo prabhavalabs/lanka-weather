@@ -372,3 +372,43 @@ func InForce(bulletins []Bulletin) []Bulletin {
 func WarningKey(bulletin Bulletin) string {
 	return bulletin.Type + "|" + sameWarning(bulletin.Title)
 }
+
+// BasinKey reduces a basin's name to what identifies it, as warnings match
+// basins: "Kalu Ganga" and "Kalu River Basin" are both "kalu".
+func BasinKey(name string) string { return basinKey(name) }
+
+var titleWord = regexp.MustCompile(`[a-z]+`)
+
+// NamedBasins lists which of the basin keys a title names, each as a name
+// followed by a word for water ("Kalu River", "Gin Ganga", "Attanagalu Oya
+// Basin"), in the order given. "Flood Warning for Kuda Ganga Sub Basin of
+// Kalu River" names kalu (and kuda, if it is a key).
+func NamedBasins(title string, keys []string) []string {
+	words := titleWord.FindAllString(strings.ToLower(title), -1)
+	for index, word := range words {
+		if spelled, ok := basinSpellings[word]; ok {
+			words[index] = spelled
+		}
+	}
+	found := []string{}
+	for _, key := range keys {
+		parts := strings.Fields(key)
+		if len(parts) == 0 {
+			continue
+		}
+	search:
+		for start := 0; start+len(parts) < len(words); start++ {
+			for offset, part := range parts {
+				if words[start+offset] != part {
+					continue search
+				}
+			}
+			next := words[start+len(parts)]
+			if basinWords[next] || next == "sub" || next == "subbasin" || next == "lake" || next == "ela" {
+				found = append(found, key)
+				break
+			}
+		}
+	}
+	return found
+}

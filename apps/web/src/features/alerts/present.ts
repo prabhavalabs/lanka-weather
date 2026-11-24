@@ -110,6 +110,67 @@ export function readPreferences(value: unknown): Preferences {
   }
 }
 
+/**
+ * The topics there were before the device kept a list of the topics it has
+ * seen. Stored settings with no such list were saved with these, so every
+ * other default topic is new to them.
+ */
+export const originalTopics: readonly Topic[] = [
+  "official",
+  "landslide",
+  "landslide_level1",
+  "river",
+  "flood_forecast",
+  "cyclone",
+  "earthquake",
+  "reservoir",
+]
+
+/** The topics a device has been shown, from storage; settings that predate the list saw the original ones. */
+export function readKnownTopics(value: unknown): Topic[] {
+  if (!Array.isArray(value)) return [...originalTopics]
+  return topics.filter((topic) => value.includes(topic))
+}
+
+/**
+ * Adds every default topic the person has never been shown, so a topic added
+ * to the service reaches devices that saved their choices before it existed.
+ * A topic they were shown and turned off stays off.
+ */
+export function withNewTopics(preferences: Preferences, known: readonly Topic[]): Preferences {
+  const added = defaultPreferences().topics.filter((topic) => !known.includes(topic))
+  if (added.length === 0) return preferences
+  return {
+    ...preferences,
+    topics: topics.filter((topic) => preferences.topics.includes(topic) || added.includes(topic)),
+  }
+}
+
+/** What the device keeps in localStorage. */
+export interface StoredAlerts {
+  preferences: Preferences
+  enabled: boolean
+  /** Every topic the person has been shown, so a new default topic can be told apart from one turned off. */
+  known: Topic[]
+}
+
+/**
+ * Reads the stored alert settings, adding default topics that are new to
+ * the person. The result knows every current topic: write it back.
+ */
+export function readStoredAlerts(value: unknown): StoredAlerts {
+  if (!value || typeof value !== "object") {
+    return { preferences: defaultPreferences(), enabled: false, known: [...topics] }
+  }
+  const raw = value as { preferences?: unknown; enabled?: unknown; known?: unknown }
+  const known = readKnownTopics(raw.known)
+  return {
+    preferences: withNewTopics(readPreferences(raw.preferences), known),
+    enabled: raw.enabled === true,
+    known: [...topics],
+  }
+}
+
 /** What a device and browser allow. */
 export interface Capabilities {
   /** Service workers, the Push API and notifications all exist. */

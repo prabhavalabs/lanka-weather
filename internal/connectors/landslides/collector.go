@@ -35,8 +35,10 @@ func (collector *Collector) Name() string { return SourceName }
 
 // Interval implements source.Collector. NBRO issues about one report a day
 // while a risk lasts, usually at 16:00, and it reaches this feed a few hours
-// later; checking every two hours picks it up the same evening.
-func (collector *Collector) Interval() time.Duration { return 2 * time.Hour }
+// later. Checking every twenty minutes passes the levels on as soon as they
+// land; checking every two hours had added up to two more hours. The DMC
+// site collector names the districts warned much earlier.
+func (collector *Collector) Interval() time.Duration { return 20 * time.Minute }
 
 // Collect fetches the history and stores new and recent reports, returning
 // the number of division levels written.

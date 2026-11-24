@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -144,8 +145,9 @@ func Bulletins(overview *warnings.Overview, now time.Time) Reading {
 			Subject: "bulletin:" + key, Level: level,
 			Event: push.Event{Kind: messages.KindBulletin, Variant: variant, Topic: push.TopicOfficial, Severity: levelSeverity(level),
 				National: len(districts) == 0, Districts: districts,
-				Facts: map[string]string{"title": bulletin.Title, "districts": strings.Join(districts, ","), "level": strconv.Itoa(level)},
-				URL:   url, Tag: "bulletin:" + key, ExpiresAt: clampExpiry(bulletin.ValidUntil, now, 12*time.Hour, 24*time.Hour)},
+				Facts: map[string]string{"title": bulletin.Title, "districts": strings.Join(districts, ","), "level": strconv.Itoa(level),
+					"type": bulletin.Type, "issuedAt": bulletin.IssuedAt.UTC().Format(time.RFC3339)},
+				URL: url, Tag: "bulletin:" + key, ExpiresAt: clampExpiry(bulletin.ValidUntil, now, 12*time.Hour, 24*time.Hour)},
 		})
 	}
 	return reading
@@ -167,6 +169,7 @@ func Landslides(layer warnings.LandslideLayer, now time.Time) Reading {
 		return reading
 	}
 	highest, divisions := map[string]int{}, map[string]int{}
+	names := map[string][]warnings.DivisionAt{}
 	for _, feature := range layer.Features {
 		district := feature.Properties.DistrictID
 		if district == "" {
@@ -174,6 +177,7 @@ func Landslides(layer warnings.LandslideLayer, now time.Time) Reading {
 		}
 		highest[district] = max(highest[district], feature.Properties.Level)
 		divisions[district]++
+		names[district] = append(names[district], feature.Properties)
 	}
 	districts := make([]string, 0, len(highest))
 	for district := range highest {
@@ -186,13 +190,79 @@ func Landslides(layer warnings.LandslideLayer, now time.Time) Reading {
 		if level == 1 {
 			topic = push.TopicLandslideLevel1
 		}
+		facts := map[string]string{"district": district, "level": strconv.Itoa(level), "divisions": strconv.Itoa(divisions[district]),
+			"divisionNames": divisionNames(names[district], level)}
+		if layer.Meta.IssuedAt != nil {
+			facts["issuedAt"] = layer.Meta.IssuedAt.UTC().Format(time.RFC3339)
+		}
 		reading.Observations = append(reading.Observations, Observation{
 			Subject: "landslide:" + district, Level: level,
 			Event: push.Event{Kind: messages.KindLandslide, Variant: strconv.Itoa(level), Topic: topic, Severity: levelSeverity(level),
 				Districts: []string{district},
-				Facts:     map[string]string{"district": district, "level": strconv.Itoa(level), "divisions": strconv.Itoa(divisions[district])},
+				Facts:     facts,
 				URL:       "/?warnings=landslide&district=" + district, Tag: "landslide:district:" + district,
 				ExpiresAt: clampExpiry(layer.Meta.ValidUntil, now, 24*time.Hour, 24*time.Hour)},
+		})
+	}
+	return reading
+}
+
+// maxDivisionNames bounds the divisions a landslide notice names.
+const maxDivisionNames = 4
+
+// divisionNames names a district's divisions at its highest level, A to Z,
+// at most four: the places a notice should say.
+func divisionNames(divisions []warnings.DivisionAt, level int) string {
+	names := []string{}
+	for _, division := range divisions {
+		if division.Level == level && division.Name != "" && !slices.Contains(names, division.Name) {
+			names = append(names, division.Name)
+		}
+	}
+	sort.Strings(names)
+	return strings.Join(names[:min(len(names), maxDivisionNames)], ", ")
+}
+
+// LandslideIssuedKind is the state kind of NBRO's report as the DMC posts it,
+// kept apart from the levels so neither reading ends the other's subjects.
+const LandslideIssuedKind = "landslide_issued"
+
+// LandslideIssued reads NBRO's latest landslide early-warning report as the
+// DMC posted it: the districts its table names, while it is in force. The
+// levels by division reach us four or more hours later (the index rebuilds
+// once a day, around 20:40), so this says where NBRO has warned at once, and
+// the levels follow as their own notices, under the same tag.
+func LandslideIssued(bulletin *warnings.Bulletin, now time.Time) Reading {
+	reading := Reading{Kind: LandslideIssuedKind, HoldFor: HoldLandslide}
+	if bulletin == nil || bulletin.Type != "landslide" {
+		return reading
+	}
+	if bulletin.TextStatus == "pending" {
+		// The districts are not known yet: nothing changes until they are.
+		return reading
+	}
+	reading.Complete = true
+	until := bulletin.IssuedAt.Add(24 * time.Hour)
+	if bulletin.ValidUntil != nil {
+		until = *bulletin.ValidUntil
+	}
+	if !now.Before(until) || now.Before(bulletin.IssuedAt) {
+		return reading
+	}
+	districts := make([]string, 0, len(bulletin.Districts))
+	for _, district := range bulletin.Districts {
+		districts = append(districts, district.ID)
+	}
+	sort.Strings(districts)
+	for _, district := range districts {
+		facts := map[string]string{"district": district, "districts": district, "issuedAt": bulletin.IssuedAt.UTC().Format(time.RFC3339),
+			"validUntil": until.UTC().Format(time.RFC3339)}
+		reading.Observations = append(reading.Observations, Observation{
+			Subject: "landslide-issued:" + district, Level: 1,
+			Event: push.Event{Kind: messages.KindLandslide, Variant: "issued", Topic: push.TopicLandslide, Severity: push.SeverityWarning,
+				Districts: []string{district}, Facts: facts,
+				URL: "/?warnings=landslide&district=" + district, Tag: "landslide:district:" + district,
+				ExpiresAt: clampExpiry(&until, now, 24*time.Hour, 24*time.Hour)},
 		})
 	}
 	return reading
@@ -237,8 +307,19 @@ func Rivers(collection rivers.FeatureCollection, districtOf DistrictOf, now time
 		if station.Source == irrigation.SourceName {
 			source = "irrigation"
 		}
+		facts := map[string]string{"station": station.Name, "river": station.Basin, "district": district, "source": source,
+			"unit": station.Unit}
+		if station.WaterLevel != nil {
+			facts["waterLevel"] = strconv.FormatFloat(*station.WaterLevel, 'f', 2, 64)
+		}
+		if threshold := riverThreshold(station, level); threshold != nil {
+			facts["threshold"] = strconv.FormatFloat(*threshold, 'f', 2, 64)
+		}
+		if station.ObservedAt != nil {
+			facts["issuedAt"] = station.ObservedAt.UTC().Format(time.RFC3339)
+		}
 		event := push.Event{Kind: messages.KindRiver, Variant: variant, Topic: push.TopicRiver, Severity: levelSeverity(level),
-			Facts: map[string]string{"station": station.Name, "river": station.Basin, "district": district, "source": source},
+			Facts: facts,
 			URL:   "/?station=" + station.ID, Tag: "river:station:" + station.ID, ExpiresAt: now.Add(6 * time.Hour)}
 		event.Lon, event.Lat = point(lon, lat)
 		if district != "" {
@@ -247,6 +328,19 @@ func Rivers(collection rivers.FeatureCollection, districtOf DistrictOf, now time
 		reading.Observations = append(reading.Observations, Observation{Subject: subject, Level: level, Event: event})
 	}
 	return reading
+}
+
+// riverThreshold is the level a gauge has reached: alert, minor or major flood.
+func riverThreshold(station rivers.StationProperties, level int) *float64 {
+	switch level {
+	case 1:
+		return station.AlertLevel
+	case 2:
+		return station.MinorFloodLevel
+	case 3:
+		return station.MajorFloodLevel
+	}
+	return nil
 }
 
 // ForecastLevel is a Google severity's level: Flood Hub's Warning 1, Danger
@@ -435,6 +529,7 @@ func Cyclones(layer hazards.CycloneLayer, now time.Time) Reading {
 		name           string
 		centreKm       float64
 		forecastKm     float64
+		lon, lat       float64
 		stale, located bool
 	}
 	systems := map[string]*system{}
@@ -459,6 +554,9 @@ func Cyclones(layer hazards.CycloneLayer, now time.Time) Reading {
 			entry.stale, _ = feature.Properties["stale"].(bool)
 			if distance, ok := feature.Properties["distanceKm"].(float64); ok {
 				entry.centreKm, entry.located = distance, true
+			}
+			if points := geometryPoints(feature.Geometry); len(points) > 0 {
+				entry.lon, entry.lat = points[0][0], points[0][1]
 			}
 		case kind == gdacs.KindForecast || (kind == gdacs.KindPosition && feature.Properties["forecast"] == true):
 			for _, position := range geometryPoints(feature.Geometry) {
@@ -487,10 +585,17 @@ func Cyclones(layer hazards.CycloneLayer, now time.Time) Reading {
 		case entry.forecastKm <= CycloneNearKm:
 			level, variant, distance = 1, "track", entry.forecastKm
 		}
+		facts := map[string]string{"name": entry.name, "distance": strconv.Itoa(int(math.Round(distance)))}
+		if entry.lon != 0 || entry.lat != 0 {
+			coastLon, coastLat, _ := grid.NearestCoast(entry.lon, entry.lat)
+			facts["direction"] = grid.Compass(coastLon, coastLat, entry.lon, entry.lat)
+			facts["coastLon"] = strconv.FormatFloat(coastLon, 'f', 4, 64)
+			facts["coastLat"] = strconv.FormatFloat(coastLat, 'f', 4, 64)
+		}
 		reading.Observations = append(reading.Observations, Observation{
 			Subject: subject, Level: level,
 			Event: push.Event{Kind: messages.KindCyclone, Variant: variant, Topic: push.TopicCyclone, Severity: levelSeverity(level), National: true,
-				Facts: map[string]string{"name": entry.name, "distance": strconv.Itoa(int(math.Round(distance)))},
+				Facts: facts,
 				URL:   "/?cyclone=" + id, Tag: "cyclone:" + id, ExpiresAt: now.Add(12 * time.Hour)},
 		})
 	}
@@ -533,7 +638,7 @@ func Earthquakes(layer hazards.EarthquakeLayer, now time.Time) Reading {
 			Subject: "quake:" + quake.ID, Level: level,
 			Event: push.Event{Kind: messages.KindEarthquake, Variant: variant, Topic: push.TopicEarthquake, Severity: levelSeverity(level), National: true,
 				Facts: map[string]string{"magnitude": messages.Magnitude(quake.Magnitude), "place": quake.Place,
-					"distance": strconv.Itoa(int(math.Round(quake.DistanceKm)))},
+					"distance": strconv.Itoa(int(math.Round(quake.DistanceKm))), "issuedAt": quake.Time.UTC().Format(time.RFC3339)},
 				URL: "/?quake=" + quake.ID, Tag: "quake:" + quake.ID, ExpiresAt: quake.Time.Add(QuakeWindow)},
 		})
 	}

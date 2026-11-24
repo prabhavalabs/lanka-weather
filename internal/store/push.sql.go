@@ -10,6 +10,44 @@ import (
 	"time"
 )
 
+const basinDistrictShares = `-- name: BasinDistrictShares :many
+SELECT b.name::text AS basin, r.id::text AS district,
+       (ST_Area(ST_Intersection(b.geom, r.geom_simple)::geography)
+        / NULLIF(ST_Area(b.geom::geography), 0))::float8 AS share
+FROM official_basins b
+JOIN regions r ON r.level = 'district' AND ST_Intersects(b.geom, r.geom_simple)
+WHERE b.named
+ORDER BY b.name, share DESC
+`
+
+type BasinDistrictSharesRow struct {
+	Basin    string  `json:"basin"`
+	District string  `json:"district"`
+	Share    float64 `json:"share"`
+}
+
+// The share of each named river basin in each district it crosses, so a flood
+// warning that names a basin can name the districts it covers.
+func (q *Queries) BasinDistrictShares(ctx context.Context) ([]BasinDistrictSharesRow, error) {
+	rows, err := q.db.Query(ctx, basinDistrictShares)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BasinDistrictSharesRow{}
+	for rows.Next() {
+		var i BasinDistrictSharesRow
+		if err := rows.Scan(&i.Basin, &i.District, &i.Share); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const claimPushDelivery = `-- name: ClaimPushDelivery :execrows
 INSERT INTO push_deliveries (subscription_id, event_key, notice_id, severity, sent_at)
 VALUES ($1, $2, $3, $4, $5)
@@ -574,6 +612,83 @@ func (q *Queries) NextPushNoticeID(ctx context.Context) (int64, error) {
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const pushInbox = `-- name: PushInbox :many
+SELECT d.notice_id, d.sent_at, d.severity AS notice_severity, e.dedupe_key, e.kind, e.variant, e.topic, e.severity, e.subject, e.national, e.districts, e.lon, e.lat, e.facts, e.url, e.tag, e.detected_at, e.expires_at
+FROM push_deliveries d
+JOIN push_events e ON e.dedupe_key = d.event_key
+WHERE d.subscription_id = $1 AND d.sent_at >= $2
+ORDER BY d.sent_at DESC, d.notice_id DESC, e.detected_at DESC
+LIMIT $3
+`
+
+type PushInboxParams struct {
+	SubscriptionID int64     `json:"subscription_id"`
+	Since          time.Time `json:"since"`
+	MaxRows        int32     `json:"max_rows"`
+}
+
+type PushInboxRow struct {
+	NoticeID       int64     `json:"notice_id"`
+	SentAt         time.Time `json:"sent_at"`
+	NoticeSeverity string    `json:"notice_severity"`
+	DedupeKey      string    `json:"dedupe_key"`
+	Kind           string    `json:"kind"`
+	Variant        string    `json:"variant"`
+	Topic          string    `json:"topic"`
+	Severity       string    `json:"severity"`
+	Subject        string    `json:"subject"`
+	National       bool      `json:"national"`
+	Districts      []string  `json:"districts"`
+	Lon            *float64  `json:"lon"`
+	Lat            *float64  `json:"lat"`
+	Facts          []byte    `json:"facts"`
+	Url            string    `json:"url"`
+	Tag            string    `json:"tag"`
+	DetectedAt     time.Time `json:"detected_at"`
+	ExpiresAt      time.Time `json:"expires_at"`
+}
+
+// What was sent to one subscription since a time, newest notice first: every
+// event of each notice, for the in-app list of notices.
+func (q *Queries) PushInbox(ctx context.Context, arg PushInboxParams) ([]PushInboxRow, error) {
+	rows, err := q.db.Query(ctx, pushInbox, arg.SubscriptionID, arg.Since, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PushInboxRow{}
+	for rows.Next() {
+		var i PushInboxRow
+		if err := rows.Scan(
+			&i.NoticeID,
+			&i.SentAt,
+			&i.NoticeSeverity,
+			&i.DedupeKey,
+			&i.Kind,
+			&i.Variant,
+			&i.Topic,
+			&i.Severity,
+			&i.Subject,
+			&i.National,
+			&i.Districts,
+			&i.Lon,
+			&i.Lat,
+			&i.Facts,
+			&i.Url,
+			&i.Tag,
+			&i.DetectedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const recentPushNoticeCounts = `-- name: RecentPushNoticeCounts :many
