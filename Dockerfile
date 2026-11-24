@@ -34,7 +34,7 @@ EXPOSE 8080
 ENTRYPOINT ["lankaweather"]
 CMD ["serve"]
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS web
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS web
 COPY deploy/nginx/web.conf /etc/nginx/conf.d/default.conf
 COPY --from=web-build /src/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080
