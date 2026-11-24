@@ -2,13 +2,13 @@
 # Ships the committed tree at HEAD to the server, builds the images there and
 # restarts the stack. Uncommitted changes are not deployed.
 #
-#   DEPLOY_HOST=root@178.104.111.17 deploy/deploy.sh
+#   DEPLOY_HOST=deploy@your-server deploy/deploy.sh
 #
 # The server keeps its settings in $DEPLOY_DIR/.env.production and the deployed
 # revision in $DEPLOY_DIR/deploy/.env; both survive a deploy. Runbook: deploy/README.md.
 set -euo pipefail
 
-host=${DEPLOY_HOST:?set DEPLOY_HOST, e.g. root@178.104.111.17}
+host=${DEPLOY_HOST:?set DEPLOY_HOST, e.g. deploy@your-server}
 dir=${DEPLOY_DIR:-/opt/lanka-weather}
 rev=$(git rev-parse --short=12 HEAD)
 
