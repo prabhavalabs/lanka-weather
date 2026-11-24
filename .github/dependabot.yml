@@ -1,0 +1,53 @@
+# Weekly version updates. Security updates are also enabled in the
+# repository settings and arrive as soon as an advisory is published.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      golang-x:
+        patterns: ["golang.org/x/*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      radix-ui:
+        patterns: ["@radix-ui/*", "radix-ui"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      lint:
+        patterns: ["eslint", "eslint-*", "@eslint/*", "typescript-eslint"]
+      vite:
+        patterns: ["vite", "vitest", "@vitejs/*", "@vitest/*", "vite-plugin-*"]
+      workbox:
+        patterns: ["workbox-*"]
+      fonts:
+        patterns: ["@fontsource-variable/*", "@fontsource/*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
