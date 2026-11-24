@@ -10,13 +10,14 @@ coverage/
 .turbo/
 .vite/
 .eslintcache
+apps/web/dev-dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
 # ---------------------------------------------------------------------------
-# Go (if a Go service is added)
+# Go
 # ---------------------------------------------------------------------------
 bin/
 *.test
@@ -51,39 +52,6 @@ pgdata/
 # ---------------------------------------------------------------------------
 logs/
 *.log
-
-# ---------------------------------------------------------------------------
-# AI agent and editor-assistant files (local only, never committed)
-# ---------------------------------------------------------------------------
-AGENTS.md
-CLAUDE.md
-CLAUDE.local.md
-GEMINI.md
-.claude/
-.agents/
-.codex/
-.cursor/
-.cursorrules
-.cursorignore
-.windsurf/
-.windsurfrules
-.aider*
-.continue/
-.clinerules
-.cline/
-.roo/
-.roomodes
-.kiro/
-.junie/
-.gemini/
-.amazonq/
-.zed/
-.mcp.json
-mcp.json
-.github/copilot-instructions.md
-.github/instructions/
-.github/prompts/
-.github/chatmodes/
 
 # ---------------------------------------------------------------------------
 # Secrets and local configuration
