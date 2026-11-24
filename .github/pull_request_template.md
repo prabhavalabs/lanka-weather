@@ -26,6 +26,6 @@
 ## Checklist
 
 - [ ] Title follows Conventional Commits (`type(scope): subject`)
-- [ ] No data, secrets or agent/editor-assistant configuration files included
+- [ ] No data, secrets or local configuration files included
 - [ ] New data sources are listed with licence and attribution in `docs/data-sources.md`
 - [ ] Documentation updated where behaviour changed

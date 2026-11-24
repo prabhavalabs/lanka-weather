@@ -5,10 +5,26 @@ forecasts, observations and hazard data from public sources into one
 interactive map, so that people can see what is happening now and what
 is likely to happen next in their area.
 
-> Status: early development. The service collects river levels, a weather
-> grid (Open-Meteo), the GFS wind field and Google flood forecasts, and
-> serves them with the layer catalogue; more collectors are added layer by
-> layer. See `docs/architecture/overview.md`.
+Live at **<https://weather.prabhavalabs.com>**. It installs as an app on a
+phone or a computer, works offline and can send push alerts.
+
+> [!WARNING]
+> **Not an official warning service.** Lanka Weather is an independent,
+> open-source project. It is not run by or affiliated with the
+> Department of Meteorology, the Disaster Management Centre (DMC), NBRO or
+> the Irrigation Department.
+>
+> - Official warnings from the [Department of Meteorology](https://www.meteo.gov.lk)
+>   and the [DMC](https://www.dmc.gov.lk) always take precedence.
+> - Anything marked "Estimate" is worked out by this software and may be
+>   wrong, late or missing. Sources can go stale or offline without notice.
+> - Do not rely on it as your only source for life-safety decisions.
+>   **In an emergency, call 117.**
+>
+> The software is provided "as is", without warranty of any kind (see
+> [LICENSE](LICENSE)).
+
+![The map in dark mode, with rain, river levels and warnings](apps/web/public/screenshots/map-wide.webp)
 
 ## Purpose
 
@@ -19,16 +35,23 @@ brings those sources together, normalises them, and presents them as
 layers on a single map of Sri Lanka, with warnings that are easy to
 understand.
 
-Planned data layers include:
+Layers on the map today:
 
-- wind speed and direction (animated), rainfall and temperature;
-- cyclone tracks and marine warnings;
-- flood forecasts (Google Flood Forecasting) and river gauge water levels;
-- reservoir and tank levels, with overflow risk;
-- Department of Meteorology forecasts and warnings;
-- Disaster Management Centre (DMC) alerts and NBRO landslide warnings;
-- current conditions from weather APIs;
-- public reports and social signals, where licensing allows.
+- weather by region and as a smooth field (temperature, rain, humidity,
+  cloud, wind), with a 72-hour and 7-day forecast at any point;
+- animated GFS wind with a 72-hour time scrubber;
+- Google Flood Forecasting gauges and flood areas;
+- river levels from the Irrigation Department and waterlevels.lk, with
+  flood status and trend; reservoirs and Colombo's canals;
+- live rain gauges and satellite rainfall (NASA IMERG);
+- DMC and Department of Meteorology warnings, NBRO landslide levels,
+  cyclones (GDACS) and earthquakes (USGS);
+- air quality and sea conditions;
+- a situation overview and a flood-risk estimate for each district.
+
+The interface is in English, Sinhala and Tamil. See
+`docs/architecture/overview.md` for how it fits together, and
+`docs/data-sources.md` for every source.
 
 ## Repository layout
 
@@ -38,9 +61,9 @@ Planned data layers include:
 | `internal/` | Go packages: layer catalogue, HTTP API, connectors, ingest, store, regions and place search, weather grid and services |
 | `apps/web/` | Front end: React, Vite, TanStack Query with a persisted IndexedDB cache, MapLibre, shadcn/ui |
 | `brand/` | Logo, wordmark and icon sources, with usage and colours |
-| `packages/` | Shared TypeScript packages, when needed |
 | `docs/` | Architecture overview, data-source catalogue and decision records |
-| `.github/` | Pull-request template and CI workflow |
+| `deploy/` | How the maintainers' instance is deployed (Docker Compose and nginx) |
+| `.github/` | CI workflow, issue and pull-request templates |
 
 ## Not versioned
 
@@ -48,15 +71,13 @@ The following are deliberately kept out of Git (see `.gitignore`):
 
 - downloaded or derived data, caches and research material (`data/`,
   `cache/`, `research/`, raster and tile files);
-- secrets and local configuration (`.env*`, keys, credentials);
-- configuration and instruction files for AI agents and editor
-  assistants.
+- secrets and local configuration (`.env*`, keys, credentials).
 
 Use `.env.example` files to document required configuration.
 
 ## Getting started
 
-Prerequisites: Go 1.25 or later, Node.js 24 or later, pnpm (enabled
+Prerequisites: Go (the version in `go.mod`), Node.js 24 or later, pnpm (enabled
 through Corepack: `corepack enable`) and Docker.
 
 ```bash
@@ -69,6 +90,11 @@ make dev-api           # terminal 1: API on http://localhost:8080
 make dev-worker        # terminal 2: scheduler that keeps data current
 make dev-web           # terminal 3: web app on http://localhost:5173
 ```
+
+No API keys are needed. The Google flood forecast and push notifications
+stay off until their keys are set in `.env`; see `.env.example`. Set
+`LANKAWEATHER_CONTACT` to your own URL or email address: it is sent to every
+data source, so their operators can reach whoever runs the instance.
 
 The Vite dev server proxies `/v1` and `/healthz` to the API. Set
 `LANKAWEATHER_API_URL` to point it elsewhere, and `LANKAWEATHER_ADDR` to
@@ -90,32 +116,22 @@ artwork in `brand/`, regenerate the icons with
 
 ### API
 
+The web app reads only from this API. A few of the main endpoints:
+
 | Endpoint | Returns |
 |---|---|
 | `GET /healthz`, `GET /readyz` | Liveness; readiness including the database |
 | `GET /v1/layers` | Layer catalogue with refresh cadence and staleness limits |
+| `GET /v1/summary?lat=&lon=` | One place: its regions, weather, nearest river and flood gauges, alerts |
+| `GET /v1/weather/point?lat=&lon=` | Current conditions, a 72-hour hourly and a 7-day daily forecast |
 | `GET /v1/rivers/levels` | River gauging stations as GeoJSON: level, flood status, trend, data age |
-| `GET /v1/rivers/stations/{id}/readings?hours=72` | One station's readings (1 to 720 hours) |
-| `GET /v1/regions?level=province\|district\|ds` | Region boundaries as GeoJSON, simplified per level; `level=gn&parent=LK-2130` for the GN divisions of one district or DS division |
-| `GET /v1/tiles/regions/{z}/{x}/{y}.pbf` | Mapbox Vector Tiles of every level (`province` z0+, `district` z6+, `ds` z8+, `gn` z10+, up to z14) |
-| `GET /v1/regions/{id}?geometry=true` | One region: names in English, Sinhala and Tamil, hierarchy, centroid, bounding box, area, 2024 population |
-| `GET /v1/regions/lookup?lat=6.9271&lon=79.8612` | The province, district, DS and GN division containing a point |
-| `GET /v1/places/search?q=kandy&limit=10` | Cities, towns, villages and regions by name, typo-tolerant, with coordinates, hierarchy and bounding box |
-| `GET /v1/weather/current` | Current weather on the 0.2° grid over Sri Lanka: one array per variable (gzipped) |
-| `GET /v1/weather/point?lat=&lon=` | Current conditions, a 72-hour hourly and a 7-day daily forecast at a point |
-| `GET /v1/weather/wind?t=` | Wind field (GFS, 10 m) for the particle layer, valid nearest `t` (default now) |
-| `GET /v1/weather/regions?level=province\|district\|ds\|gn&parent=LK-11` | Weather per administrative region, optionally within one parent region |
-| `GET /v1/floods/forecast` | Google flood forecasts for Sri Lanka as GeoJSON: gauges and flood areas |
-| `GET /v1/summary?lat=&lon=` | One place: its regions, weather, nearest river and flood gauges, derived alerts |
+| `GET /v1/floods/forecast` | Google flood forecasts for Sri Lanka as GeoJSON |
+| `GET /v1/places/search?q=kandy` | Cities, towns, villages and regions by name, typo-tolerant |
 
 Region ids are Department of Census and Statistics codes: `LK-2`
 (province), `LK-21` (district), `LK-2130` (DS division), `LK-2130120`
-(GN division). Boundary responses carry an `ETag` and a day's
-`Cache-Control`. The full contract, with example responses, is in
-[ADR 0006](docs/decisions/0006-admin-regions-and-search.md#api-contract).
-
-The weather and flood endpoints are described, with example responses, in
-[docs/api/weather-and-floods.md](docs/api/weather-and-floods.md).
+(GN division). Every endpoint is documented, with example responses, in
+[docs/api/](docs/api/overview.md).
 
 ### Web application
 
@@ -140,12 +156,37 @@ make ci          # format, lint, type checks, generated-code check, tests, build
 
 ## Contributing
 
-Branching, commit and pull-request conventions are described in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome: bug reports, data corrections, translations
+and code. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to set up, the
+branch and commit conventions, and how pull requests are reviewed. Please
+follow the [code of conduct](CODE_OF_CONDUCT.md), and report security
+problems privately as described in [SECURITY.md](SECURITY.md).
 
 ## Data sources and attribution
 
-Each data source is listed, with its licence and attribution
-requirements, in [docs/data-sources.md](docs/data-sources.md). Data is shown for
-public information; official warnings from the Department of
-Meteorology and the Disaster Management Centre remain authoritative.
+The code licence does not cover the data. Each source keeps its own
+licence and terms, and the app credits the source of every layer. The
+main ones:
+
+| Source | Terms |
+|---|---|
+| OpenStreetMap, through OpenFreeMap (basemap, places, reservoirs) | ODbL; © OpenStreetMap contributors |
+| Open-Meteo (weather grid, air quality, sea) | CC BY 4.0; free tier for non-commercial use only. Air quality: Copernicus Atmosphere Monitoring Service |
+| Google Flood Forecasting API | Google's terms; needs your own key, and results are kept no longer than 24 hours |
+| NOAA GFS (wind), USGS (earthquakes) | Public domain |
+| NASA GIBS IMERG (satellite rain), GDACS (cyclones) | Free to use with attribution |
+| HydroSHEDS (HydroRIVERS, HydroBASINS) | Free with attribution (Lehner and Grill, 2013) |
+| Administrative boundaries (lk_admin_regions, OCHA HDX) | CC BY-IGO; Survey Department and Department of Census and Statistics |
+| Department of Meteorology, DMC, NBRO, Irrigation Department | Public government information, credited and linked; no licence is published |
+| waterlevels.lk, HMIS rain gauges | Community and agency data, credited; no licence is published |
+
+The full list, with access methods and the exact attribution text, is in
+[docs/data-sources.md](docs/data-sources.md). If you run your own
+instance, follow each source's terms and rate limits.
+
+## Licence
+
+Lanka Weather is licensed under the [Apache License 2.0](LICENSE). Parts
+of the code are derived from other Apache-2.0 work; see [NOTICE](NOTICE).
+The project name and the artwork in `brand/` are not licensed as
+trademarks.
