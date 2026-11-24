@@ -1,0 +1,35 @@
+name: Translation
+description: A wrong, unclear or missing word in Sinhala, Tamil or English.
+labels: ["i18n", "needs-triage"]
+body:
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options: [Sinhala, Tamil, English]
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where in the app
+      description: The screen or panel, or the page link.
+    validations:
+      required: true
+  - type: input
+    id: current
+    attributes:
+      label: Current text
+    validations:
+      required: true
+  - type: input
+    id: suggested
+    attributes:
+      label: Suggested text
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Translations follow docs/i18n-glossary.md. Mention it if the glossary itself should change.
