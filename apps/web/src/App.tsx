@@ -52,7 +52,8 @@ import {
   floodsForView,
   type FloodView,
 } from "./features/floods/view"
-import { hazardDefaults, useHazards } from "./features/hazards/useHazards"
+import { useHazards } from "./features/hazards/useHazards"
+import { defaultLayers, defaultsVersion, migrateLayers } from "./features/layers/defaults"
 import { LayerPanel } from "./features/layers/LayerPanel"
 import { layerStatus, type LayerStatus } from "./features/layers/status"
 import { useLayers } from "./features/layers/useLayers"
@@ -168,23 +169,6 @@ const RIVERS = "rivers"
 const PAST_FLOODS = "past-floods"
 const RESERVOIRS = "reservoirs"
 
-/**
- * Layers on at the first visit: official warnings and hazards first, then the
- * water, with boundaries for where things are. Wind is one switch away: its
- * animation sits over everything and its timeline takes room on a phone.
- */
-const defaultLayers = [
-  ...hazardDefaults,
-  RIVERS,
-  RIVER_LEVELS,
-  FLOOD_FORECAST,
-  RESERVOIRS,
-  RAIN_GAUGES,
-  ADMIN_REGIONS,
-]
-/** Default layers added since people may have saved their choice; offered to them once. */
-const newDefaultLayers = [RIVERS, RESERVOIRS, RAIN_GAUGES, ...hazardDefaults]
-
 type RegionFill = RegionVariable | "none"
 
 /** Gauges are small: clicks and hovers count within a few pixels. */
@@ -192,7 +176,12 @@ const pointSlack = 6
 
 export function App() {
   const [enabled, setEnabled] = useLocalStorage<string[]>("lanka-weather:layers", defaultLayers)
-  const [offered, setOffered] = useLocalStorage<string[]>("lanka-weather:layers-offered", [])
+  // The first visit shows every warning and nothing more (features/layers/defaults).
+  const [offered] = useLocalStorage<string[]>("lanka-weather:layers-offered", [])
+  const [defaultsSeen, setDefaultsSeen] = useLocalStorage<number>(
+    "lanka-weather:layers-defaults",
+    0,
+  )
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(
     "lanka-weather:sidebar-collapsed",
     false,
@@ -250,13 +239,13 @@ export function App() {
   const riverNetworkOn = on(RIVERS)
   const pastFloodsOn = on(PAST_FLOODS)
 
-  // Someone who saved their layers before a default was added still gets it, once.
+  // A browser that saved layers under earlier defaults is moved on, once: the
+  // untouched old set becomes the new one, a set someone chose is kept.
   useEffect(() => {
-    const unseen = newDefaultLayers.filter((id) => !offered.includes(id))
-    if (unseen.length === 0) return
-    setOffered((current) => [...current, ...unseen])
-    setEnabled((current) => [...new Set([...current, ...unseen])])
-  }, [offered, setOffered, setEnabled])
+    if (defaultsSeen >= defaultsVersion) return
+    setEnabled((current) => migrateLayers(current, offered))
+    setDefaultsSeen(defaultsVersion)
+  }, [defaultsSeen, offered, setDefaultsSeen, setEnabled])
 
   const observedLayers = useObservedLayers({
     available,

@@ -62,14 +62,6 @@ export const OFFICIAL_WARNINGS = "official-warnings"
 export const EARTHQUAKE_LAYER = "earthquakes"
 export const CYCLONE_LAYER = "cyclones"
 
-/** Hazard layers on at the first visit. */
-export const hazardDefaults = [
-  LANDSLIDE_WARNINGS,
-  OFFICIAL_WARNINGS,
-  EARTHQUAKE_LAYER,
-  CYCLONE_LAYER,
-]
-
 interface HazardsOptions {
   map: MapLibreMap | null
   /** The catalogue entry of a layer, if it is available. */

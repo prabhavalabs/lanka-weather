@@ -20,7 +20,7 @@ supersedes the old one, not by editing an accepted record.
 | [0011](0011-official-warnings-and-hazards.md)          | Official warnings, landslide levels, earthquakes and cyclones                  | Accepted                                                    |
 | [0012](0012-rainfall-stations-air-and-sea.md)          | Rainfall, weather stations, air quality and sea conditions                     | Accepted                                                    |
 | [0013](0013-reservoirs-and-extra-gauges.md)            | Reservoirs and extra river gauges through waterlevels.lk                       | Accepted; its `data` branch rule superseded in part by 0015 |
-| [0014](0014-situation-overview.md)                     | Situation overview                                                             | Accepted                                                    |
+| [0014](0014-situation-overview.md)                     | Situation overview                                                             | Accepted; default layers superseded by 0022                 |
 | [0015](0015-flood-hub-language-and-all-live-gauges.md) | Flood Hub's language, Extended coverage, live rain gauges and Colombo's canals | Accepted                                                    |
 | [0016](0016-languages.md)                              | The interface in Sinhala, Tamil and English                                    | Accepted                                                    |
 | [0017](0017-pwa-offline-and-install.md)                | Installable, offline-capable app, and an install guide                         | Accepted                                                    |
@@ -28,3 +28,4 @@ supersedes the old one, not by editing an accepted record.
 | [0019](0019-combined-flood-risk.md)                     | A combined flood-risk estimate by district                                     | Accepted                                                    |
 | [0020](0020-timely-placed-push-notices.md)              | Timely official warnings, notices that say where, and a list of notices       | Accepted                                                    |
 | [0021](0021-open-source-licence.md)                     | Apache-2.0 licence and reuse of TerraGuard code                                | Accepted                                                    |
+| [0022](0022-warnings-first-map-focus-and-home.md)      | Warnings-first default layers, a focus mask and a home place                   | Accepted                                                    |
