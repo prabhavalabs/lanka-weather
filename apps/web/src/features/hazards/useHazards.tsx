@@ -37,6 +37,7 @@ import { EARTHQUAKES, EarthquakesLayer } from "../earthquakes/EarthquakesLayer"
 import { LandslidePanel } from "../warnings/LandslidePanel"
 import { focusBounds, padBounds } from "../map/focus"
 import { LANDSLIDE_FILL, LandslideLayer } from "../warnings/LandslideLayer"
+import { warningFocus } from "../warnings/focus"
 import { OFFICIAL_FILL, OfficialDistrictsLayer } from "../warnings/OfficialDistrictsLayer"
 import {
   districtName,
@@ -456,11 +457,24 @@ export function useHazards({
       content: <CycloneLegend bare />,
     })
 
+  // The districts the open warnings are about, kept clear of a grey veil.
+  const warningDistricts = useMemo(
+    () =>
+      selection?.kind === "warnings"
+        ? warningFocus({ type: selection.type, district: selection.district }, warnings.data)
+        : [],
+    [selection, warnings.data],
+  )
+
   // Map layers.
   const fills = (
     <>
-      {officialOn && tilesLayer && (
-        <OfficialDistrictsLayer tiles={tilesLayer} districts={warnings.data?.districts ?? []} />
+      {(officialOn || selection?.kind === "warnings") && tilesLayer && (
+        <OfficialDistrictsLayer
+          tiles={tilesLayer}
+          districts={warnings.data?.districts ?? []}
+          focus={warningDistricts}
+        />
       )}
       {landslidesOn && (
         <LandslideLayer
