@@ -792,11 +792,17 @@ export function App() {
     },
     [enable, pendingCamera, setSelection],
   )
-  const openOverview = useCallback(() => {
+  const closeOverview = useCallback(() => setOverviewOpen(false), [])
+  // The "Now" button: shows the overview, or closes it when it is what is on show.
+  // Over another panel it brings the overview back rather than closing anything.
+  const toggleOverview = useCallback(() => {
+    if (overviewOpen && !selection) {
+      setOverviewOpen(false)
+      return
+    }
     setSelection(null)
     setOverviewOpen(true)
-  }, [setSelection])
-  const closeOverview = useCallback(() => setOverviewOpen(false), [])
+  }, [overviewOpen, selection, setSelection])
 
   // Search: ⌘K or Ctrl+K anywhere; the palette's code loads on first use.
   const openSearch = useCallback(() => {
@@ -1555,7 +1561,7 @@ export function App() {
             actions={
               <>
                 <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
-                <OverviewButton compact onClick={openOverview} />
+                <OverviewButton compact open={overviewShown} onClick={toggleOverview} />
                 {hazards.button(true)}
                 <AlertsButton compact onShowOnMap={openLink} />
               </>
@@ -1572,7 +1578,11 @@ export function App() {
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
             />
-            <OverviewButton onClick={openOverview} className={toolbarPill} />
+            <OverviewButton
+              open={overviewShown}
+              onClick={toggleOverview}
+              className={toolbarPill}
+            />
             {hazards.button(false)}
             <AlertsButton className={toolbarPill} onShowOnMap={openLink} />
             {regionsOn && (
