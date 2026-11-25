@@ -60,6 +60,8 @@ interface LocationWeatherPanelProps {
   children?: React.ReactNode
   /** Sources and data age, at the foot. */
   sources?: React.ReactNode
+  /** Beside the close button: e.g. making the place home. */
+  headerAction?: React.ReactNode
   onClose?: () => void
   className?: string
 }
@@ -92,6 +94,7 @@ export function LocationWeatherPanel({
   highlight,
   children,
   sources,
+  headerAction,
   onClose,
   className,
 }: LocationWeatherPanelProps) {
@@ -126,15 +129,20 @@ export function LocationWeatherPanel({
       }
       className={cn("w-full", className)}
       action={
-        onClose && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onClose}
-            aria-label={t("weather.panel.closeFor", { name: place.name })}
-          >
-            <XIcon />
-          </Button>
+        (headerAction || onClose) && (
+          <div className="flex items-center gap-2">
+            {headerAction}
+            {onClose && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onClose}
+                aria-label={t("weather.panel.closeFor", { name: place.name })}
+              >
+                <XIcon />
+              </Button>
+            )}
+          </div>
         )
       }
     >

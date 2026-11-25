@@ -65,6 +65,8 @@ import {
   type Selection,
 } from "./features/location/selection"
 import { useUrlSelection } from "./features/location/useUrlSelection"
+import { homeSelection, type HomePlace } from "./features/home/home"
+import { useHome } from "./features/home/useHome"
 import { InstallHost } from "./features/install"
 import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
@@ -209,6 +211,7 @@ export function App() {
     defaultFloodView,
   )
   const [selection, setSelection] = useUrlSelection()
+  const [home, setHome] = useHome()
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchLoaded, setSearchLoaded] = useState(false)
@@ -806,6 +809,40 @@ export function App() {
     setOverviewOpen(true)
   }, [overviewOpen, selection, setSelection])
 
+  // The house button: back to the home place and its weather, or how to set one.
+  const goHome = useCallback(() => {
+    if (!home) {
+      toast(t("map.home.hint"), { id: "home" })
+      return
+    }
+    setOverviewOpen(false)
+    const next = homeSelection(home)
+    if (next.kind === "region") {
+      pendingCamera(next, "fit")
+      setSelection(next)
+    } else {
+      pending.current = null
+      setSelection(next)
+      reveal([home.lon, home.lat], { zoom: 12 })
+    }
+  }, [home, pendingCamera, reveal, setSelection, t])
+  const changeHome = useCallback(
+    (next: HomePlace | null) => {
+      setHome(next)
+      toast(next ? t("map.home.saved", { name: next.name }) : t("map.home.removed"), {
+        id: "home",
+      })
+    },
+    [setHome, t],
+  )
+  const homeControl = useMemo(
+    () => ({
+      label: home ? t("map.home.goHome", { name: home.name }) : t("map.home.unset"),
+      onClick: goHome,
+    }),
+    [home, goHome, t],
+  )
+
   // Search: ⌘K or Ctrl+K anywhere; the palette's code loads on first use.
   const openSearch = useCallback(() => {
     setSearchLoaded(true)
@@ -1239,6 +1276,8 @@ export function App() {
           onSelectReservoir={openReservoir}
           onSelectRainGauge={openRainGauge}
           onOpenCanals={openCanals}
+          home={home}
+          onHomeChange={changeHome}
         />
       </Suspense>
     )
@@ -1478,7 +1517,7 @@ export function App() {
       <AppShell
         sidebarCollapsed={sidebarCollapsed}
         map={
-          <MapView theme={theme} onReady={setMap} onResetView={resetView}>
+          <MapView theme={theme} onReady={setMap} onResetView={resetView} home={homeControl}>
             {gridOn && <GridLayer grid={grid.data} variable={gridVariable} />}
             {observedLayers.mapLayers}
             {regionsOn && regionsLayer && (
@@ -1587,11 +1626,7 @@ export function App() {
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
             />
-            <OverviewButton
-              open={overviewShown}
-              onClick={toggleOverview}
-              className={toolbarPill}
-            />
+            <OverviewButton open={overviewShown} onClick={toggleOverview} className={toolbarPill} />
             {hazards.button(false)}
             <AlertsButton className={toolbarPill} onShowOnMap={openLink} />
             {regionsOn && (

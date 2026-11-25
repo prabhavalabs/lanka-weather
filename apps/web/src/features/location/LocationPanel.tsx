@@ -3,12 +3,14 @@
  * point, the regions containing it, nearby gauges and alerts. Loaded on
  * demand (React.lazy), so it is not in the first download.
  */
+import { HouseIcon } from "lucide-react"
 import { useMemo, type ReactNode } from "react"
 import { AlertList } from "@/components/weather/AlertList"
 import { fillNodes } from "@/components/weather/fillNodes"
 import { GaugeList, type GaugeListItem } from "@/components/weather/GaugeList"
 import { LocationWeatherPanel } from "@/components/weather/LocationWeatherPanel"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { ApiError, isNotReady } from "@/lib/api"
 import { formatAge } from "@/lib/format"
 import { localName, translate, useLocale, useT } from "@/lib/i18n"
@@ -29,6 +31,7 @@ import { formatLevel, statusLabels, trendArrows } from "../rivers/present"
 import { useRegionAggregate, useRegionDetail } from "../regions/queries"
 import { RegionAggregate } from "../regions/RegionAggregate"
 import { regionLevelOf } from "../regions/present"
+import { homeFor, isHome, type HomePlace } from "../home/home"
 import { FloodRiskCard } from "../floodrisk/FloodRiskCard"
 import { districtRisk } from "../floodrisk/present"
 import { useFloodRisk } from "../floodrisk/queries"
@@ -56,6 +59,9 @@ export interface LocationPanelProps {
   onSelectReservoir: (id: string) => void
   onSelectRainGauge?: (id: string) => void
   onOpenCanals?: () => void
+  /** The home place saved in this browser; with onHomeChange, the panel offers to set it. */
+  home?: HomePlace | null
+  onHomeChange?: (home: HomePlace | null) => void
 }
 
 function unavailableText(error: unknown, outside: boolean) {
@@ -98,6 +104,8 @@ export default function LocationPanel({
   onSelectReservoir,
   onSelectRainGauge,
   onOpenCanals,
+  home = null,
+  onHomeChange,
 }: LocationPanelProps) {
   const t = useT()
   // Names, words and the alerts are rebuilt in the reader's language.
@@ -346,8 +354,29 @@ export default function LocationPanel({
     </ul>
   )
 
+  // The house beside the close button: pressed while this is the home place.
+  const here = isHome(home, selection, location)
+  // Offered once the place has its name, so "Loading" is never saved as home.
+  const named =
+    selection.kind === "region" ? Boolean(region.data) : Boolean(selection.name || summary.data)
+  const candidate = location && named ? homeFor(selection, location, area) : null
+  const homeLabel = here ? t("map.home.isHome", { name: area }) : t("map.home.set", { name: area })
+  const homeButton = onHomeChange && (here || candidate) && (
+    <Button
+      variant={here ? "default" : "outline"}
+      size="icon"
+      aria-pressed={here}
+      aria-label={homeLabel}
+      title={homeLabel}
+      onClick={() => onHomeChange(here ? null : candidate)}
+    >
+      <HouseIcon />
+    </Button>
+  )
+
   return (
     <LocationWeatherPanel
+      headerAction={homeButton}
       place={place}
       current={current}
       forecast={view.hours}

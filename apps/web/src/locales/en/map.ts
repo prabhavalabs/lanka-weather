@@ -14,6 +14,16 @@ export const map = {
     map: "Map",
   },
   /** The hover chip by the pointer. */
+  /** The home place (features/home): saved in this browser only. */
+  home: {
+    goHome: "Go home: {name}",
+    unset: "Set a home place",
+    hint: "Open a place on the map, then choose the house in its panel to make it your home place.",
+    set: "Make {name} my home place",
+    isHome: "{name} is your home place. Remove it",
+    saved: "{name} is now your home place. The house button on the map brings you back here.",
+    removed: "Home place removed.",
+  },
   chip: {
     riverGauge: "River gauge",
     riverGaugeLevel: "{status} · {level}",
