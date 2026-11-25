@@ -69,6 +69,8 @@ import { InstallHost } from "./features/install"
 import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
+import { asFocusGeometry } from "./features/map/focus"
+import { FocusMask } from "./features/map/FocusMask"
 import { HoverChip } from "./features/map/HoverChip"
 import { MapView } from "./features/map/MapView"
 import { sriLankaBounds } from "./features/map/config"
@@ -1462,6 +1464,12 @@ export function App() {
     [basins.data],
   )
 
+  // A selected area stands out: the rest of the map goes grey around it.
+  const focusGeometry = useMemo(
+    () => hazards.focus ?? asFocusGeometry(selectedArea?.geometry),
+    [hazards.focus, selectedArea],
+  )
+
   const markerAt =
     (selection?.kind === "point" || selection?.kind === "region") && location ? location : null
 
@@ -1527,6 +1535,7 @@ export function App() {
               />
             )}
             {hazards.points}
+            <FocusMask geometry={focusGeometry} />
             {markerAt && (
               <LocationMarker lat={markerAt.lat} lon={markerAt.lon} label={detailLabel} />
             )}

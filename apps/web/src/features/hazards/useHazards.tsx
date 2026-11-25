@@ -35,6 +35,7 @@ import { distanceFromSriLanka, earthquakeParts, magnitude } from "../earthquakes
 import { useEarthquakes } from "../earthquakes/queries"
 import { EARTHQUAKES, EarthquakesLayer } from "../earthquakes/EarthquakesLayer"
 import { LandslidePanel } from "../warnings/LandslidePanel"
+import { focusBounds, padBounds } from "../map/focus"
 import { LANDSLIDE_FILL, LandslideLayer } from "../warnings/LandslideLayer"
 import { OFFICIAL_FILL, OfficialDistrictsLayer } from "../warnings/OfficialDistrictsLayer"
 import {
@@ -155,15 +156,28 @@ export function useHazards({
           ?.properties
       : undefined
   const divisionKey = division ? division.id : null
+  // The opened division, cut out of a grey veil (features/map/FocusMask).
+  const focus =
+    selection?.kind === "landslide"
+      ? (landslides.data?.features.find((feature) => feature.properties.id === selection.id)
+          ?.geometry ?? null)
+      : null
   const divisionAt = useRef(division)
   useEffect(() => {
     divisionAt.current = division
   })
+  const focusAt = useRef(focus)
   useEffect(() => {
-    if (map && divisionKey && divisionAt.current) {
-      reveal([divisionAt.current.labelLon, divisionAt.current.labelLat])
-    }
-  }, [map, divisionKey, reveal])
+    focusAt.current = focus
+  })
+  // The whole division comes into view, picked from a list or the map: at the
+  // country's scale it is a few pixels across and the focus mask's hole with it.
+  useEffect(() => {
+    if (!map || !divisionKey || !divisionAt.current) return
+    const bounds = focusAt.current ? focusBounds(focusAt.current) : null
+    if (bounds) fitBox(padBounds(bounds))
+    else reveal([divisionAt.current.labelLon, divisionAt.current.labelLat])
+  }, [map, divisionKey, fitBox, reveal])
 
   // A click that has landed on a hazard (see features/map/hits): a storm or an
   // earthquake, a division or a highlighted district.
@@ -554,6 +568,8 @@ export function useHazards({
     detail,
     detailLabel,
     detailFull: selection?.kind === "warnings",
+    /** The selected division's shape, for the focus mask. */
+    focus,
     /** The map is showing something far from Sri Lanka, on purpose. */
     farAway: selection?.kind === "cyclone" || selection?.kind === "quake",
     banner,
