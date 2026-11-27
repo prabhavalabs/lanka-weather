@@ -3,6 +3,8 @@ export const common = {
   language: "Language",
   languageNote: "Sinhala and Tamil translations are being reviewed.",
   appearance: "Appearance",
+  scrollLeft: "Scroll left",
+  scrollRight: "Scroll right",
   close: "Close",
   closeNamed: "Close {name}",
   back: "Back",

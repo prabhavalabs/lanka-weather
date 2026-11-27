@@ -5,6 +5,8 @@ export const common: Translation<typeof en> = {
   language: "භාෂාව",
   languageNote: "සිංහල සහ දෙමළ පරිවර්තන සමාලෝචනය වෙමින් පවතී.",
   appearance: "පෙනුම",
+  scrollLeft: "වමට අනුචලනය කරන්න",
+  scrollRight: "දකුණට අනුචලනය කරන්න",
   close: "වසන්න",
   closeNamed: "{name} වසන්න",
   back: "ආපසු",

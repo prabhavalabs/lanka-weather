@@ -1,10 +1,10 @@
 import { BellIcon, ExternalLinkIcon, XIcon } from "lucide-react"
 import { useEffect, useMemo, useRef, type ReactNode } from "react"
 import { Panel } from "@/components/Panel"
+import { ScrollRow } from "@/components/ScrollRow"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { formatAge, formatDayTime } from "@/lib/format"
 import { isLocale, useLocale, useT } from "@/lib/i18n"
@@ -310,12 +310,9 @@ export function WarningsPanel({
       {data && <LandslideStatusCard meta={data.landslide} />}
 
       {/* One row that scrolls sideways: the names stay whole on a narrow panel. */}
-      <ScrollArea
-        type="auto"
-        orientation="horizontal"
-        className="shrink-0 rounded-xl border border-border bg-muted"
-        scrollbarClassName="data-horizontal:h-1.5 data-horizontal:p-0 data-horizontal:px-2"
-        viewportProps={{ ref: filterRow }}
+      <ScrollRow
+        className="shrink-0 overflow-hidden rounded-xl border border-border bg-muted"
+        viewportRef={filterRow}
       >
         <ToggleGroup
           type="single"
@@ -325,7 +322,7 @@ export function WarningsPanel({
             if (value) onFilter({ type: value === "all" ? undefined : value, district })
           }}
           aria-label={t("warnings.panel.filterLabel")}
-          className="w-max min-w-full rounded-none border-0 bg-transparent p-1 pb-1.5"
+          className="w-max min-w-full rounded-none border-0 bg-transparent p-1"
         >
           <ToggleGroupItem value="all" className="flex-auto px-2.5">
             {t("warnings.panel.all")}
@@ -336,7 +333,7 @@ export function WarningsPanel({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-      </ScrollArea>
+      </ScrollRow>
 
       {district && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-inset px-3 py-2 text-sm">
