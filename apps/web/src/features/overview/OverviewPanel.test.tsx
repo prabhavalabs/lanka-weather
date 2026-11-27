@@ -120,7 +120,7 @@ describe("OverviewPanel", () => {
     const html = render()
     expect(html).toContain("Disaster Management Centre")
     expect(html).toContain("<button")
-    expect(html).toContain('aria-label="Close Sri Lanka now"')
+    expect(html).toContain('aria-label="Close the current situation"')
     expect(html).toMatch(/ago|hour|min|day|now/i)
   })
 

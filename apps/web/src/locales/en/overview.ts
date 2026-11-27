@@ -9,14 +9,14 @@
  */
 export const overview = {
   button: {
-    label: "Sri Lanka now, the overview",
-    text: "Now",
+    label: "Current situation across Sri Lanka",
+    text: "Current situation",
   },
   panel: {
-    title: "Sri Lanka now",
+    title: "Current situation",
     composed: "Composed {age}",
     subtitle: "What the official and open feeds say",
-    close: "Close Sri Lanka now",
+    close: "Close the current situation",
     loading: "Loading the overview",
     failed:
       "The overview could not be loaded, so nothing can be said from here. Check with the Disaster Management Centre, {link}, or call 117 in an emergency.",

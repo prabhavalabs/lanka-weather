@@ -816,7 +816,7 @@ export function App() {
     [enable, pendingCamera, setSelection],
   )
   const closeOverview = useCallback(() => setOverviewOpen(false), [])
-  // The "Now" button: shows the overview, or closes it when it is what is on show.
+  // The "Current situation" button: shows the overview, or closes it when it is what is on show.
   // Over another panel it brings the overview back rather than closing anything.
   const toggleOverview = useCallback(() => {
     if (overviewOpen && !selection && !alertsShown) {
