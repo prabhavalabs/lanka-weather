@@ -73,6 +73,7 @@ import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
 import { asFocusGeometry } from "./features/map/focus"
+import { BasemapPanel } from "./features/map/BasemapPanel"
 import { FocusMask } from "./features/map/FocusMask"
 import { HoverChip } from "./features/map/HoverChip"
 import { MapView } from "./features/map/MapView"
@@ -1182,13 +1183,16 @@ export function App() {
   const activeCount = enabled.filter((id) => available(id)).length
 
   const layerList = (
-    <LayerPanel
-      enabled={enabled}
-      onToggle={toggle}
-      summaries={summaries}
-      details={details}
-      stale={stale}
-    />
+    <div className="flex flex-col gap-4">
+      <LayerPanel
+        enabled={enabled}
+        onToggle={toggle}
+        summaries={summaries}
+        details={details}
+        stale={stale}
+      />
+      <BasemapPanel />
+    </div>
   )
   const smallPrint = (
     <div className="flex flex-col gap-1">

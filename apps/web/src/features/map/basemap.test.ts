@@ -1,6 +1,12 @@
 import type { ExpressionSpecification, StyleSpecification } from "maplibre-gl"
 import { describe, expect, it } from "vitest"
-import { labelFields, localisedLabel, tuneBasemap, type BasemapPalette } from "./basemap"
+import {
+  groupedLayers,
+  labelFields,
+  localisedLabel,
+  tuneBasemap,
+  type BasemapPalette,
+} from "./basemap"
 
 const palette: BasemapPalette = {
   land: "#111111",
@@ -143,5 +149,54 @@ describe("basemap labels and scripts", () => {
       { url: "/si.woff2", "unicode-range": ["U+0D80-0DFF", "U+111E0-111FF", "U+200C-200D"] },
       { url: "/ta.woff2", "unicode-range": ["U+0B80-0BFF", "U+11FC0-11FFF"] },
     ])
+  })
+})
+
+describe("basemap groups", () => {
+  const visibility = (result: StyleSpecification, id: string) =>
+    (result.layers.find((layer) => layer.id === id)?.layout as Record<string, unknown> | undefined)
+      ?.visibility
+
+  it("marks each detail layer with its group, and leaves land and water out", () => {
+    expect(groupedLayers(tuneBasemap(style, palette).layers)).toEqual([
+      { id: "landuse_park", group: "landcover" },
+      { id: "building", group: "landcover" },
+      { id: "highway_major_inner", group: "roads" },
+      { id: "boundary_2", group: "boundaries" },
+      { id: "label_city", group: "places" },
+      { id: "label_village", group: "places" },
+      { id: "water_name", group: "waterways" },
+    ])
+  })
+
+  it("hides the groups that are not shown, and only those", () => {
+    const result = tuneBasemap(style, palette, { shown: ["places"] })
+    expect(visibility(result, "highway_major_inner")).toBe("none")
+    expect(visibility(result, "building")).toBe("none")
+    expect(visibility(result, "water_name")).toBe("none")
+    expect(visibility(result, "label_city")).toBeUndefined()
+    expect(visibility(result, "water")).toBeUndefined()
+    expect(visibility(result, "background")).toBeUndefined()
+  })
+
+  it("never groups a layer the style itself hides", () => {
+    const hidden = tuneBasemap(
+      {
+        ...style,
+        layers: [
+          {
+            id: "road_hidden",
+            type: "line",
+            source: "openmaptiles",
+            "source-layer": "transportation",
+            layout: { visibility: "none" },
+          },
+        ],
+      },
+      palette,
+      { shown: ["roads"] },
+    )
+    expect(groupedLayers(hidden.layers)).toEqual([])
+    expect(visibility(hidden, "road_hidden")).toBe("none")
   })
 })

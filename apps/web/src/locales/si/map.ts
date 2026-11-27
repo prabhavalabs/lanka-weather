@@ -23,6 +23,23 @@ export const map: Translation<typeof en> = {
     saved: "{name} දැන් ඔබේ නිවෙස් ස්ථානයයි. සිතියමේ ඇති නිවසේ බොත්තම ඔබව නැවත මෙහි ගෙන එයි.",
     removed: "නිවෙස් ස්ථානය ඉවත් කළා.",
   },
+  basemap: {
+    heading: "පාදක සිතියම",
+    places: { title: "ස්ථාන නාම", description: "නගර සහ ගම්මාන" },
+    waterways: {
+      title: "ඇළ දොළ සහ ජල නාම",
+      description: "ඇළ, දොළ සහ මුහුද හා වැව්වල නම්",
+    },
+    roads: {
+      title: "මාර්ග සහ දුම්රිය මාර්ග",
+      description: "මාර්ග, දුම්රිය මාර්ග සහ ගුවන් තොටුපළ",
+    },
+    landcover: {
+      title: "භූමි ආවරණය",
+      description: "වනාන්තර, උද්‍යාන, ජනාවාස සහ ගොඩනැගිලි",
+    },
+    boundaries: { title: "මායිම්", description: "රටවල් සහ පළාත් මායිම්" },
+  },
   chip: {
     riverGauge: "ගංගා ජල මාපකය",
     riverGaugeLevel: "{status} · {level}",

@@ -8,7 +8,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { getLocale, translateIn, useLocale, useT, type Locale } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
-import { basemapTokens, labelFields, localisedLabel, tuneBasemap } from "./basemap"
+import { basemapTokens, groupedLayers, labelFields, localisedLabel, tuneBasemap } from "./basemap"
+import { getBasemapGroups, useBasemapGroups } from "./basemapGroups"
 import { mapStyles, minimumZoom, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
 
@@ -27,12 +28,16 @@ const scriptFonts = {
 }
 
 /**
- * Tunes each fetched basemap to the theme and language in effect. The `dark`
+ * Tunes each fetched basemap to the theme, language and basemap groups in effect. The `dark`
  * class is set before a theme change reaches React, so the tokens read here
  * already belong to the new theme.
  */
 const transformStyle: maplibregl.TransformStyleFunction = (_previous, next) =>
-  tuneBasemap(next, readTokens(basemapTokens), { locale: getLocale(), fonts: scriptFonts })
+  tuneBasemap(next, readTokens(basemapTokens), {
+    locale: getLocale(),
+    fonts: scriptFonts,
+    shown: getBasemapGroups(),
+  })
 
 /** MapLibre's own button labels, in a language. */
 function controlStrings(locale: Locale): Record<string, string> {
@@ -166,6 +171,18 @@ export function MapView({ theme, onReady, onResetView, home, children }: MapView
       }
     }
   }, [map, locale])
+
+  // Basemap groups switch on and off in place, as the language does.
+  const shownGroups = useBasemapGroups()
+  useEffect(() => {
+    if (!map) return
+    for (const { id, group } of groupedLayers(map.getStyle().layers)) {
+      const visibility = shownGroups.includes(group) ? "visible" : "none"
+      if (map.getLayoutProperty(id, "visibility") !== visibility) {
+        map.setLayoutProperty(id, "visibility", visibility)
+      }
+    }
+  }, [map, shownGroups])
 
   const t = useT()
   const loadedTheme = useRef(theme)

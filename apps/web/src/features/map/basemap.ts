@@ -5,6 +5,7 @@ import type {
   StyleSpecification,
 } from "maplibre-gl"
 import type { Locale } from "@/lib/i18n"
+import { basemapGroup, basemapGroupKey, type BasemapGroup } from "./basemapGroups"
 
 /** Basemap colours, read from the theme tokens (src/styles/theme.css). */
 export interface BasemapPalette {
@@ -124,11 +125,15 @@ export function labelFields(layers: LayerSpecification[]): { id: string; origina
  * and keep the style's own field in their metadata so a later language change
  * can be applied without reloading the style. With `fonts`, Sinhala and Tamil
  * are drawn from those files.
+ *
+ * Each layer that belongs to a basemap group (basemapGroups.ts) records it in
+ * its metadata, so it can be shown or hidden in place. With `shown`, layers of
+ * the groups not in it start hidden.
  */
 export function tuneBasemap(
   style: StyleSpecification,
   palette: BasemapPalette,
-  options: { locale?: Locale; fonts?: ScriptFonts } = {},
+  options: { locale?: Locale; fonts?: ScriptFonts; shown?: readonly BasemapGroup[] } = {},
 ): StyleSpecification {
   const layers = style.layers.map((layer): LayerSpecification => {
     const source = sourceLayer(layer)
@@ -191,16 +196,47 @@ export function tuneBasemap(
         } as LayerSpecification
       })
     : layers
+  const grouped = localised.map((layer) => groupLayer(layer, options.shown))
   return {
     ...style,
-    layers: localised,
+    layers: grouped,
     ...(options.fonts
       ? {
           "font-faces": {
             ...(style["font-faces"] ?? {}),
-            ...scriptFontFaces(fontStacks(localised), options.fonts),
+            ...scriptFontFaces(fontStacks(grouped), options.fonts),
           },
         }
       : {}),
   }
+}
+
+/**
+ * A layer marked with its basemap group, and hidden when that group is not
+ * shown. Layers the style itself hides are left alone, so showing a group
+ * never brings them up.
+ */
+function groupLayer(
+  layer: LayerSpecification,
+  shown?: readonly BasemapGroup[],
+): LayerSpecification {
+  const group = basemapGroup(layer)
+  if (!group || layer.layout?.visibility === "none") return layer
+  const marked = {
+    ...layer,
+    metadata: { ...((layer.metadata as object | undefined) ?? {}), [basemapGroupKey]: group },
+  }
+  if (!shown || shown.includes(group)) return marked as LayerSpecification
+  return {
+    ...marked,
+    layout: { ...(layer.layout ?? {}), visibility: "none" },
+  } as LayerSpecification
+}
+
+/** The basemap layers that belong to a group, by id. */
+export function groupedLayers(layers: LayerSpecification[]): { id: string; group: BasemapGroup }[] {
+  return layers.flatMap((layer) => {
+    const group = (layer.metadata as Record<string, unknown> | undefined)?.[basemapGroupKey]
+    return typeof group === "string" ? [{ id: layer.id, group: group as BasemapGroup }] : []
+  })
 }
