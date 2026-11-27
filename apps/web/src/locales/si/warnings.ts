@@ -91,6 +91,11 @@ export const warnings: Translation<typeof en> = {
     allMore: "සියලු අනතුරු ඇඟවීම් (තවත් {count}ක්)",
     dismiss: "මෙම දැනුම්දීම ඉවත් කරන්න",
   },
+  tabs: {
+    label: "අනතුරු ඇඟවීම් සහ ඔබේ ඇඟවීම්",
+    official: "නිල අනතුරු ඇඟවීම්",
+    alerts: "ඔබේ ඇඟවීම්",
+  },
   button: {
     text: "අනතුරු ඇඟවීම්",
     label: "නිල අනතුරු ඇඟවීම්, බලපැවැත්වෙන ගණන {count}",

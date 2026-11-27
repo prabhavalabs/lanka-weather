@@ -126,7 +126,11 @@ import { RiverLegend } from "./features/rivers/RiverLegend"
 import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsLayer"
 import { StationPanel } from "./features/rivers/StationPanel"
 import { MetStationPanel } from "./features/stations/MetStationPanel"
-import { AlertsButton } from "./features/alerts/AlertsButton"
+import { AlertsInboxPanel } from "./features/alerts/AlertsInboxPanel"
+import { useAlertsCentre } from "./features/alerts/useAlertsCentre"
+import { closeInbox, type InboxTab, openInbox, useInboxView } from "./features/notifications/state"
+import { useInbox } from "./features/notifications/useInbox"
+import { WarningsTabs } from "./features/warnings/WarningsTabs"
 import { linkTarget } from "./features/notifications/present"
 import { OverviewButton } from "./features/overview/OverviewButton"
 import { OverviewPanel } from "./features/overview/OverviewPanel"
@@ -211,6 +215,27 @@ export function App() {
   // The first thing on load, until dismissed or the map is used instead.
   const [overviewOpen, setOverviewOpen] = useState(true)
   const overview = useOverview(overviewOpen)
+
+  // The alerts this device was sent share the warnings panel, on its second tab.
+  // Opening them clears whatever else is on show; opening anything else closes them.
+  const inbox = useInbox()
+  const inboxView = useInboxView()
+  const alertsShown = inboxView.open
+  const openAlerts = useCallback(
+    (tab?: InboxTab) => {
+      setSelection(null)
+      setOverviewOpen(false)
+      openInbox(tab ? { tab } : {})
+    },
+    [setSelection],
+  )
+  const showAlerts = useCallback(() => openAlerts(), [openAlerts])
+  useAlertsCentre(openAlerts)
+  const shownSelection = useRef(selection)
+  useEffect(() => {
+    if (selection && selection !== shownSelection.current) closeInbox()
+    shownSelection.current = selection
+  }, [selection])
   const zoom = useMapZoom(map)
   const desktop = useMediaQuery(desktopQuery, true)
   const { resolved: theme } = useTheme()
@@ -395,7 +420,7 @@ export function App() {
   }
 
   // Camera: keep the selected place clear of the cards floating over the map.
-  const overviewShown = overviewOpen && !selection
+  const overviewShown = overviewOpen && !selection && !alertsShown
   const insets = useCallback(
     () =>
       layoutInsets({
@@ -642,6 +667,8 @@ export function App() {
 
   const revealPoint = useCallback((lngLat: [number, number]) => reveal(lngLat), [reveal])
   const hazards = useHazards({
+    unreadAlerts: inbox.unread,
+    onShowAlerts: showAlerts,
     map,
     available,
     isOn: on,
@@ -792,13 +819,14 @@ export function App() {
   // The "Now" button: shows the overview, or closes it when it is what is on show.
   // Over another panel it brings the overview back rather than closing anything.
   const toggleOverview = useCallback(() => {
-    if (overviewOpen && !selection) {
+    if (overviewOpen && !selection && !alertsShown) {
       setOverviewOpen(false)
       return
     }
+    closeInbox()
     setSelection(null)
     setOverviewOpen(true)
-  }, [overviewOpen, selection, setSelection])
+  }, [overviewOpen, selection, alertsShown, setSelection])
 
   // The house button: back to the home place and its weather, or how to set one.
   const goHome = useCallback(() => {
@@ -854,14 +882,15 @@ export function App() {
   // Escape closes the detail panel when no dialog is open.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || (!selection && !overviewOpen)) return
+      if (event.key !== "Escape" || (!selection && !overviewOpen && !alertsShown)) return
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
-      if (selection) setSelection(null)
+      if (alertsShown) closeInbox()
+      else if (selection) setSelection(null)
       else setOverviewOpen(false)
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selection, overviewOpen, setSelection])
+  }, [selection, overviewOpen, alertsShown, setSelection])
 
   const close = useCallback(() => setSelection(null), [setSelection])
 
@@ -1421,6 +1450,28 @@ export function App() {
     )
   }
 
+  if (alertsShown) {
+    detailLabel = t("notifications.title")
+    detail = (
+      <AlertsInboxPanel
+        inbox={inbox}
+        onShowOnMap={openLink}
+        tabs={
+          <WarningsTabs
+            tab="alerts"
+            officialCount={hazards.activeCount}
+            unread={inbox.unread}
+            onTabChange={(tab) => {
+              if (tab !== "official") return
+              closeInbox()
+              hazards.openWarnings()
+            }}
+          />
+        }
+      />
+    )
+  }
+
   // Legends for the layers that are on (wide screens; phones show them in the layer sheet).
   // What colours the whole map keeps its own card; the rest share the map key.
   const legendClass = "w-60"
@@ -1611,7 +1662,6 @@ export function App() {
                 <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
                 <OverviewButton compact open={overviewShown} onClick={toggleOverview} />
                 {hazards.button(true)}
-                <AlertsButton compact onShowOnMap={openLink} />
               </>
             }
           />
@@ -1628,7 +1678,6 @@ export function App() {
             />
             <OverviewButton open={overviewShown} onClick={toggleOverview} className={toolbarPill} />
             {hazards.button(false)}
-            <AlertsButton className={toolbarPill} onShowOnMap={openLink} />
             {regionsOn && (
               <div className="pointer-events-auto hidden h-10 shrink-0 items-center rounded-full border border-border bg-card/95 px-[3px] shadow-panel backdrop-blur-md @3xl:flex">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />
@@ -1647,9 +1696,9 @@ export function App() {
         }
         detail={detail}
         detailLabel={detailLabel}
-        detailFull={hazards.detailFull}
+        detailFull={hazards.detailFull || alertsShown}
         detailSmall={overviewShown}
-        onDetailClose={selection ? close : closeOverview}
+        onDetailClose={alertsShown ? closeInbox : selection ? close : closeOverview}
         legends={legends}
         controls={mapControls}
         timeline={

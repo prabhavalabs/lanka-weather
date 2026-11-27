@@ -2,9 +2,10 @@ import type { Translation } from "@/lib/i18n"
 import type { notifications as en } from "../en/notifications"
 
 export const notifications: Translation<typeof en> = {
-  title: "எச்சரிக்கைகள்",
+  title: "அறிவிப்புகள்",
   description: "இந்தச் சாதனத்துக்கு அனுப்பப்பட்ட எச்சரிக்கைகளும், எவற்றை அனுப்புவது என்பதும்.",
   tabs: { list: "பெற்றவை", settings: "அமைப்புகள்" },
+  close: "அறிவிப்புகளை மூடு",
   buttonUnread: {
     one: "எச்சரிக்கைகள், {count} புதியது",
     other: "எச்சரிக்கைகள், {count} புதியவை",

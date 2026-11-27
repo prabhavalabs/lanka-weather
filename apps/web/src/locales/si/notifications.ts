@@ -5,6 +5,7 @@ export const notifications: Translation<typeof en> = {
   title: "ඇඟවීම්",
   description: "මෙම උපාංගයට එවූ ඇඟවීම් සහ එවිය යුතු දේ.",
   tabs: { list: "ලැබුණු", settings: "සැකසුම්" },
+  close: "ඇඟවීම් වසන්න",
   buttonUnread: "ඇඟවීම්, නව {count}ක්",
   count: "ඇඟවීම් {count}",
   newCount: "නව {count}",

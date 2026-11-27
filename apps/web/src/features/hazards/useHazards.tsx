@@ -53,6 +53,7 @@ import { LandslideLegend, OfficialDistrictsLegend } from "../warnings/WarningLeg
 import { WarningBanner } from "../warnings/WarningBanner"
 import { WarningsButton } from "../warnings/WarningsButton"
 import { WarningsPanel } from "../warnings/WarningsPanel"
+import { WarningsTabs } from "../warnings/WarningsTabs"
 import { toolbarPill } from "@/components/weather/toolbar"
 import type { HoverLayers } from "../map/HoverChip"
 import { regionLevelOf } from "../regions/present"
@@ -75,10 +76,16 @@ interface HazardsOptions {
   fitBox: (bbox: [number, number, number, number]) => void
   /** Moves the map, if needed, so a point is clear of the cards over it. */
   reveal: (lngLat: [number, number]) => void
+  /** Alerts this device was sent and has not seen, for the button and the tabs. */
+  unreadAlerts: number
+  /** Shows this device's alerts, the second tab of the warnings panel. */
+  onShowAlerts: () => void
 }
 
 export function useHazards({
   reveal,
+  unreadAlerts,
+  onShowAlerts,
   map,
   available,
   isOn,
@@ -495,6 +502,7 @@ export function useHazards({
 
   // Detail panel.
   const close = () => setSelection(null)
+  const activeCount = warnings.data?.activeCount ?? 0
   let detail: ReactNode = null
   let detailLabel: string | null = null
   if (selection?.kind === "warnings") {
@@ -507,6 +515,16 @@ export function useHazards({
         districtName={warnings.data?.districts.find((item) => item.id === selection.district)?.name}
         onFilter={(filter) => setSelection({ kind: "warnings", ...filter })}
         onClose={close}
+        tabs={
+          <WarningsTabs
+            tab="official"
+            officialCount={activeCount}
+            unread={unreadAlerts}
+            onTabChange={(tab) => {
+              if (tab === "alerts") onShowAlerts()
+            }}
+          />
+        }
       />
     )
   } else if (selection?.kind === "landslide") {
@@ -546,7 +564,6 @@ export function useHazards({
     (officialLayer !== undefined &&
       warnings.dataUpdatedAt > 0 &&
       isStale(officialLayer, new Date(warnings.dataUpdatedAt)))
-  const activeCount = warnings.data?.activeCount ?? 0
   const banner = warnings.data ? (
     <WarningBanner
       items={warnings.data.banner}
@@ -559,6 +576,7 @@ export function useHazards({
     <WarningsButton
       compact={compact}
       count={activeCount}
+      unread={unreadAlerts}
       stale={stale}
       onClick={() => openWarnings()}
       className={compact ? undefined : toolbarPill}
@@ -580,6 +598,10 @@ export function useHazards({
     farAway: selection?.kind === "cyclone" || selection?.kind === "quake",
     banner,
     button,
+    /** Opens the official warnings, optionally filtered. */
+    openWarnings,
+    /** Official warnings and advisories in force. */
+    activeCount,
     hover,
     handleHit,
   }

@@ -3,6 +3,7 @@ export const notifications = {
   title: "Alerts",
   description: "Alerts sent to this device, and what to send.",
   tabs: { list: "Received", settings: "Settings" },
+  close: "Close alerts",
   buttonUnread: { one: "Alerts, {count} new", other: "Alerts, {count} new" },
   count: { one: "{count} alert", other: "{count} alerts" },
   newCount: { one: "{count} new", other: "{count} new" },
