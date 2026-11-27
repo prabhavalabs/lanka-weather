@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useT } from "@/lib/i18n"
+import { AboutButton } from "@/features/about"
 import { InstallButton } from "@/features/install"
 import { cn } from "@/lib/utils"
 
@@ -60,6 +61,7 @@ export function AppSidebar({
     >
       <header className="flex items-center gap-2 px-5 pt-5 pb-4">
         <AppLogo tagline={t("app.shell.tagline")} className="min-w-0 flex-1" />
+        <AboutButton />
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

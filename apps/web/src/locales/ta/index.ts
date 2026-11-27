@@ -1,5 +1,6 @@
 import type { Translation } from "@/lib/i18n"
 import type { en } from "../en"
+import { about } from "./about"
 import { alerts } from "./alerts"
 import { common } from "./common"
 import { format } from "./format"
@@ -54,4 +55,5 @@ export const ta: Translation<typeof en> = {
   pwa,
   alerts,
   notifications,
+  about,
 }

@@ -70,6 +70,7 @@ import { useUrlSelection } from "./features/location/useUrlSelection"
 import { homeSelection, type HomePlace } from "./features/home/home"
 import { useHome } from "./features/home/useHome"
 import { InstallHost } from "./features/install"
+import { AboutLink, AboutPage } from "./features/about"
 import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
@@ -1227,6 +1228,7 @@ export function App() {
   const smallPrint = (
     <div className="flex flex-col gap-1">
       <span>{t("app.smallPrint")}</span>
+      <AboutLink className="mt-1" />
     </div>
   )
 
@@ -1731,6 +1733,7 @@ export function App() {
       )}
       <Toaster position={desktop ? "bottom-center" : "top-center"} />
       <InstallHost />
+      <AboutPage />
     </TooltipProvider>
   )
 }
