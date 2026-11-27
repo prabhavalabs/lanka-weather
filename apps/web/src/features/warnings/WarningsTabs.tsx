@@ -5,6 +5,8 @@ import { useT } from "@/lib/i18n"
 
 export type WarningsTab = "official" | "alerts"
 
+const trigger = "h-auto min-h-9 min-w-0 px-2 py-1.5 text-center leading-snug whitespace-normal"
+
 interface WarningsTabsProps {
   tab: WarningsTab
   /** Official warnings and advisories in force. */
@@ -24,19 +26,23 @@ export function WarningsTabs({ tab, officialCount, unread, onTabChange }: Warnin
   const badge = badgeText(unread)
   return (
     <Tabs value={tab} onValueChange={(value) => onTabChange(value as WarningsTab)}>
-      <TabsList className="w-full" aria-label={t("warnings.tabs.label")}>
-        <TabsTrigger value="official">
+      {/* Long labels (Sinhala, Tamil) wrap onto a second line rather than run into each other. */}
+      <TabsList
+        className="w-full items-stretch group-data-horizontal/tabs:h-auto"
+        aria-label={t("warnings.tabs.label")}
+      >
+        <TabsTrigger value="official" className={trigger}>
           <LandmarkIcon />
-          {t("warnings.tabs.official")}
+          <span className="min-w-0 text-balance">{t("warnings.tabs.official")}</span>
           {officialCount > 0 && (
             <span className="numeric rounded-full bg-brand px-1.5 text-[0.625rem] leading-4 font-semibold text-brand-foreground">
               {officialCount}
             </span>
           )}
         </TabsTrigger>
-        <TabsTrigger value="alerts">
+        <TabsTrigger value="alerts" className={trigger}>
           <BellIcon />
-          {t("warnings.tabs.alerts")}
+          <span className="min-w-0 text-balance">{t("warnings.tabs.alerts")}</span>
           {badge && (
             <span className="numeric rounded-full bg-destructive px-1.5 text-[0.625rem] leading-4 font-semibold text-white">
               {badge}
