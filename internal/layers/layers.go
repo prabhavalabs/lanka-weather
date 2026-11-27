@@ -88,7 +88,7 @@ var catalogue = []Layer{
 		Sources:           []string{"hydrosheds-hydrorivers", "irrigation-river-basins", "irrigation-gauges", "google-flood-forecasting", "open-meteo"},
 		RefreshSeconds:    seconds(15 * time.Minute),
 		StaleAfterSeconds: seconds(3 * time.Hour),
-		Attribution:       "HydroRIVERS (HydroSHEDS), Irrigation Department of Sri Lanka",
+		Attribution:       "HydroRIVERS (Lehner & Grill 2013, HydroSHEDS), names via nuuuwan/lk_rivers; Irrigation Department of Sri Lanka",
 		DataPath:          "/v1/rivers/risk",
 		TilePath:          "/v1/tiles/rivers/{z}/{x}/{y}.pbf",
 		MaxZoom:           14,
@@ -217,7 +217,7 @@ var catalogue = []Layer{
 		Sources:           []string{"nuuuwan-lk-weather-3h", "nuuuwan-weather-lk"},
 		RefreshSeconds:    seconds(1 * time.Hour),
 		StaleAfterSeconds: seconds(6 * time.Hour),
-		Attribution:       "Department of Meteorology, Sri Lanka",
+		Attribution:       "Department of Meteorology, Sri Lanka, via nuuuwan/lk_weather_3h and nuuuwan/weather_lk",
 		DataPath:          "/v1/stations",
 	},
 	{
@@ -269,7 +269,7 @@ var catalogue = []Layer{
 		Sources:           []string{"nuuuwan-lk-dmc-landslides", "dmc-reports"},
 		RefreshSeconds:    seconds(2 * time.Hour),
 		StaleAfterSeconds: seconds(12 * time.Hour),
-		Attribution:       "National Building Research Organisation, Disaster Management Centre",
+		Attribution:       "National Building Research Organisation, Disaster Management Centre, via nuuuwan/lk_dmc_landslides",
 		DataPath:          "/v1/warnings/landslides",
 	},
 	{
@@ -282,7 +282,7 @@ var catalogue = []Layer{
 		Sources:           []string{"dmc-reports"},
 		RefreshSeconds:    seconds(1 * time.Hour),
 		StaleAfterSeconds: seconds(6 * time.Hour),
-		Attribution:       "Disaster Management Centre",
+		Attribution:       "Disaster Management Centre, via dmc.gov.lk and nuuuwan/lk_dmc",
 		DataPath:          "/v1/warnings",
 	},
 	{
@@ -312,7 +312,7 @@ var catalogue = []Layer{
 		// check is when the layer is shown as possibly out of date.
 		RefreshSeconds:    seconds(7 * 24 * time.Hour),
 		StaleAfterSeconds: seconds(30 * 24 * time.Hour),
-		Attribution:       "Survey Department of Sri Lanka and Department of Census and Statistics via OCHA HDX and lk_admin_regions",
+		Attribution:       "Survey Department of Sri Lanka and Department of Census and Statistics via OCHA HDX, nuuuwan/lk_admin_regions and nuuuwan/lk_census_2024",
 		DataPath:          "/v1/regions",
 		TilePath:          "/v1/tiles/regions/{z}/{x}/{y}.pbf",
 		MinZoom:           0,
