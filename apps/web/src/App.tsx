@@ -21,6 +21,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AdminLevelSelector } from "@/components/weather/AdminLevelSelector"
+import { LegendDock } from "@/components/weather/LegendDock"
 import { MapKey, type MapKeySection } from "@/components/weather/MapKey"
 import { SearchTrigger } from "@/components/weather/SearchTrigger"
 import { toolbarPill } from "@/components/weather/toolbar"
@@ -1467,17 +1468,23 @@ export function App() {
     ...observedLayers.keySections,
     ...hazards.keySections,
   ]
-  const legends = (
-    <>
-      {windTimeline}
-      {observedLayers.legends}
-      {gridOn && <GridLegend variable={gridVariable} className={legendClass} />}
-      {fillVariable && (
-        <RegionLegend variable={fillVariable} level={level} className={legendClass} />
-      )}
-      <MapKey sections={keySections} />
-    </>
-  )
+  const legendItems: ReactNode[] = [...observedLayers.legends]
+  if (gridOn)
+    legendItems.push(<GridLegend key="grid" variable={gridVariable} className={legendClass} />)
+  if (fillVariable)
+    legendItems.push(
+      <RegionLegend key="regions" variable={fillVariable} level={level} className={legendClass} />,
+    )
+  if (keySections.length > 0) legendItems.push(<MapKey key="map-key" sections={keySections} />)
+  const legends = <LegendDock items={legendItems} />
+  // The wind and rain timelines are controls, not legends: they stay put when the legends fold.
+  const mapControls =
+    windTimeline || observedLayers.rainTimeline ? (
+      <>
+        {windTimeline}
+        {observedLayers.rainTimeline}
+      </>
+    ) : null
 
   const riverHover = useMemo(() => {
     const list = riverRisk.data?.rivers ?? []
@@ -1644,6 +1651,7 @@ export function App() {
         detailSmall={overviewShown}
         onDetailClose={selection ? close : closeOverview}
         legends={legends}
+        controls={mapControls}
         timeline={
           windTimeline && observedLayers.rainTimeline ? (
             <div className="flex w-full flex-col items-center gap-2">
