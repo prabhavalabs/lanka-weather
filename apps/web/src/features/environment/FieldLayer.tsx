@@ -5,7 +5,7 @@ import { useMap } from "../map/MapContext"
 import { slotBefore, styleReady, type Slot } from "../map/slots"
 import { gridBounds, imageSize, paintField, rasterise } from "../weather-grid/field"
 import type { GridSpec } from "../location/types"
-import { fadeEdges, ringToPixels } from "./present"
+import { distanceToLand, fadeEdges, fadeFromCoast, fillGaps, ringToPixels } from "./present"
 
 interface FieldLayerProps {
   /** Names the source and layer. */
@@ -25,7 +25,42 @@ interface FieldLayerProps {
 
 /** How much finer a clipped field is drawn than it is sampled, so the coast is crisp. */
 const clipScale = 3
-const fadePixels = 45
+/** A last fade at the grid's own edges, should the coastal fade not reach them. */
+const fadePixels = 20
+/**
+ * The coastal band, in pixels of the field image (about 100 a degree): whole
+ * for some 30 km off the coast, gone by about 100 km, inside the grid.
+ */
+const coastInner = 28
+const coastOuter = 92
+
+/** Land as a mask over the field image: 1 where a land ring covers a pixel. */
+function landMask(
+  land: [number, number][][],
+  grid: GridSpec,
+  width: number,
+  height: number,
+): Uint8Array | null {
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext("2d")
+  if (!context) return null
+  context.beginPath()
+  for (const ring of land) {
+    ringToPixels(ring, grid, width, height).forEach(([x, y], index) => {
+      if (index === 0) context.moveTo(x, y)
+      else context.lineTo(x, y)
+    })
+    context.closePath()
+  }
+  context.fill()
+  const alpha = context.getImageData(0, 0, width, height).data
+  const mask = new Uint8Array(width * height)
+  for (let index = 0; index < mask.length; index += 1)
+    mask[index] = alpha[index * 4 + 3]! > 127 ? 1 : 0
+  return mask
+}
 
 /** The field as a PNG data URL, or null where the browser gives no canvas. */
 function render(
@@ -41,8 +76,14 @@ function render(
   const context = canvas.getContext("2d")
   if (!context) return null
   const image = context.createImageData(width, height)
-  paintField(rasterise(grid, values, width, height), colourTable(ramp, 1024), image.data)
-  if (land) fadeEdges(image.data, width, height, fadePixels)
+  // A field that belongs on the water is carried to the shore; the land is cut out below.
+  const field = land ? fillGaps(values, grid.nx, grid.ny) : values
+  paintField(rasterise(grid, field, width, height), colourTable(ramp, 1024), image.data)
+  if (land) {
+    const mask = landMask(land, grid, width, height)
+    if (mask) fadeFromCoast(image.data, distanceToLand(mask, width, height), coastInner, coastOuter)
+    fadeEdges(image.data, width, height, fadePixels)
+  }
   context.putImageData(image, 0, 0)
   if (!land) return canvas.toDataURL("image/png")
 
@@ -117,7 +158,7 @@ function hide(map: MapLibreMap, id: string) {
 /**
  * A smooth colour field from values on a grid, as the weather field draws
  * itself, for layers on grids of their own. A field with land rings stops at
- * the coast and fades out at its outer edges.
+ * the coast and fades out with distance from it, so it hugs the shore.
  */
 export function FieldLayer({
   id,
