@@ -2,11 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 /* Fonts are self-hosted. The Sinhala and Tamil faces declare unicode ranges,
-   so a browser downloads them only for text in those scripts. */
+   so a browser downloads them only for text in those scripts (scripts.css). */
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
-@import "@fontsource-variable/noto-sans-sinhala";
-@import "@fontsource-variable/noto-sans-tamil";
+@import "./styles/scripts.css";
 @import "./styles/theme.css";
 @import "./styles/map.css";
 
@@ -17,12 +16,11 @@
 
 @theme inline {
   --font-sans:
-    "Geist Variable", "Noto Sans Sinhala Variable", "Noto Sans Tamil Variable", system-ui,
-    -apple-system, "Segoe UI", sans-serif;
+    "Geist Variable", "Lanka Sinhala", "Lanka Tamil", system-ui, -apple-system, "Segoe UI",
+    sans-serif;
   --font-heading: var(--font-sans);
   --font-mono:
-    "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, "Noto Sans Sinhala Variable",
-    "Noto Sans Tamil Variable", monospace;
+    "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, "Lanka Sinhala", "Lanka Tamil", monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

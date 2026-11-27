@@ -198,7 +198,7 @@ function LandslideStatusCard({ meta }: { meta: LandslideMeta }) {
   return (
     <section
       aria-label={t("warnings.landslide.title")}
-      className="flex flex-col gap-1.5 rounded-xl border border-border bg-inset px-3 py-2.5"
+      className="flex flex-col gap-2 rounded-xl border border-border bg-inset px-3 py-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-medium text-muted-foreground">

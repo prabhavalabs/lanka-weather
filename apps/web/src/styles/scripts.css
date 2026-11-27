@@ -1,0 +1,29 @@
+/* The Sinhala and Tamil faces, from the same Noto files as @fontsource, but
+   drawn a little smaller. At the same font size their letters stand taller
+   and wider than Geist's, so a Sinhala or Tamil page read as larger and
+   denser than the English one, and long labels ran out of their buttons.
+   `size-adjust` scales only these faces: English text, the sizes in the
+   stylesheet and the line heights stay as they are, which leaves the
+   scripts' marks more room above and below. The ranges are the scripts'
+   own, so the files load only for text in them. */
+@font-face {
+  font-family: "Lanka Sinhala";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../../node_modules/@fontsource-variable/noto-sans-sinhala/files/noto-sans-sinhala-sinhala-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0964-0965, U+0D81-0DF4, U+1CF2, U+200C-200D, U+25CC, U+111E1-111F4;
+  size-adjust: 90%;
+}
+
+@font-face {
+  font-family: "Lanka Tamil";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../../node_modules/@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0964-0965, U+0B82-0BFA, U+200C-200D, U+20B9, U+25CC;
+  size-adjust: 88%;
+}
