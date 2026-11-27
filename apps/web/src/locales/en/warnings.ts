@@ -103,6 +103,8 @@ export const warnings = {
     allMore: { one: "All warnings ({count} more)", other: "All warnings ({count} more)" },
     dismiss: "Dismiss this notice",
   },
+  /** The two tabs of the warnings panel. */
+  tabs: { label: "Warnings and alerts", official: "Official warnings", alerts: "Your alerts" },
   button: {
     text: "Warnings",
     label: {

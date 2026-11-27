@@ -174,6 +174,15 @@ export const weather = {
     label: "Wind from the {direction} ({degrees}°) at {speed} km/h",
     labelGusts: "Wind from the {direction} ({degrees}°) at {speed} km/h, gusting {gust} km/h",
   },
+  /** The legends over the map, together: folded away, or moved. */
+  legendDock: {
+    show: "Legends",
+    hide: "Legends",
+    fold: "Fold this legend",
+    unfold: "Show this legend",
+    move: "Move the legends: drag, or use the arrow keys",
+    reset: "Put the legends back",
+  },
   mapKey: {
     show: "Map key",
     hide: "Hide map key",

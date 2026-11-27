@@ -167,6 +167,14 @@ export const weather: Translation<typeof en> = {
     labelGusts:
       "{direction} දෙසින් {speed} km/h වේගයෙන් හමන සුළඟ ({degrees}°), වේගවත් සුළං {gust} km/h",
   },
+  legendDock: {
+    show: "සංකේත",
+    hide: "සංකේත",
+    fold: "මෙම සංකේත පුවරුව හකුළන්න",
+    unfold: "මෙම සංකේත පුවරුව පෙන්වන්න",
+    move: "සංකේත ගෙන යන්න: අදින්න, නැතහොත් ඊතල යතුරු භාවිත කරන්න",
+    reset: "සංකේත නැවත තැනට ගෙනෙන්න",
+  },
   mapKey: {
     show: "සිතියම් සංකේත",
     hide: "සිතියම් සංකේත සඟවන්න",

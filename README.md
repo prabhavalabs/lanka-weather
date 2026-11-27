@@ -179,9 +179,12 @@ main ones:
 | Administrative boundaries (lk_admin_regions, OCHA HDX) | CC BY-IGO; Survey Department and Department of Census and Statistics |
 | Department of Meteorology, DMC, NBRO, Irrigation Department | Public government information, credited and linked; no licence is published |
 | waterlevels.lk, HMIS rain gauges | Community and agency data, credited; no licence is published |
+| Nuwan Senaratna's Sri Lanka data repositories ([nuuuwan](https://github.com/nuuuwan): `lk_dmc`, `lk_dmc_landslides`, `weather_lk`, `lk_weather_3h`, `lk_admin_regions`, `lk_census_2024`, `lk_rivers`) | Code under MIT; the data stays with the agencies above. Much of the official data reaches us through these copies, with thanks |
 
 The full list, with access methods and the exact attribution text, is in
-[docs/data-sources.md](docs/data-sources.md). If you run your own
+[docs/data-sources.md](docs/data-sources.md). The app shows the same
+credits, the privacy notes and the disclaimer on its About page
+(`/?about`, or the ⓘ button in the sidebar). If you run your own
 instance, follow each source's terms and rate limits.
 
 ## Licence

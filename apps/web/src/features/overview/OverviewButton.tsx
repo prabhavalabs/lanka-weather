@@ -6,12 +6,19 @@ import { cn } from "@/lib/utils"
 interface OverviewButtonProps {
   /** Icon only, for the phone bar. */
   compact?: boolean
+  /** "Sri Lanka now" is the panel on show: a click closes it. */
+  open?: boolean
   onClick: () => void
   className?: string
 }
 
-/** Opens "Sri Lanka now", from the header on desktop and phone. */
-export function OverviewButton({ compact = false, onClick, className }: OverviewButtonProps) {
+/** Opens and closes "Sri Lanka now", from the header on desktop and phone. */
+export function OverviewButton({
+  compact = false,
+  open = false,
+  onClick,
+  className,
+}: OverviewButtonProps) {
   const t = useT()
   return (
     <Button
@@ -20,7 +27,12 @@ export function OverviewButton({ compact = false, onClick, className }: Overview
       size="sm"
       onClick={onClick}
       aria-label={t("overview.button.label")}
-      className={cn(!compact && "rounded-full bg-card/95 shadow-panel backdrop-blur-md", className)}
+      aria-pressed={open}
+      className={cn(
+        !compact && "rounded-full bg-card/95 shadow-panel backdrop-blur-md",
+        "aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/90",
+        className,
+      )}
     >
       <LandmarkIcon />
       {!compact && t("overview.button.text")}

@@ -35,7 +35,9 @@ import { distanceFromSriLanka, earthquakeParts, magnitude } from "../earthquakes
 import { useEarthquakes } from "../earthquakes/queries"
 import { EARTHQUAKES, EarthquakesLayer } from "../earthquakes/EarthquakesLayer"
 import { LandslidePanel } from "../warnings/LandslidePanel"
+import { focusBounds, padBounds } from "../map/focus"
 import { LANDSLIDE_FILL, LandslideLayer } from "../warnings/LandslideLayer"
+import { warningFocus } from "../warnings/focus"
 import { OFFICIAL_FILL, OfficialDistrictsLayer } from "../warnings/OfficialDistrictsLayer"
 import {
   districtName,
@@ -51,6 +53,7 @@ import { LandslideLegend, OfficialDistrictsLegend } from "../warnings/WarningLeg
 import { WarningBanner } from "../warnings/WarningBanner"
 import { WarningsButton } from "../warnings/WarningsButton"
 import { WarningsPanel } from "../warnings/WarningsPanel"
+import { WarningsTabs } from "../warnings/WarningsTabs"
 import { toolbarPill } from "@/components/weather/toolbar"
 import type { HoverLayers } from "../map/HoverChip"
 import { regionLevelOf } from "../regions/present"
@@ -59,14 +62,6 @@ export const LANDSLIDE_WARNINGS = "landslide-warnings"
 export const OFFICIAL_WARNINGS = "official-warnings"
 export const EARTHQUAKE_LAYER = "earthquakes"
 export const CYCLONE_LAYER = "cyclones"
-
-/** Hazard layers on at the first visit. */
-export const hazardDefaults = [
-  LANDSLIDE_WARNINGS,
-  OFFICIAL_WARNINGS,
-  EARTHQUAKE_LAYER,
-  CYCLONE_LAYER,
-]
 
 interface HazardsOptions {
   map: MapLibreMap | null
@@ -81,10 +76,16 @@ interface HazardsOptions {
   fitBox: (bbox: [number, number, number, number]) => void
   /** Moves the map, if needed, so a point is clear of the cards over it. */
   reveal: (lngLat: [number, number]) => void
+  /** Alerts this device was sent and has not seen, for the button and the tabs. */
+  unreadAlerts: number
+  /** Shows this device's alerts, the second tab of the warnings panel. */
+  onShowAlerts: () => void
 }
 
 export function useHazards({
   reveal,
+  unreadAlerts,
+  onShowAlerts,
   map,
   available,
   isOn,
@@ -155,15 +156,28 @@ export function useHazards({
           ?.properties
       : undefined
   const divisionKey = division ? division.id : null
+  // The opened division, cut out of a grey veil (features/map/FocusMask).
+  const focus =
+    selection?.kind === "landslide"
+      ? (landslides.data?.features.find((feature) => feature.properties.id === selection.id)
+          ?.geometry ?? null)
+      : null
   const divisionAt = useRef(division)
   useEffect(() => {
     divisionAt.current = division
   })
+  const focusAt = useRef(focus)
   useEffect(() => {
-    if (map && divisionKey && divisionAt.current) {
-      reveal([divisionAt.current.labelLon, divisionAt.current.labelLat])
-    }
-  }, [map, divisionKey, reveal])
+    focusAt.current = focus
+  })
+  // The whole division comes into view, picked from a list or the map: at the
+  // country's scale it is a few pixels across and the focus mask's hole with it.
+  useEffect(() => {
+    if (!map || !divisionKey || !divisionAt.current) return
+    const bounds = focusAt.current ? focusBounds(focusAt.current) : null
+    if (bounds) fitBox(padBounds(bounds))
+    else reveal([divisionAt.current.labelLon, divisionAt.current.labelLat])
+  }, [map, divisionKey, fitBox, reveal])
 
   // A click that has landed on a hazard (see features/map/hits): a storm or an
   // earthquake, a division or a highlighted district.
@@ -442,11 +456,24 @@ export function useHazards({
       content: <CycloneLegend bare />,
     })
 
+  // The districts the open warnings are about, kept clear of a grey veil.
+  const warningDistricts = useMemo(
+    () =>
+      selection?.kind === "warnings"
+        ? warningFocus({ type: selection.type, district: selection.district }, warnings.data)
+        : [],
+    [selection, warnings.data],
+  )
+
   // Map layers.
   const fills = (
     <>
-      {officialOn && tilesLayer && (
-        <OfficialDistrictsLayer tiles={tilesLayer} districts={warnings.data?.districts ?? []} />
+      {(officialOn || selection?.kind === "warnings") && tilesLayer && (
+        <OfficialDistrictsLayer
+          tiles={tilesLayer}
+          districts={warnings.data?.districts ?? []}
+          focus={warningDistricts}
+        />
       )}
       {landslidesOn && (
         <LandslideLayer
@@ -475,6 +502,7 @@ export function useHazards({
 
   // Detail panel.
   const close = () => setSelection(null)
+  const activeCount = warnings.data?.activeCount ?? 0
   let detail: ReactNode = null
   let detailLabel: string | null = null
   if (selection?.kind === "warnings") {
@@ -487,6 +515,16 @@ export function useHazards({
         districtName={warnings.data?.districts.find((item) => item.id === selection.district)?.name}
         onFilter={(filter) => setSelection({ kind: "warnings", ...filter })}
         onClose={close}
+        tabs={
+          <WarningsTabs
+            tab="official"
+            officialCount={activeCount}
+            unread={unreadAlerts}
+            onTabChange={(tab) => {
+              if (tab === "alerts") onShowAlerts()
+            }}
+          />
+        }
       />
     )
   } else if (selection?.kind === "landslide") {
@@ -526,7 +564,6 @@ export function useHazards({
     (officialLayer !== undefined &&
       warnings.dataUpdatedAt > 0 &&
       isStale(officialLayer, new Date(warnings.dataUpdatedAt)))
-  const activeCount = warnings.data?.activeCount ?? 0
   const banner = warnings.data ? (
     <WarningBanner
       items={warnings.data.banner}
@@ -539,6 +576,7 @@ export function useHazards({
     <WarningsButton
       compact={compact}
       count={activeCount}
+      unread={unreadAlerts}
       stale={stale}
       onClick={() => openWarnings()}
       className={compact ? undefined : toolbarPill}
@@ -554,10 +592,16 @@ export function useHazards({
     detail,
     detailLabel,
     detailFull: selection?.kind === "warnings",
+    /** The selected division's shape, for the focus mask. */
+    focus,
     /** The map is showing something far from Sri Lanka, on purpose. */
     farAway: selection?.kind === "cyclone" || selection?.kind === "quake",
     banner,
     button,
+    /** Opens the official warnings, optionally filtered. */
+    openWarnings,
+    /** Official warnings and advisories in force. */
+    activeCount,
     hover,
     handleHit,
   }

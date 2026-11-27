@@ -34,6 +34,8 @@ interface WarningsPanelProps {
   districtName?: string
   onFilter: (next: { type?: string; district?: string }) => void
   onClose: () => void
+  /** The official / alerts switch over the panel. */
+  tabs?: ReactNode
 }
 
 function OfficialLink({ href, children }: { href: string; children: ReactNode }) {
@@ -249,6 +251,7 @@ export function WarningsPanel({
   districtName,
   onFilter,
   onClose,
+  tabs,
 }: WarningsPanelProps) {
   const t = useT()
   const locale = useLocale()
@@ -303,6 +306,7 @@ export function WarningsPanel({
         </Button>
       }
     >
+      {tabs}
       {data && <LandslideStatusCard meta={data.landslide} />}
 
       {/* One row that scrolls sideways: the names stay whole on a narrow panel. */}

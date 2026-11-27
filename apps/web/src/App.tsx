@@ -21,6 +21,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AdminLevelSelector } from "@/components/weather/AdminLevelSelector"
+import { LegendDock } from "@/components/weather/LegendDock"
 import { MapKey, type MapKeySection } from "@/components/weather/MapKey"
 import { SearchTrigger } from "@/components/weather/SearchTrigger"
 import { toolbarPill } from "@/components/weather/toolbar"
@@ -52,7 +53,8 @@ import {
   floodsForView,
   type FloodView,
 } from "./features/floods/view"
-import { hazardDefaults, useHazards } from "./features/hazards/useHazards"
+import { useHazards } from "./features/hazards/useHazards"
+import { defaultLayers, defaultsVersion, migrateLayers } from "./features/layers/defaults"
 import { LayerPanel } from "./features/layers/LayerPanel"
 import { layerStatus, type LayerStatus } from "./features/layers/status"
 import { useLayers } from "./features/layers/useLayers"
@@ -65,10 +67,16 @@ import {
   type Selection,
 } from "./features/location/selection"
 import { useUrlSelection } from "./features/location/useUrlSelection"
+import { homeSelection, type HomePlace } from "./features/home/home"
+import { useHome } from "./features/home/useHome"
 import { InstallHost } from "./features/install"
+import { AboutLink, AboutPage } from "./features/about"
 import { useOfflineNotice } from "./features/pwa/OfflineNotice"
 import { hitLayerIds } from "./features/map/hitLayers"
 import { hitOrder, orderedHits, queryMap } from "./features/map/hits"
+import { asFocusGeometry } from "./features/map/focus"
+import { BasemapPanel } from "./features/map/BasemapPanel"
+import { FocusMask } from "./features/map/FocusMask"
 import { HoverChip } from "./features/map/HoverChip"
 import { MapView } from "./features/map/MapView"
 import { sriLankaBounds } from "./features/map/config"
@@ -119,7 +127,11 @@ import { RiverLegend } from "./features/rivers/RiverLegend"
 import { RiverLevelsLayer, RIVER_STATIONS } from "./features/rivers/RiverLevelsLayer"
 import { StationPanel } from "./features/rivers/StationPanel"
 import { MetStationPanel } from "./features/stations/MetStationPanel"
-import { AlertsButton } from "./features/alerts/AlertsButton"
+import { AlertsInboxPanel } from "./features/alerts/AlertsInboxPanel"
+import { useAlertsCentre } from "./features/alerts/useAlertsCentre"
+import { closeInbox, type InboxTab, openInbox, useInboxView } from "./features/notifications/state"
+import { useInbox } from "./features/notifications/useInbox"
+import { WarningsTabs } from "./features/warnings/WarningsTabs"
 import { linkTarget } from "./features/notifications/present"
 import { OverviewButton } from "./features/overview/OverviewButton"
 import { OverviewPanel } from "./features/overview/OverviewPanel"
@@ -164,23 +176,6 @@ const RIVERS = "rivers"
 const PAST_FLOODS = "past-floods"
 const RESERVOIRS = "reservoirs"
 
-/**
- * Layers on at the first visit: official warnings and hazards first, then the
- * water, with boundaries for where things are. Wind is one switch away: its
- * animation sits over everything and its timeline takes room on a phone.
- */
-const defaultLayers = [
-  ...hazardDefaults,
-  RIVERS,
-  RIVER_LEVELS,
-  FLOOD_FORECAST,
-  RESERVOIRS,
-  RAIN_GAUGES,
-  ADMIN_REGIONS,
-]
-/** Default layers added since people may have saved their choice; offered to them once. */
-const newDefaultLayers = [RIVERS, RESERVOIRS, RAIN_GAUGES, ...hazardDefaults]
-
 type RegionFill = RegionVariable | "none"
 
 /** Gauges are small: clicks and hovers count within a few pixels. */
@@ -188,7 +183,12 @@ const pointSlack = 6
 
 export function App() {
   const [enabled, setEnabled] = useLocalStorage<string[]>("lanka-weather:layers", defaultLayers)
-  const [offered, setOffered] = useLocalStorage<string[]>("lanka-weather:layers-offered", [])
+  // The first visit shows every warning and nothing more (features/layers/defaults).
+  const [offered] = useLocalStorage<string[]>("lanka-weather:layers-offered", [])
+  const [defaultsSeen, setDefaultsSeen] = useLocalStorage<number>(
+    "lanka-weather:layers-defaults",
+    0,
+  )
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(
     "lanka-weather:sidebar-collapsed",
     false,
@@ -207,6 +207,7 @@ export function App() {
     defaultFloodView,
   )
   const [selection, setSelection] = useUrlSelection()
+  const [home, setHome] = useHome()
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchLoaded, setSearchLoaded] = useState(false)
@@ -215,6 +216,27 @@ export function App() {
   // The first thing on load, until dismissed or the map is used instead.
   const [overviewOpen, setOverviewOpen] = useState(true)
   const overview = useOverview(overviewOpen)
+
+  // The alerts this device was sent share the warnings panel, on its second tab.
+  // Opening them clears whatever else is on show; opening anything else closes them.
+  const inbox = useInbox()
+  const inboxView = useInboxView()
+  const alertsShown = inboxView.open
+  const openAlerts = useCallback(
+    (tab?: InboxTab) => {
+      setSelection(null)
+      setOverviewOpen(false)
+      openInbox(tab ? { tab } : {})
+    },
+    [setSelection],
+  )
+  const showAlerts = useCallback(() => openAlerts(), [openAlerts])
+  useAlertsCentre(openAlerts)
+  const shownSelection = useRef(selection)
+  useEffect(() => {
+    if (selection && selection !== shownSelection.current) closeInbox()
+    shownSelection.current = selection
+  }, [selection])
   const zoom = useMapZoom(map)
   const desktop = useMediaQuery(desktopQuery, true)
   const { resolved: theme } = useTheme()
@@ -245,13 +267,13 @@ export function App() {
   const riverNetworkOn = on(RIVERS)
   const pastFloodsOn = on(PAST_FLOODS)
 
-  // Someone who saved their layers before a default was added still gets it, once.
+  // A browser that saved layers under earlier defaults is moved on, once: the
+  // untouched old set becomes the new one, a set someone chose is kept.
   useEffect(() => {
-    const unseen = newDefaultLayers.filter((id) => !offered.includes(id))
-    if (unseen.length === 0) return
-    setOffered((current) => [...current, ...unseen])
-    setEnabled((current) => [...new Set([...current, ...unseen])])
-  }, [offered, setOffered, setEnabled])
+    if (defaultsSeen >= defaultsVersion) return
+    setEnabled((current) => migrateLayers(current, offered))
+    setDefaultsSeen(defaultsVersion)
+  }, [defaultsSeen, offered, setDefaultsSeen, setEnabled])
 
   const observedLayers = useObservedLayers({
     available,
@@ -399,7 +421,7 @@ export function App() {
   }
 
   // Camera: keep the selected place clear of the cards floating over the map.
-  const overviewShown = overviewOpen && !selection
+  const overviewShown = overviewOpen && !selection && !alertsShown
   const insets = useCallback(
     () =>
       layoutInsets({
@@ -646,6 +668,8 @@ export function App() {
 
   const revealPoint = useCallback((lngLat: [number, number]) => reveal(lngLat), [reveal])
   const hazards = useHazards({
+    unreadAlerts: inbox.unread,
+    onShowAlerts: showAlerts,
     map,
     available,
     isOn: on,
@@ -792,11 +816,52 @@ export function App() {
     },
     [enable, pendingCamera, setSelection],
   )
-  const openOverview = useCallback(() => {
+  const closeOverview = useCallback(() => setOverviewOpen(false), [])
+  // The "Current situation" button: shows the overview, or closes it when it is what is on show.
+  // Over another panel it brings the overview back rather than closing anything.
+  const toggleOverview = useCallback(() => {
+    if (overviewOpen && !selection && !alertsShown) {
+      setOverviewOpen(false)
+      return
+    }
+    closeInbox()
     setSelection(null)
     setOverviewOpen(true)
-  }, [setSelection])
-  const closeOverview = useCallback(() => setOverviewOpen(false), [])
+  }, [overviewOpen, selection, alertsShown, setSelection])
+
+  // The house button: back to the home place and its weather, or how to set one.
+  const goHome = useCallback(() => {
+    if (!home) {
+      toast(t("map.home.hint"), { id: "home" })
+      return
+    }
+    setOverviewOpen(false)
+    const next = homeSelection(home)
+    if (next.kind === "region") {
+      pendingCamera(next, "fit")
+      setSelection(next)
+    } else {
+      pending.current = null
+      setSelection(next)
+      reveal([home.lon, home.lat], { zoom: 12 })
+    }
+  }, [home, pendingCamera, reveal, setSelection, t])
+  const changeHome = useCallback(
+    (next: HomePlace | null) => {
+      setHome(next)
+      toast(next ? t("map.home.saved", { name: next.name }) : t("map.home.removed"), {
+        id: "home",
+      })
+    },
+    [setHome, t],
+  )
+  const homeControl = useMemo(
+    () => ({
+      label: home ? t("map.home.goHome", { name: home.name }) : t("map.home.unset"),
+      onClick: goHome,
+    }),
+    [home, goHome, t],
+  )
 
   // Search: ⌘K or Ctrl+K anywhere; the palette's code loads on first use.
   const openSearch = useCallback(() => {
@@ -818,14 +883,15 @@ export function App() {
   // Escape closes the detail panel when no dialog is open.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || (!selection && !overviewOpen)) return
+      if (event.key !== "Escape" || (!selection && !overviewOpen && !alertsShown)) return
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
-      if (selection) setSelection(null)
+      if (alertsShown) closeInbox()
+      else if (selection) setSelection(null)
       else setOverviewOpen(false)
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selection, overviewOpen, setSelection])
+  }, [selection, overviewOpen, alertsShown, setSelection])
 
   const close = useCallback(() => setSelection(null), [setSelection])
 
@@ -1148,17 +1214,21 @@ export function App() {
   const activeCount = enabled.filter((id) => available(id)).length
 
   const layerList = (
-    <LayerPanel
-      enabled={enabled}
-      onToggle={toggle}
-      summaries={summaries}
-      details={details}
-      stale={stale}
-    />
+    <div className="flex flex-col gap-4">
+      <LayerPanel
+        enabled={enabled}
+        onToggle={toggle}
+        summaries={summaries}
+        details={details}
+        stale={stale}
+      />
+      <BasemapPanel />
+    </div>
   )
   const smallPrint = (
     <div className="flex flex-col gap-1">
       <span>{t("app.smallPrint")}</span>
+      <AboutLink className="mt-1" />
     </div>
   )
 
@@ -1231,6 +1301,8 @@ export function App() {
           onSelectReservoir={openReservoir}
           onSelectRainGauge={openRainGauge}
           onOpenCanals={openCanals}
+          home={home}
+          onHomeChange={changeHome}
         />
       </Suspense>
     )
@@ -1380,6 +1452,28 @@ export function App() {
     )
   }
 
+  if (alertsShown) {
+    detailLabel = t("notifications.title")
+    detail = (
+      <AlertsInboxPanel
+        inbox={inbox}
+        onShowOnMap={openLink}
+        tabs={
+          <WarningsTabs
+            tab="alerts"
+            officialCount={hazards.activeCount}
+            unread={inbox.unread}
+            onTabChange={(tab) => {
+              if (tab !== "official") return
+              closeInbox()
+              hazards.openWarnings()
+            }}
+          />
+        }
+      />
+    )
+  }
+
   // Legends for the layers that are on (wide screens; phones show them in the layer sheet).
   // What colours the whole map keeps its own card; the rest share the map key.
   const legendClass = "w-60"
@@ -1427,17 +1521,23 @@ export function App() {
     ...observedLayers.keySections,
     ...hazards.keySections,
   ]
-  const legends = (
-    <>
-      {windTimeline}
-      {observedLayers.legends}
-      {gridOn && <GridLegend variable={gridVariable} className={legendClass} />}
-      {fillVariable && (
-        <RegionLegend variable={fillVariable} level={level} className={legendClass} />
-      )}
-      <MapKey sections={keySections} />
-    </>
-  )
+  const legendItems: ReactNode[] = [...observedLayers.legends]
+  if (gridOn)
+    legendItems.push(<GridLegend key="grid" variable={gridVariable} className={legendClass} />)
+  if (fillVariable)
+    legendItems.push(
+      <RegionLegend key="regions" variable={fillVariable} level={level} className={legendClass} />,
+    )
+  if (keySections.length > 0) legendItems.push(<MapKey key="map-key" sections={keySections} />)
+  const legends = <LegendDock items={legendItems} />
+  // The wind and rain timelines are controls, not legends: they stay put when the legends fold.
+  const mapControls =
+    windTimeline || observedLayers.rainTimeline ? (
+      <>
+        {windTimeline}
+        {observedLayers.rainTimeline}
+      </>
+    ) : null
 
   const riverHover = useMemo(() => {
     const list = riverRisk.data?.rivers ?? []
@@ -1456,6 +1556,12 @@ export function App() {
     [basins.data],
   )
 
+  // A selected area stands out: the rest of the map goes grey around it.
+  const focusGeometry = useMemo(
+    () => hazards.focus ?? asFocusGeometry(selectedArea?.geometry),
+    [hazards.focus, selectedArea],
+  )
+
   const markerAt =
     (selection?.kind === "point" || selection?.kind === "region") && location ? location : null
 
@@ -1464,7 +1570,7 @@ export function App() {
       <AppShell
         sidebarCollapsed={sidebarCollapsed}
         map={
-          <MapView theme={theme} onReady={setMap} onResetView={resetView}>
+          <MapView theme={theme} onReady={setMap} onResetView={resetView} home={homeControl}>
             {gridOn && <GridLayer grid={grid.data} variable={gridVariable} />}
             {observedLayers.mapLayers}
             {regionsOn && regionsLayer && (
@@ -1521,6 +1627,7 @@ export function App() {
               />
             )}
             {hazards.points}
+            <FocusMask geometry={focusGeometry} />
             {markerAt && (
               <LocationMarker lat={markerAt.lat} lon={markerAt.lon} label={detailLabel} />
             )}
@@ -1555,9 +1662,8 @@ export function App() {
             actions={
               <>
                 <SearchTrigger compact onClick={openSearch} onPointerEnter={loadSearch} />
-                <OverviewButton compact onClick={openOverview} />
+                <OverviewButton compact open={overviewShown} onClick={toggleOverview} />
                 {hazards.button(true)}
-                <AlertsButton compact onShowOnMap={openLink} />
               </>
             }
           />
@@ -1572,9 +1678,8 @@ export function App() {
               onPointerEnter={loadSearch}
               onFocus={loadSearch}
             />
-            <OverviewButton onClick={openOverview} className={toolbarPill} />
+            <OverviewButton open={overviewShown} onClick={toggleOverview} className={toolbarPill} />
             {hazards.button(false)}
-            <AlertsButton className={toolbarPill} onShowOnMap={openLink} />
             {regionsOn && (
               <div className="pointer-events-auto hidden h-10 shrink-0 items-center rounded-full border border-border bg-card/95 px-[3px] shadow-panel backdrop-blur-md @3xl:flex">
                 <AdminLevelSelector level={level} onLevelChange={setLevel} />
@@ -1593,10 +1698,11 @@ export function App() {
         }
         detail={detail}
         detailLabel={detailLabel}
-        detailFull={hazards.detailFull}
+        detailFull={hazards.detailFull || alertsShown}
         detailSmall={overviewShown}
-        onDetailClose={selection ? close : closeOverview}
+        onDetailClose={alertsShown ? closeInbox : selection ? close : closeOverview}
         legends={legends}
+        controls={mapControls}
         timeline={
           windTimeline && observedLayers.rainTimeline ? (
             <div className="flex w-full flex-col items-center gap-2">
@@ -1627,6 +1733,7 @@ export function App() {
       )}
       <Toaster position={desktop ? "bottom-center" : "top-center"} />
       <InstallHost />
+      <AboutPage />
     </TooltipProvider>
   )
 }

@@ -122,7 +122,7 @@ export const app = {
     reservoir: "Reservoir",
     reservoirMissing: "This reservoir is not in the latest reservoir data.",
     reservoirsActive: "Reservoirs spilling or releasing",
-    overview: "Sri Lanka now",
+    overview: "Current situation",
   },
   key: {
     riverRisk: "River risk",

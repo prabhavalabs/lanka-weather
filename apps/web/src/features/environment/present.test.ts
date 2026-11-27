@@ -4,7 +4,10 @@ import {
   aqiBand,
   aqiBandOf,
   aqiLabel,
+  distanceToLand,
   fadeEdges,
+  fadeFromCoast,
+  fillGaps,
   ringToPixels,
   seaStateLabel,
   seaStateOf,
@@ -94,5 +97,52 @@ describe("ringToPixels", () => {
     expect(pixels[0]![1]).toBeCloseTo(0)
     expect(pixels[1]![0]).toBeCloseTo(100)
     expect(pixels[1]![1]).toBeCloseTo(200)
+  })
+})
+
+describe("distanceToLand", () => {
+  it("measures each pixel's distance to the nearest land", () => {
+    // One land pixel in the middle of a 5 × 5 image.
+    const land = new Uint8Array(25)
+    land[12] = 1
+    const distance = distanceToLand(land, 5, 5)
+    expect(distance[12]).toBe(0)
+    expect(distance[11]).toBe(1)
+    expect(distance[6]).toBeCloseTo(Math.SQRT2)
+    expect(distance[2]).toBe(2)
+    expect(distance[0]).toBeCloseTo(2 * Math.SQRT2)
+  })
+
+  it("is infinite everywhere without land", () => {
+    expect([...distanceToLand(new Uint8Array(4), 2, 2)]).toEqual([
+      Infinity,
+      Infinity,
+      Infinity,
+      Infinity,
+    ])
+  })
+})
+
+describe("fadeFromCoast", () => {
+  it("keeps the field near the coast, eases it out and drops it far off", () => {
+    const pixels = new Uint8ClampedArray(4 * 4).fill(200)
+    fadeFromCoast(pixels, Float32Array.from([0, 10, 20, 40]), 10, 30)
+    expect(pixels[3]).toBe(200)
+    expect(pixels[7]).toBe(200)
+    expect(pixels[11]).toBe(100)
+    expect(pixels[15]).toBe(0)
+  })
+})
+
+describe("fillGaps", () => {
+  it("fills empty cells from their neighbours, ring by ring", () => {
+    // A 3 × 1 strip with one value at the end.
+    expect(fillGaps([null, null, 2], 3, 1, 1)).toEqual([null, 2, 2])
+    expect(fillGaps([null, null, 2], 3, 1, 2)).toEqual([2, 2, 2])
+  })
+
+  it("averages the filled neighbours, and leaves an empty grid alone", () => {
+    expect(fillGaps([1, null, 3], 3, 1)).toEqual([1, 2, 3])
+    expect(fillGaps([null, null], 2, 1)).toEqual([null, null])
   })
 })

@@ -5,7 +5,7 @@
  */
 import type { MapKeySection } from "@/components/weather/MapKey"
 import type { ExpressionSpecification } from "maplibre-gl"
-import { useCallback, type ReactNode } from "react"
+import { Fragment, useCallback, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { LegendSwatch } from "@/components/LegendSwatch"
 import { MapLegend } from "@/components/weather/MapLegend"
@@ -390,16 +390,18 @@ export function useObservedLayers({
       />
     ) : null
 
-  const legends = (
-    <>
-      {rainTimeline}
-      {stationsOn && (
-        <TemperatureLegend title={t("stations.layer.legendTitleObserved")} className="w-60" />
-      )}
-      {airOn && airLegend(false)}
-      {seaOn && seaLegend(false, "w-60")}
-    </>
-  )
+  // One legend per layer that is on; the rain timeline is a control and goes apart.
+  const legends: ReactNode[] = []
+  if (stationsOn)
+    legends.push(
+      <TemperatureLegend
+        key="stations"
+        title={t("stations.layer.legendTitleObserved")}
+        className="w-60"
+      />,
+    )
+  if (airOn) legends.push(<Fragment key="air">{airLegend(false)}</Fragment>)
+  if (seaOn) legends.push(<Fragment key="sea">{seaLegend(false, "w-60")}</Fragment>)
 
   const airRampFor = useCallback(() => airRamp(airVariable), [airVariable])
 

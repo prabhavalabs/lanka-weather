@@ -194,6 +194,8 @@
   --map-label-strong: #262624;
   --map-label-halo: #f6f6f4;
   --map-water-label: #4a5a66;
+  /* The veil over the map around a selected area (features/map/FocusMask) */
+  --map-focus-veil: rgba(38, 38, 36, 0.42);
 }
 
 .dark {
@@ -352,4 +354,5 @@
   --map-label-strong: #c4c4c4;
   --map-label-halo: #0a0a0a;
   --map-water-label: #7a8d9b;
+  --map-focus-veil: rgba(0, 0, 0, 0.58);
 }

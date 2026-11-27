@@ -36,6 +36,8 @@ interface AppShellProps {
   detailSmall?: boolean
   /** Map legends, bottom left over the map (md and up). */
   legends?: React.ReactNode
+  /** Map controls beside the legends, e.g. the wind and rain timelines (md and up). */
+  controls?: React.ReactNode
   /** A short notice centred under the toolbar or the phone bar, e.g. "Zoom in to see GN divisions". */
   notice?: React.ReactNode
   /** Phones only: a control along the bottom of the map, e.g. the wind forecast time; hidden under an open sheet. */
@@ -59,6 +61,7 @@ export function AppShell({
   detailFull = false,
   detailSmall = false,
   legends,
+  controls,
   notice,
   timeline,
   className,
@@ -141,13 +144,14 @@ export function AppShell({
         </div>
       )}
 
-      {legends && (
+      {(legends || controls) && (
         <div
           className={cn(
             "pointer-events-none absolute bottom-3 left-[calc(var(--sidebar-w)+0.75rem)] z-10 hidden max-w-[calc(100%-var(--sidebar-w)-12rem)] flex-wrap items-end gap-3 md:flex",
             detail && "max-w-[calc(100%-var(--sidebar-w)-var(--detail-w)-4rem)]",
           )}
         >
+          {controls}
           {legends}
         </div>
       )}

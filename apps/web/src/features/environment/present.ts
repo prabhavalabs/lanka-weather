@@ -135,3 +135,115 @@ export function ringToPixels(
     ((top - mercatorY(lat)) / (top - bottom)) * height,
   ])
 }
+
+/**
+ * Each pixel's distance to the nearest land pixel, in pixels, by a two-pass
+ * chamfer transform (steps of 1 and √2): close to the true distance and
+ * linear in the image size. Infinity where the mask holds no land at all.
+ */
+export function distanceToLand(land: Uint8Array, width: number, height: number): Float32Array {
+  const distance = new Float32Array(width * height)
+  for (let index = 0; index < distance.length; index += 1) {
+    distance[index] = land[index] ? 0 : Infinity
+  }
+  const diagonal = Math.SQRT2
+  const at = (row: number, column: number) => row * width + column
+  for (let row = 0; row < height; row += 1) {
+    for (let column = 0; column < width; column += 1) {
+      const here = at(row, column)
+      let best = distance[here]!
+      if (column > 0) best = Math.min(best, distance[here - 1]! + 1)
+      if (row > 0) {
+        best = Math.min(best, distance[here - width]! + 1)
+        if (column > 0) best = Math.min(best, distance[here - width - 1]! + diagonal)
+        if (column < width - 1) best = Math.min(best, distance[here - width + 1]! + diagonal)
+      }
+      distance[here] = best
+    }
+  }
+  for (let row = height - 1; row >= 0; row -= 1) {
+    for (let column = width - 1; column >= 0; column -= 1) {
+      const here = at(row, column)
+      let best = distance[here]!
+      if (column < width - 1) best = Math.min(best, distance[here + 1]! + 1)
+      if (row < height - 1) {
+        best = Math.min(best, distance[here + width]! + 1)
+        if (column < width - 1) best = Math.min(best, distance[here + width + 1]! + diagonal)
+        if (column > 0) best = Math.min(best, distance[here + width - 1]! + diagonal)
+      }
+      distance[here] = best
+    }
+  }
+  return distance
+}
+
+/**
+ * Fades a painted field out with distance from the coast: whole within
+ * `inner` pixels of land, gone beyond `outer`, eased between. The sea field
+ * then reads as the water around the island, not as the box its grid fills.
+ */
+export function fadeFromCoast(
+  pixels: Uint8ClampedArray,
+  distance: Float32Array,
+  inner: number,
+  outer: number,
+) {
+  const span = Math.max(outer - inner, 1)
+  for (let index = 0; index < distance.length; index += 1) {
+    const away = distance[index]!
+    if (away <= inner) continue
+    const at = index * 4 + 3
+    if (away >= outer) {
+      pixels[at] = 0
+      continue
+    }
+    const t = (away - inner) / span
+    // Smoothstep, so the edge has no visible line.
+    pixels[at] = pixels[at]! * (1 - t * t * (3 - 2 * t))
+  }
+  return pixels
+}
+
+/**
+ * A grid with its empty cells filled from their filled neighbours, a ring at
+ * a time, up to `passes` rings deep. A wave model leaves the cells that touch
+ * the coast empty; filled, the sea field reaches the shore, where the land
+ * cut-out ends it, instead of stopping a cell out to sea.
+ */
+export function fillGaps(
+  values: readonly (number | null)[],
+  nx: number,
+  ny: number,
+  passes = 2,
+): (number | null)[] {
+  let current = [...values]
+  for (let pass = 0; pass < passes; pass += 1) {
+    const next = [...current]
+    let filled = false
+    for (let j = 0; j < ny; j += 1) {
+      for (let i = 0; i < nx; i += 1) {
+        if (current[j * nx + i] !== null) continue
+        let total = 0
+        let count = 0
+        for (let dj = -1; dj <= 1; dj += 1) {
+          for (let di = -1; di <= 1; di += 1) {
+            const x = i + di
+            const y = j + dj
+            if ((di === 0 && dj === 0) || x < 0 || y < 0 || x >= nx || y >= ny) continue
+            const value = current[y * nx + x]
+            if (value === null || value === undefined || !Number.isFinite(value)) continue
+            total += value
+            count += 1
+          }
+        }
+        if (count > 0) {
+          next[j * nx + i] = total / count
+          filled = true
+        }
+      }
+    }
+    current = next
+    if (!filled) break
+  }
+  return current
+}

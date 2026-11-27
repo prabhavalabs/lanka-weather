@@ -14,6 +14,31 @@ export const map = {
     map: "Map",
   },
   /** The hover chip by the pointer. */
+  /** The home place (features/home): saved in this browser only. */
+  home: {
+    goHome: "Go home: {name}",
+    unset: "Set a home place",
+    hint: "Open a place on the map, then choose the house in its panel to make it your home place.",
+    set: "Make {name} my home place",
+    isHome: "{name} is your home place. Remove it",
+    saved: "{name} is now your home place. The house button on the map brings you back here.",
+    removed: "Home place removed.",
+  },
+  /** The basemap's own detail, switched on and off in the sidebar. */
+  basemap: {
+    heading: "Base map",
+    places: { title: "Place names", description: "Cities, towns and villages" },
+    waterways: {
+      title: "Streams and water names",
+      description: "Streams and canals, and the names of seas and lakes",
+    },
+    roads: { title: "Roads and railways", description: "Roads, railways and airports" },
+    landcover: {
+      title: "Land cover",
+      description: "Forests, parks, built-up areas and buildings",
+    },
+    boundaries: { title: "Borders", description: "Country and province borders" },
+  },
   chip: {
     riverGauge: "River gauge",
     riverGaugeLevel: "{status} · {level}",

@@ -3,12 +3,13 @@ import "maplibre-gl/dist/maplibre-gl.css"
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url"
 import sinhalaFontUrl from "@fontsource-variable/noto-sans-sinhala/files/noto-sans-sinhala-sinhala-wght-normal.woff2?url"
 import tamilFontUrl from "@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2?url"
-import { HouseIcon } from "lucide-react"
+import { HouseIcon, MapIcon } from "lucide-react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { getLocale, translateIn, useLocale, useT, type Locale } from "@/lib/i18n"
 import { readTokens } from "@/lib/tokens"
-import { basemapTokens, labelFields, localisedLabel, tuneBasemap } from "./basemap"
+import { basemapTokens, groupedLayers, labelFields, localisedLabel, tuneBasemap } from "./basemap"
+import { getBasemapGroups, useBasemapGroups } from "./basemapGroups"
 import { mapStyles, minimumZoom, panLimit, sriLankaBounds, type MapTheme } from "./config"
 import { MapContext } from "./MapContext"
 
@@ -27,12 +28,16 @@ const scriptFonts = {
 }
 
 /**
- * Tunes each fetched basemap to the theme and language in effect. The `dark`
+ * Tunes each fetched basemap to the theme, language and basemap groups in effect. The `dark`
  * class is set before a theme change reaches React, so the tokens read here
  * already belong to the new theme.
  */
 const transformStyle: maplibregl.TransformStyleFunction = (_previous, next) =>
-  tuneBasemap(next, readTokens(basemapTokens), { locale: getLocale(), fonts: scriptFonts })
+  tuneBasemap(next, readTokens(basemapTokens), {
+    locale: getLocale(),
+    fonts: scriptFonts,
+    shown: getBasemapGroups(),
+  })
 
 /** MapLibre's own button labels, in a language. */
 function controlStrings(locale: Locale): Record<string, string> {
@@ -78,6 +83,11 @@ interface MapViewProps {
    * buttons. Without it the map fits Sri Lanka to the full map.
    */
   onResetView?: () => void
+  /**
+   * The house button over the reset one: goes to the home place, or says how
+   * to set one. Its label names the place when there is one.
+   */
+  home?: { label: string; onClick: () => void }
   /** Called with the map once its first style has loaded, and with null when it goes. */
   onReady?: (map: maplibregl.Map | null) => void
   /** Data layers; they read the map from MapContext. */
@@ -85,7 +95,7 @@ interface MapViewProps {
 }
 
 /** The base map of Sri Lanka. Data layers are rendered as children. */
-export function MapView({ theme, onReady, onResetView, children }: MapViewProps) {
+export function MapView({ theme, onReady, onResetView, home, children }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<maplibregl.Map | null>(null)
   const [resetSlot, setResetSlot] = useState<HTMLElement | null>(null)
@@ -162,6 +172,18 @@ export function MapView({ theme, onReady, onResetView, children }: MapViewProps)
     }
   }, [map, locale])
 
+  // Basemap groups switch on and off in place, as the language does.
+  const shownGroups = useBasemapGroups()
+  useEffect(() => {
+    if (!map) return
+    for (const { id, group } of groupedLayers(map.getStyle().layers)) {
+      const visibility = shownGroups.includes(group) ? "visible" : "none"
+      if (map.getLayoutProperty(id, "visibility") !== visibility) {
+        map.setLayoutProperty(id, "visibility", visibility)
+      }
+    }
+  }, [map, shownGroups])
+
   const t = useT()
   const loadedTheme = useRef(theme)
   useEffect(() => {
@@ -188,17 +210,29 @@ export function MapView({ theme, onReady, onResetView, children }: MapViewProps)
       {map &&
         resetSlot &&
         createPortal(
-          <button
-            type="button"
-            title={t("map.controls.resetView")}
-            aria-label={t("map.controls.resetView")}
-            onClick={() => {
-              if (onResetView) onResetView()
-              else map.fitBounds(sriLankaBounds, { padding: 24, bearing: 0, pitch: 0 })
-            }}
-          >
-            <HouseIcon aria-hidden="true" className="mx-auto block size-4 text-foreground" />
-          </button>,
+          <>
+            {home && (
+              <button
+                type="button"
+                title={home.label}
+                aria-label={home.label}
+                onClick={home.onClick}
+              >
+                <HouseIcon aria-hidden="true" className="mx-auto block size-4 text-foreground" />
+              </button>
+            )}
+            <button
+              type="button"
+              title={t("map.controls.resetView")}
+              aria-label={t("map.controls.resetView")}
+              onClick={() => {
+                if (onResetView) onResetView()
+                else map.fitBounds(sriLankaBounds, { padding: 24, bearing: 0, pitch: 0 })
+              }}
+            >
+              <MapIcon aria-hidden="true" className="mx-auto block size-4 text-foreground" />
+            </button>
+          </>,
           resetSlot,
         )}
       <MapContext.Provider value={map}>{children}</MapContext.Provider>

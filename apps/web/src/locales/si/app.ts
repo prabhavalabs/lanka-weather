@@ -123,7 +123,7 @@ export const app: Translation<typeof en> = {
     reservoir: "ජලාශය",
     reservoirMissing: "මෙම ජලාශය නවතම ජලාශ දත්තවල නැත.",
     reservoirsActive: "වාන් දමන හෝ ජලය මුදා හරින ජලාශ",
-    overview: "ශ්‍රී ලංකාව දැන්",
+    overview: "වත්මන් තත්ත්වය",
   },
   key: {
     riverRisk: "ගංගා අවදානම",

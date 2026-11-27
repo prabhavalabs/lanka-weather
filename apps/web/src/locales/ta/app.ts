@@ -125,7 +125,7 @@ export const app: Translation<typeof en> = {
     reservoir: "நீர்த்தேக்கம்",
     reservoirMissing: "இந்த நீர்த்தேக்கம் அண்மைய நீர்த்தேக்கத் தரவில் இல்லை.",
     reservoirsActive: "வான் பாயும் அல்லது நீர் வெளியேற்றும் நீர்த்தேக்கங்கள்",
-    overview: "இலங்கை இப்போது",
+    overview: "தற்போதைய நிலைமை",
   },
   key: {
     riverRisk: "ஆற்று அபாயம்",
